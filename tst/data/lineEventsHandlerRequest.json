@@ -1,0 +1,36 @@
+{
+    "version": "2.0",
+    "rawPath": "/",
+    "rawQueryString": "",
+    "headers": {
+        "content-length": "327",
+        "content-type": "application/json; charset=utf-8",
+        "host": "qy3pbbsc3cyabkyiytmaylxcti0sqxan.lambda-url.ap-northeast-1.on.aws",
+        "user-agent": "LineBotWebhook/2.0",
+        "x-amzn-tls-cipher-suite": "ECDHE-RSA-AES128-GCM-SHA256",
+        "x-amzn-tls-version": "TLSv1.2",
+        "x-amzn-trace-id": "Root=1-647572b0-40a718214efee35e4093d21d",
+        "x-forwarded-for": "147.92.149.167",
+        "x-forwarded-port": "443",
+        "x-forwarded-proto": "https",
+        "x-line-signature": "FVHoA/jErHKH8FB4j2s40tGXQ/yf5nYKRqRvcfT7JpE="
+    },
+    "requestContext": {
+        "accountId": "anonymous",
+        "requestId": "1395916b-235a-4aa5-946b-8412f484cfe4",
+        "apiId": "qy3pbbsc3cyabkyiytmaylxcti0sqxan",
+        "domainName": "qy3pbbsc3cyabkyiytmaylxcti0sqxan.lambda-url.ap-northeast-1.on.aws",
+        "domainPrefix": "qy3pbbsc3cyabkyiytmaylxcti0sqxan",
+        "time": "30/May/2023:03:51:12 +0000",
+        "timeEpoch": 1685418672040,
+        "http": {
+            "method": "POST",
+            "path": "/",
+            "protocol": "HTTP/1.1",
+            "sourceIp": "147.92.149.167",
+            "userAgent": "LineBotWebhook/2.0"
+        }
+    },
+    "body": "{\"destination\":\"Ueb37fe60d2febe8bdfe62d990cc28860\",\"events\":[{\"type\":\"follow\",\"webhookEventId\":\"01H1NCFZSJN1HAPFREM0193Y1Q\",\"deliveryContext\":{\"isRedelivery\":false},\"timestamp\":1685418671895,\"source\":{\"type\":\"user\",\"userId\":\"Ucc29292b212e271132cee980c58e94eb\"},\"replyToken\":\"36ffd31138354b2dbe94d1a7759fb9ab\",\"mode\":\"active\"}]}",
+    "isBase64Encoded": false
+}
