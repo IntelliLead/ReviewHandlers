@@ -1,12 +1,11 @@
-package ddbDao
+package enum
 
 type Table int
 
 const (
-    USER Table = iota
-    REVIEW
+    TableUser Table = iota
+    TableReview
 )
-
 
 func (t Table) String() string {
     return []string{"User", "Review"}[t]

@@ -5,7 +5,7 @@ import (
     "log"
 )
 
-func InitLogger() *zap.SugaredLogger {
+func NewLogger() *zap.SugaredLogger {
     logger, err := zap.NewDevelopment()
 
     // disable DEBUG level in prod
