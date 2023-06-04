@@ -13,6 +13,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
+    "time"
 )
 
 type ReviewDao struct {
@@ -71,6 +72,8 @@ const uniqueConditionExpression = "attribute_not_exists(userId) AND attribute_no
 
 // CreateReview creates a new review in DynamoDB
 func (d *ReviewDao) CreateReview(review model.Review) error {
+    // TODO: ValidateReview(review) or ValidateReview(&review)
+
     uniqueVendorReviewID := dbModel.NewUniqueVendorReviewIdRecord(review)
 
     av, err := dynamodbattribute.MarshalMap(review)
@@ -126,4 +129,82 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
     }
 
     return nil
+}
+
+type UpdateReviewInput struct {
+    UserId      string         `dynamodbav:"userId"`
+    ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
+    LastUpdated time.Time      `dynamodbav:"lastUpdated"`
+    LastReplied time.Time      `dynamodbav:"lastReplied"`
+    Reply       string         `dynamodbav:"reply"`
+}
+
+func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
+    av, err := dynamodbattribute.MarshalMap(input)
+    if err != nil {
+        return err
+    }
+
+    // Create the key for the UpdateItem request
+    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
+        "userId":   input.UserId,
+        "uniqueId": input.ReviewId,
+    })
+    if err != nil {
+        return err
+    }
+
+    // Execute the UpdateItem operation
+    _, err = d.client.UpdateItem(&dynamodb.UpdateItemInput{
+        TableName:                 aws.String(enum.TableReview.String()),
+        Key:                       key,
+        UpdateExpression:          aws.String("SET #lu = :lu, #lr = :lr, #rep = :rep"),
+        ExpressionAttributeNames:  map[string]*string{"#lu": aws.String("lastUpdated"), "#lr": aws.String("lastReplied"), "#rep": aws.String("reply")},
+        ExpressionAttributeValues: av,
+    })
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Review, error) {
+    // Create the key for the GetItem request
+    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
+        "userId":   userId,
+        "uniqueId": reviewId,
+    })
+    if err != nil {
+        return model.Review{}, err
+    }
+
+    result, err := d.client.GetItem(&dynamodb.GetItemInput{
+        TableName: aws.String(enum.TableReview.String()),
+        Key:       key,
+    })
+    if err != nil {
+        d.log.Debugf("GetReview failed for userId %s reviewId %s: %s", userId, reviewId, util.AnyToJson(err))
+
+        return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for userId %s reviewId %s with unknown error: ", userId, reviewId), err)
+    }
+
+    // Check if the item was found
+    if result.Item == nil || len(result.Item) == 0 {
+        return model.Review{}, exception.NewReviewDoesNotExistException(fmt.Sprintf("Review with userId '%s' reviewID '%s' not found", userId, reviewId))
+    }
+
+    // Unmarshal the item into a review object
+    review := &model.Review{}
+    err = dynamodbattribute.UnmarshalMap(result.Item, review)
+    if err != nil {
+        return model.Review{}, fmt.Errorf("failed to unmarshal Review, %v", err)
+    }
+
+    err = model.ValidateReview(review)
+    if err != nil {
+        return model.Review{}, fmt.Errorf("invalid review fetched: %v", err)
+    }
+
+    return *review, nil
 }

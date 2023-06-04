@@ -12,22 +12,22 @@ import (
     "strings"
 )
 
-type LineUtil struct {
+type Line struct {
     lineClient *linebot.Client
-    logger     *zap.SugaredLogger
+    log        *zap.SugaredLogger
 }
 
-func NewLineUtil(logger *zap.SugaredLogger) *LineUtil {
-    return &LineUtil{
+func NewLine(logger *zap.SugaredLogger) *Line {
+    return &Line{
         lineClient: newLineClient(logger),
-        logger:     logger,
+        log:        logger,
     }
 }
 
-func (l *LineUtil) SendNewReview(review model.Review) error {
+func (l *Line) SendNewReview(review model.Review) error {
     readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
-        l.logger.Error("Error converting review timestamp to readable format: ", err)
+        l.log.Error("Error converting review timestamp to readable format: ", err)
         return err
     }
     // send message with quick reply options
@@ -45,37 +45,28 @@ func (l *LineUtil) SendNewReview(review model.Review) error {
 
     resp, err := l.lineClient.PushMessage(review.UserId, message).Do()
     if err != nil {
-        l.logger.Error("Error sending message to line: ", err)
+        l.log.Error("Error sending message to line: ", err)
         return err
     }
 
-    l.logger.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", review.UserId, util.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", review.UserId, util.AnyToJson(resp))
     return nil
 }
 
-func (l *LineUtil) SendQuickReply(replyToken string) (*linebot.BasicResponse, error) {
-    message := linebot.NewTextMessage("").WithQuickReplies(linebot.NewQuickReplyItems(
-        // label` must not be longer than 20 characters
-        linebot.NewQuickReplyButton(
-            "",
-            linebot.NewMessageAction("NewMsgActionLabel", "NewMessageActionText"),
-        ),
-        linebot.NewQuickReplyButton(
-            "",
-            linebot.NewURIAction("NewURIActionLabel", "https://google.com"),
-        ),
-        linebot.NewQuickReplyButton(
-            "",
-            linebot.NewPostbackAction("NewPostBkActionLabel", "action=buy&itemid=111", "", "displayText", linebot.InputOptionOpenKeyboard, "---\nName: \nPhone: \nBirthday: \n---"),
-        ),
-    ))
+func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string) (*linebot.BasicResponse, error) {
+    var text string
+    if succeeded {
+        text = fmt.Sprintf("已回復 %s 的評論。感謝使用智引力！", reviewerName)
+    } else {
+        text = fmt.Sprintf("回復 %s 的評論失敗，請稍後再試。抱歉為您造成不便。", reviewerName)
+    }
 
-    return l.lineClient.ReplyMessage(replyToken, message).Do()
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }
 
-func (l *LineUtil) ParseRequest(request *events.LambdaFunctionURLRequest) ([]*linebot.Event, error) {
+func (l *Line) ParseRequest(request *events.LambdaFunctionURLRequest) ([]*linebot.Event, error) {
     httpRequest := convertToHttpRequest(request)
-    l.logger.Debug("wrapped HTTP request is: ", request)
+    l.log.Debug("wrapped HTTP request is: ", request)
 
     return l.lineClient.ParseRequest(httpRequest)
 }
@@ -94,13 +85,13 @@ func convertToHttpRequest(request *events.LambdaFunctionURLRequest) *http.Reques
     }
 }
 
-func newLineClient(logger *zap.SugaredLogger) *linebot.Client {
+func newLineClient(log *zap.SugaredLogger) *linebot.Client {
     // Create a new LINE Bot client
-    channelSecret := "a6064245795375fee1fb9cc2e4711447"
-    channelAccessToken := "0PWI55x6HFQ1WfHOBTddspgVTpTbFtFmy9ImN7NuYqScSz0mTFjYDqb9dA8TeRaUHNCrAWJ0x6yv4iJiMNrki4ZuYS4UhntFFtKma5tocBpgMcnD8+Kg0cTz3yoghq24QKmKp7R7OfoaTn4i/m7Y1AdB04t89/1O/w1cDnyilFU="
+    channelSecret := "aa8c492c6295d7e3857fca4b41f49604"
+    channelAccessToken := "AqTNC1x18DT0/e1rkVUEnigmwyyHj4cPa+TbX1ECE5NVfzeB7OPLUsQjRkXrbCzBp7etk9Skni4/8NZW9dBR6eDbeKTA+4CNFOtHEF5sHp+1nXDJ2dzQnuf/NV0vuqMju7iznWvpLaSGKbRonLs6FgdB04t89/1O/w1cDnyilFU="
     lineClient, err := linebot.New(channelSecret, channelAccessToken)
     if err != nil {
-        logger.Fatal("cannot create new Line Client", err)
+        log.Fatal("cannot create new Line Client", err)
     }
 
     return lineClient

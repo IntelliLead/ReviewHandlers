@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/service/dynamodb"
@@ -31,18 +32,23 @@ func NewUserDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *UserDao {
 // 1. user already exist UserAlreadyExistException
 // 2. aws error
 func (d *UserDao) CreateUser(user model.User) error {
+    d.log.Debug("Putting user in DDB if not exist: ", user)
+
     av, err := userMarshalMap(user)
     if err != nil {
         return err
     }
 
     // Execute the PutItem operation
+    d.log.Debug("Executing PutItem operation in DDB")
     _, err = d.client.PutItem(&dynamodb.PutItemInput{
         TableName:           aws.String(enum.TableUser.String()),
         Item:                av,
         ConditionExpression: aws.String("attribute_not_exists(userId)"), // User table has composite key, so does not enforce unique userId by default
     })
     if err != nil {
+        d.log.Debug("Error putting user in DDB: ", util.AnyToJson(err))
+
         if awsErr, ok := err.(awserr.Error); ok {
             if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
                 return exception.NewUserAlreadyExistException(fmt.Sprintf("User with userID %s already exists", user.UserID), err)

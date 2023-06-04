@@ -17,4 +17,6 @@ type ZapierNewReviewEvent struct {
     UserId               string             `json:"userId"`
     LastReplied          *time.Time         `json:"lastReplied" validate:"required_with=Reply"` // optional
     Reply                *string            `json:"reply" validate:"required_with=LastReplied"` // optional
+    // TODO: remove https://linear.app/vest/issue/INT-23/each-zapier-webhook-url-is-unique-to-the-user
+    ZapierReplyWebhook string `dynamodbav:"zapierReplyWebhook" validate:"url"`
 }

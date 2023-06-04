@@ -8,12 +8,13 @@ import (
 )
 
 type User struct {
-    UserID           string                `dynamodbav:"userId"`    // partition key
-    CreatedAt        time.Time             `dynamodbav:"createdAt"` // sort key
-    LineID           *string               `dynamodbav:"lineId"`
-    SubscriptionTier enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
-    ExpireAt         *time.Time            `dynamodbav:"expireAt"`
-    LastUpdated      time.Time             `dynamodbav:"lastUpdated"`
+    UserID             string                `dynamodbav:"userId"`    // partition key
+    CreatedAt          time.Time             `dynamodbav:"createdAt"` // sort key
+    LineID             *string               `dynamodbav:"lineId,omitempty"`
+    ZapierReplyWebhook *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
+    SubscriptionTier   enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
+    ExpireAt           *time.Time            `dynamodbav:"expireAt,omitempty"`
+    LastUpdated        time.Time             `dynamodbav:"lastUpdated"`
 }
 
 func NewUser(lineUserId string, createdAt time.Time) User {

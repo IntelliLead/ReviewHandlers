@@ -9,9 +9,8 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go/aws"
@@ -19,7 +18,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
-    "os"
+    "time"
 )
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -27,7 +26,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Info("Received new request: ", util.AnyToJson(request))
 
+    // --------------------
     // Check if the request is a health check call
+    // --------------------
     isHealthCheckCall, err := handleHealthCheckCall(request, log)
     if err != nil {
         log.Error("Error handling health check call:", err)
@@ -44,58 +45,172 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, nil
     }
 
+    // --------------------
     // initialize resources
+    // --------------------
     // DDB
     mySession := session.Must(session.NewSession())
-    dao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
 
     // LINE
-    line := lineUtil.NewLineUtil(log)
+    line := lineUtil.NewLine(log)
 
     // parse message to LINE events
     var lineEvents []*linebot.Event
-    if os.Getenv("Stage") == enum.StageLocal.String() {
-        // DEBUG: test event
-        lineEvents = lineEventsHandlerTestEvents.TestFollowEvent
-    } else {
-        err = nil
-        lineEvents, err = line.ParseRequest(&request)
-        if err != nil {
-            // Log and return an error response
-            log.Error("Error parsing Line Event request:", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 400,
-                Body:       fmt.Sprintf(`{"error": "Failed to parse request: %s"}`, err),
-            }, nil
-        }
+    // TODO: handle local differently if needed
+    // if os.Getenv("Stage") == enum.StageLocal.String() {
+    //     log.Debug("Running in local environment. Skipping LINE event parser")
+    //     lineEvents = lineEventsHandlerTestEvents.TestReplyEvent
+    // } else {
+    err = nil
+    lineEvents, err = line.ParseRequest(&request)
+    if err != nil {
+        // Log and return an error response
+        log.Error("Error parsing Line Event request:", err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 400,
+            Body:       fmt.Sprintf(`{"error": "Failed to parse request: %s"}`, err),
+        }, nil
     }
+    // }
     log.Infof("Received %d LINE events: ", len(lineEvents))
 
+    // --------------------
     // process LINE events
+    // --------------------
     for _, event := range lineEvents {
         log.Infof("Processing event: %s\n", util.AnyToJson(event))
 
+        userId := event.Source.UserID
+
         switch event.Type {
         case linebot.EventTypeMessage:
-            // TODO: revise quick reply
-            // DEBUG: test handle
-            response, err := line.SendQuickReply(event.ReplyToken)
+            // validate is review reply message
+            // --------------------------------
+
+            isTextMsgFromUser, err := lineUtil.IsTextMessageFromUser(event)
             if err != nil {
-                log.Error("Error sending message:", err)
+                log.Error("Error checking if event is text message from user:", err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to send message: %s"}`, err),
+                    Body:       fmt.Sprintf(`{"error": "Failed to check if event is text message from user: %s"}`, err),
                 }, nil
             }
-            log.Debug("Response:", response)
+            if isTextMsgFromUser {
+                textMessage := event.Message.(*linebot.TextMessage)
+
+                // check if message contain emoji
+                emojis := textMessage.Emojis
+                if len(emojis) > 0 {
+                    // TODO: Reply user: reply emojis not yet supported
+
+                    return events.LambdaFunctionURLResponse{
+                        StatusCode: 200,
+                        Body:       `{"message": "Emoji not yet supported"}`,
+                    }, nil
+                }
+
+                message := textMessage.Text
+                log.Infof("Received text message from user '%s': %s", userId, message)
+
+                if lineUtil.IsReviewReplyMessage(message) {
+                    replyMessage, err := lineUtil.ParseReplyMessage(message)
+                    if err != nil {
+                        log.Error("Error parsing reply message:", err)
+                    }
+
+                    // fetch review from DDB
+                    // --------------------
+                    review, err := reviewDao.GetReview(userId, replyMessage.ReviewId)
+                    if err != nil {
+                        log.Errorf("Error getting review for review reply %s from user '%s': %v", replyMessage, userId, err)
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
+                        }, nil
+                    }
+
+                    log.Debug("Got Review:", util.AnyToJson(review))
+
+                    // post reply to zapier
+                    // --------------------
+                    zapier := zapierUtil.NewZapier(log)
+                    zapierEvent := zapierUtil.ReplyToZapierEvent{
+                        VendorReviewId: review.VendorReviewId,
+                        Message:        replyMessage.Message,
+                    }
+
+                    err = zapier.SendReplyEvent(review.ZapierReplyWebhook, zapierEvent)
+                    if err != nil {
+                        log.Errorf("Error sending reply event to Zapier for review %s from user '%s': %v", replyMessage, userId, err)
+
+                        _, err = line.NotifyUserReplyProcessed(event.ReplyToken, false, review.ReviewerName)
+                        if err != nil {
+                            log.Errorf("Error notifying reply failure for user '%s' for review '%s' with ID '%s': %v",
+                                userId, util.AnyToJson(replyMessage), review.ReviewId.String(), err)
+                            return events.LambdaFunctionURLResponse{
+                                StatusCode: 500,
+                                Body:       fmt.Sprintf(`{"error": "Failed to notify reply failure for user '%s' : %v"}`, userId, err),
+                            }, err
+                        }
+
+                        log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was NOT processed",
+                            userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Failed to send reply event to Zapier: %s"}`, err),
+                        }, nil
+                    }
+
+                    log.Infof("Sent reply event '%s' to Zapier from user '%s'", util.AnyToJson(zapierEvent), userId)
+
+                    // reply LINE message
+                    // --------------------
+                    _, err = line.NotifyUserReplyProcessed(event.ReplyToken, true, review.ReviewerName)
+                    if err != nil {
+                        log.Errorf("Error notifying user '%s' for review '%s' with ID '%s': %v",
+                            userId, util.AnyToJson(replyMessage), review.ReviewId.String(), err)
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Failed to notify user '%s' : %v"}`, userId, err),
+                        }, err
+                    }
+
+                    log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was processed",
+                        userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+
+                    // update DDB
+                    // --------------------
+                    err = reviewDao.UpdateReview(ddbDao.UpdateReviewInput{
+                        UserId:      userId,
+                        ReviewId:    *review.ReviewId,
+                        LastUpdated: time.Now(),
+                        LastReplied: time.Now(),
+                        Reply:       replyMessage.Message,
+                    })
+                    if err != nil {
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Failed to update review DB record: %s"}`, err),
+                        }, err
+                    }
+
+                    log.Infof("Completed handling review reply event for user ID '%s', reply '%s' for review ID '%s'",
+                        userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+                }
+
+                // TODO: handle other type of messages such as help, etc.
+            }
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
-            log.Info("Follow event User ID", event.Source)
+            log.Info("Follow event source: ", util.AnyToJson(event.Source))
 
             // if not exists, create new user in DB
             user := model.NewUser(event.Source.UserID, event.Timestamp)
-            err := dao.CreateUser(user)
+            err := userDao.CreateUser(user)
             if err != nil {
                 if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
                     log.Info("User already exists. No action taken on Follow event:", userAlreadyExistErr.Error())

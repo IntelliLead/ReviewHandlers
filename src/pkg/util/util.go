@@ -6,9 +6,13 @@ import (
 )
 
 func AnyToJson(obj any) string {
+    return string(AnyToJsonObject(obj))
+}
+
+func AnyToJsonObject(obj any) []byte {
     // Convert the Person object to JSON
     jsonData, _ := json.Marshal(obj)
-    return string(jsonData)
+    return jsonData
 }
 
 func UtcToReadableTwTimestamp(timestamp time.Time) (string, error) {

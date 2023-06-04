@@ -2,6 +2,7 @@ package _type
 
 import (
     "fmt"
+    "github.com/go-playground/validator/v10"
     "strconv"
 )
 
@@ -84,4 +85,49 @@ func (id ReviewId) GetPrevious() ReviewId {
 
     println("DEBUG: new ascii code str: ", numeric[:len(numeric)-3]+fmt.Sprintf("%03s", strconv.Itoa(newLastAsciiCode)))
     return ReviewId(numeric[:len(numeric)-3] + fmt.Sprintf("%03s", strconv.Itoa(newLastAsciiCode)))
+}
+
+func ReviewIdPtrValidation(fl validator.FieldLevel) bool {
+    reviewId := fl.Field().Interface().(*ReviewId)
+
+    // Check if ReviewId is nil
+    if reviewId == nil {
+        return true
+    }
+
+    // Check if ReviewId is a numbers-only string
+    if !isNumbersOnly(string(*reviewId)) {
+        return false
+    }
+
+    // Check if ReviewId length is divisible by 3
+    if len(*reviewId)%3 != 0 {
+        return false
+    }
+
+    return true
+}
+func ReviewIdValidation(fl validator.FieldLevel) bool {
+    reviewId := fl.Field().Interface().(ReviewId)
+
+    // Check if ReviewId is a numbers-only string
+    if !isNumbersOnly(string(reviewId)) {
+        return false
+    }
+
+    // Check if ReviewId length is divisible by 3
+    if len(reviewId)%3 != 0 {
+        return false
+    }
+
+    return true
+}
+
+func isNumbersOnly(s string) bool {
+    for _, c := range s {
+        if c < '0' || c > '9' {
+            return false
+        }
+    }
+    return true
 }

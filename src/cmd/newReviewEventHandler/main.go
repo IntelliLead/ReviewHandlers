@@ -102,7 +102,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     // forward to LINE by calling LINE messaging API
     // --------------------------------
-    line := lineUtil.NewLineUtil(log)
+    line := lineUtil.NewLine(log)
     // DEBUG: revert to prev ReviewId
     reviewId := _type.NewReviewId("0")
     review.ReviewId = &reviewId
