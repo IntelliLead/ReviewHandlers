@@ -8,7 +8,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -103,10 +102,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // forward to LINE by calling LINE messaging API
     // --------------------------------
     line := lineUtil.NewLine(log)
-    // DEBUG: revert to prev ReviewId
-    reviewId := _type.NewReviewId("0")
-    review.ReviewId = &reviewId
-
+    
     err = line.SendNewReview(review)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, util.AnyToJson(err))
