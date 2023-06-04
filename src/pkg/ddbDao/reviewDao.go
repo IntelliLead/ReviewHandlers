@@ -68,11 +68,13 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
     return (*review.ReviewId).GetNext(), nil
 }
 
-const uniqueConditionExpression = "attribute_not_exists(userId) AND attribute_not_exists(sortKey)"
-
 // CreateReview creates a new review in DynamoDB
 func (d *ReviewDao) CreateReview(review model.Review) error {
-    // TODO: ValidateReview(review) or ValidateReview(&review)
+    err := model.ValidateReview(&review)
+    if err != nil {
+        d.log.Error("CreateReview failed due to invalid review: ", util.AnyToJson(review))
+        return err
+    }
 
     uniqueVendorReviewID := dbModel.NewUniqueVendorReviewIdRecord(review)
 
@@ -92,14 +94,14 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
                 Put: &dynamodb.Put{
                     TableName:           aws.String(enum.TableReview.String()),
                     Item:                av,
-                    ConditionExpression: aws.String(uniqueConditionExpression),
+                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
                 },
             },
             {
                 Put: &dynamodb.Put{
                     TableName:           aws.String(enum.TableReview.String()),
                     Item:                uniqueAv,
-                    ConditionExpression: aws.String(uniqueConditionExpression),
+                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
                 },
             },
         },

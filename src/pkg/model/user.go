@@ -8,8 +8,8 @@ import (
 )
 
 type User struct {
-    UserID             string                `dynamodbav:"userId"`    // partition key
-    CreatedAt          time.Time             `dynamodbav:"createdAt"` // sort key
+    UserID             string                `dynamodbav:"userId"` // partition key
+    CreatedAt          time.Time             `dynamodbav:"createdAt"`
     LineID             *string               `dynamodbav:"lineId,omitempty"`
     ZapierReplyWebhook *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
     SubscriptionTier   enum.SubscriptionTier `dynamodbav:"subscriptionTier"`

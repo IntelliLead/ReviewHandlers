@@ -5,7 +5,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/service/dynamodb"
@@ -41,13 +40,14 @@ func (d *UserDao) CreateUser(user model.User) error {
 
     // Execute the PutItem operation
     d.log.Debug("Executing PutItem operation in DDB")
+
     _, err = d.client.PutItem(&dynamodb.PutItemInput{
         TableName:           aws.String(enum.TableUser.String()),
         Item:                av,
-        ConditionExpression: aws.String("attribute_not_exists(userId)"), // User table has composite key, so does not enforce unique userId by default
+        ConditionExpression: aws.String(KeyNotExistsConditionExpression),
     })
     if err != nil {
-        d.log.Debug("Error putting user in DDB: ", util.AnyToJson(err))
+        d.log.Debug("Error putting user in DDB: ", err)
 
         if awsErr, ok := err.(awserr.Error); ok {
             if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
@@ -69,10 +69,11 @@ func (d *UserDao) IsUserExist(userId string) (bool, error) {
     // Define the key condition expression for the query
     expr, err := expression.NewBuilder().WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).Build()
     if err != nil {
-        d.log.Error("Unable to produce key condition expression with userId %s: ", userId, err)
+        d.log.Errorf("Unable to produce key condition expression in IsUserExist with userId %s: %v", userId, err)
         return false, err
     }
 
+    // TODO: [INT-31] use GetItem instead to improve performance and reduce cost
     // Execute the query
     result, err := d.client.Query(&dynamodb.QueryInput{
         TableName:                 aws.String(enum.TableUser.String()),
@@ -113,6 +114,14 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
             N: aws.String(strconv.FormatInt(user.ExpireAt.UnixNano(), 10)),
         }
     }
+
+    // add sort key
+    // (sort key appears already added somehow, just mistakenly as 'N' type)
+    av["uniqueId"] = &dynamodb.AttributeValue{
+        S: aws.String("#"),
+    }
+
+    // logger.NewLogger().Debug("userMarshalMap after uniqueId add: ", av)
 
     return av, nil
 }
