@@ -31,7 +31,7 @@ func (l *Line) SendNewReview(review model.Review) error {
         return err
     }
     // send message with quick reply options
-    reviewMessage := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n評論者：%s\n評論時間：%s\n",
+    reviewMessage := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評論者：%s\n評論時間：%s\n",
         review.ReviewId.String(), review.Review, review.ReviewerName, readableReviewTimestamp)
 
     message := linebot.NewTextMessage(reviewMessage).WithQuickReplies(linebot.NewQuickReplyItems(

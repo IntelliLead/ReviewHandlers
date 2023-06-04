@@ -39,6 +39,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error when parsing request body"}`, StatusCode: 400}, nil
     }
 
+    // Google may translate Mandarin to English. Remove the translation
+    removeGoogleTranslate(&event)
+
     reviewPtr, err := model.NewReview(event)
     if err != nil {
         log.Error("Validation error during mapping to Review object: ", err)
@@ -102,7 +105,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // forward to LINE by calling LINE messaging API
     // --------------------------------
     line := lineUtil.NewLine(log)
-    
+
     err = line.SendNewReview(review)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, util.AnyToJson(err))
@@ -113,6 +116,15 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     log.Info("Successfully processed new review event: ", review)
 
     return events.LambdaFunctionURLResponse{Body: `{"message": "OK"}`, StatusCode: 200}, nil
+}
+
+func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
+    text := event.Review
+
+    originalLine, translationFound := util.ExtractOriginalFromGoogleTranslate(text)
+    if translationFound {
+        event.Review = originalLine
+    }
 }
 
 func main() {
