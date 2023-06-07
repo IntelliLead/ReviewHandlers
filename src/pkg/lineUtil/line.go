@@ -31,8 +31,8 @@ func (l *Line) SendNewReview(review model.Review) error {
         return err
     }
     // send message with quick reply options
-    reviewMessage := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評論者：%s\n評論時間：%s\n",
-        review.ReviewId.String(), review.Review, review.ReviewerName, readableReviewTimestamp)
+    reviewMessage := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評價：%s\n評論者：%s\n評論時間：%s\n",
+        review.ReviewId.String(), review.Review, review.NumberRating.String(), review.ReviewerName, readableReviewTimestamp)
 
     message := linebot.NewTextMessage(reviewMessage).WithQuickReplies(linebot.NewQuickReplyItems(
         // label` must not be longer than 20 characters
@@ -56,7 +56,7 @@ func (l *Line) SendNewReview(review model.Review) error {
 func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string) (*linebot.BasicResponse, error) {
     var text string
     if succeeded {
-        text = fmt.Sprintf("已回復 %s 的評論。感謝使用智引力。", reviewerName)
+        text = fmt.Sprintf("已回復 %s 的評論。感謝您使用智引力。", reviewerName)
     } else {
         text = fmt.Sprintf("回復 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
     }
