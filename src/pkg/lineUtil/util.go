@@ -15,6 +15,22 @@ func IsReviewReplyMessage(message string) bool {
     return strings.HasPrefix(message, "@")
 }
 
+func IsHelpMessage(message string) bool {
+    return isCommand(message, "/help") || isCommand(message, "/h ") || isCommand(message, "/幫助")
+}
+
+func isCommand(s string, cmd string) bool {
+    if strings.HasPrefix(s, cmd) {
+        remaining := strings.TrimPrefix(s, cmd)
+
+        if remaining == "" || strings.TrimSpace(remaining) == "" || strings.HasPrefix(remaining, " ") {
+            return true
+        }
+    }
+
+    return false
+}
+
 func ParseReplyMessage(str string) (model.ReplyMessage, error) {
     if !strings.HasPrefix(str, "@") {
         return model.ReplyMessage{}, fmt.Errorf("message is not a reply message: %s", str)
@@ -56,7 +72,16 @@ func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     return data.Message.Type, nil
 }
 
-func IsTextMessageFromUser(event *linebot.Event) (bool, error) {
+func IsMessageFromUser(event *linebot.Event) bool {
+    if event.Type != linebot.EventTypeMessage {
+        // not even message event
+        return false
+    }
+
+    return event.Source.Type == linebot.EventSourceTypeUser
+}
+
+func IsTextMessage(event *linebot.Event) (bool, error) {
     if event.Type != linebot.EventTypeMessage {
         // not even message event
         return false, nil
@@ -66,7 +91,7 @@ func IsTextMessageFromUser(event *linebot.Event) (bool, error) {
     if err != nil {
         return false, err
     }
-    return event.Source.Type == linebot.EventSourceTypeUser && messageType == linebot.MessageTypeText, nil
+    return messageType == linebot.MessageTypeText, nil
 }
 
 type message struct {

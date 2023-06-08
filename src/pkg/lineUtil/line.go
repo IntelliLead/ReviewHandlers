@@ -24,6 +24,27 @@ func NewLine(logger *zap.SugaredLogger) *Line {
     }
 }
 
+func (l *Line) SendUnknownResponseReply(replyToken string) error {
+    reviewMessage := fmt.Sprintf("對不起，我還不會處理您的訊息。如需幫助，請回復\"/help\"")
+
+    message := linebot.NewTextMessage(reviewMessage).WithQuickReplies(linebot.NewQuickReplyItems(
+        // label` must not be longer than 20 characters
+        linebot.NewQuickReplyButton(
+            "",
+            linebot.NewMessageAction("幫助", "/help"),
+        ),
+    ))
+
+    resp, err := l.lineClient.ReplyMessage(replyToken, message).Do()
+    if err != nil {
+        l.log.Error("Error sending message to line: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in SendUnknownResponseReply: %s", util.AnyToJson(resp))
+    return nil
+}
+
 func (l *Line) SendNewReview(review model.Review) error {
     readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
@@ -59,6 +80,30 @@ func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, revie
         text = fmt.Sprintf("已回復 %s 的評論。感謝您使用智引力。", reviewerName)
     } else {
         text = fmt.Sprintf("回復 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+    }
+
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+}
+
+func (l *Line) ReplyHelpMessage(replyToken string) (*linebot.BasicResponse, error) {
+    text := fmt.Sprint("本服務目前僅用於回復Google Maps 評論。\n" +
+        "回復最新評論：使用評論訊息下方\"快速回復\"按鈕即可編輯回復內容。\n\n" +
+        "若需回復非最新評論：評論皆有編號，請在回復時以 @編號 作為開頭。例如，如果評論編號為\"@8F\"，則回復\"@8F 感謝您的認可！\"\n\n" +
+        "若需更新回復內容：以 @編號 作為開頭照常回復即可。\n\n" +
+        "新評論2分鐘內會推送到這裡。新星評（無評價內容）不會被推送。\n" +
+        "評論者更新自己的已留評論不會被推送。\n\n" +
+        "如需更多幫助，請聯係我們：")
+    text = text + "https://line.me/R/ti/p/%40006xnyvp"
+
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+
+}
+func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {
+    var text string
+    if succeeded {
+        text = fmt.Sprintf("已回復 %s 的評論。感謝您使用智引力。", reviewerName)
+    } else {
+        text = fmt.Sprintf("回復 %s 的評論失敗。%s", reviewerName, reason)
     }
 
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
