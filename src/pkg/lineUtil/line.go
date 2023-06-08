@@ -51,22 +51,36 @@ func (l *Line) SendNewReview(review model.Review) error {
         l.log.Error("Error converting review timestamp to readable format: ", err)
         return err
     }
-    // send message with quick reply options
-    reviewMessage := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評價：%s\n評論者：%s\n評論時間：%s\n",
-        review.ReviewId.String(), review.Review, review.NumberRating.String(), review.ReviewerName, readableReviewTimestamp)
 
-    message := linebot.NewTextMessage(reviewMessage).WithQuickReplies(linebot.NewQuickReplyItems(
-        // label` must not be longer than 20 characters
-        linebot.NewQuickReplyButton(
-            "",
-            linebot.NewPostbackAction("快速回復", "any", "", "", linebot.InputOptionOpenKeyboard, fmt.Sprintf("@%s 感謝…", review.ReviewId.String())),
-        ),
-    ))
-    message.AddEmoji(linebot.NewEmoji(0, "5ac2280f031a6752fb806d65", "001"))
+    isEmptyReview := review.Review == ""
 
-    resp, err := l.lineClient.PushMessage(review.UserId, message).Do()
+    var reviewMessage string
+    if isEmptyReview {
+        reviewMessage = "（星評無內容）"
+    } else {
+        reviewMessage = review.Review
+    }
+
+    msg := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評價：%s\n評論者：%s\n評論時間：%s\n",
+        review.ReviewId.String(), reviewMessage, review.NumberRating.String(), review.ReviewerName, readableReviewTimestamp)
+
+    lineTextMessage := linebot.NewTextMessage(msg)
+
+    if !isEmptyReview {
+        lineTextMessage.WithQuickReplies(linebot.NewQuickReplyItems(
+            // label` must not be longer than 20 characters
+            linebot.NewQuickReplyButton(
+                "",
+                linebot.NewPostbackAction("快速回復", "any", "", "", linebot.InputOptionOpenKeyboard, fmt.Sprintf("@%s 感謝…", review.ReviewId.String())),
+            ),
+        ))
+    }
+
+    lineTextMessage.AddEmoji(linebot.NewEmoji(0, "5ac2280f031a6752fb806d65", "001"))
+
+    resp, err := l.lineClient.PushMessage(review.UserId, lineTextMessage).Do()
     if err != nil {
-        l.log.Error("Error sending message to line: ", err)
+        l.log.Error("Error sending lineTextMessage to line: ", err)
         return err
     }
 

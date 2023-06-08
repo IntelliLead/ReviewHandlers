@@ -104,20 +104,15 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     // forward to LINE by calling LINE messaging API
     // --------------------------------
-    // check review not empty
-    if review.Review != "" {
-        line := lineUtil.NewLine(log)
+    line := lineUtil.NewLine(log)
 
-        err = line.SendNewReview(review)
-        if err != nil {
-            log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, util.AnyToJson(err))
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
-        }
-
-        log.Debugf("Successfully sent new review to LINE user '%s': %v", review.UserId, util.AnyToJson(review))
-    } else {
-        log.Debugf("Review is empty, not sending to LINE user '%s': %v", review.UserId, util.AnyToJson(review))
+    err = line.SendNewReview(review)
+    if err != nil {
+        log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, util.AnyToJson(err))
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
+
+    log.Debugf("Successfully sent new review to LINE user '%s': %v", review.UserId, util.AnyToJson(review))
 
     // --------------------
     log.Info("Successfully processed new review event: ", util.AnyToJson(review))
