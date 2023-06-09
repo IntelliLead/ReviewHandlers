@@ -66,15 +66,13 @@ func (l *Line) SendNewReview(review model.Review) error {
 
     lineTextMessage := linebot.NewTextMessage(msg)
 
-    if !isEmptyReview {
-        lineTextMessage.WithQuickReplies(linebot.NewQuickReplyItems(
-            // label` must not be longer than 20 characters
-            linebot.NewQuickReplyButton(
-                "",
-                linebot.NewPostbackAction("快速回復", "any", "", "", linebot.InputOptionOpenKeyboard, fmt.Sprintf("@%s 感謝…", review.ReviewId.String())),
-            ),
-        ))
-    }
+    lineTextMessage.WithQuickReplies(linebot.NewQuickReplyItems(
+        // label` must not be longer than 20 characters
+        linebot.NewQuickReplyButton(
+            "",
+            linebot.NewPostbackAction("快速回復", "any", "", "", linebot.InputOptionOpenKeyboard, fmt.Sprintf("@%s 感謝…", review.ReviewId.String())),
+        ),
+    ))
 
     lineTextMessage.AddEmoji(linebot.NewEmoji(0, "5ac2280f031a6752fb806d65", "001"))
 
@@ -100,18 +98,9 @@ func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, revie
 }
 
 func (l *Line) ReplyHelpMessage(replyToken string) (*linebot.BasicResponse, error) {
-    text := fmt.Sprint("本服務目前僅用於回復Google Maps 評論。\n" +
-        "回復最新評論：使用評論訊息下方\"快速回復\"按鈕即可編輯回復內容。\n\n" +
-        "若需回復非最新評論：評論皆有編號，請在回復時以 @編號 作為開頭。例如，如果評論編號為\"@8F\"，則回復\"@8F 感謝您的認可！\"\n\n" +
-        "若需更新回復內容：以 @編號 作為開頭照常回復即可。\n\n" +
-        "新評論2分鐘內會推送到這裡。新星評（無評價內容）不會被推送。\n" +
-        "評論者更新自己的已留評論不會被推送。\n\n" +
-        "如需更多幫助，請聯係我們：")
-    text = text + "https://line.me/R/ti/p/%40006xnyvp"
-
-    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
-
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(util.HelpMessage())).Do()
 }
+
 func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {
     var text string
     if succeeded {
