@@ -44,7 +44,6 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
     msg1 := "New user followed IntelliLead App LINE Official Account at " + readableTimestamp + ". User ID: "
     respChannel, respTimestamp, err := s.client.PostMessage(
         util.NewUserBotChannelId,
-        // slack.MsgOptionBlocks(blocks...),
         slack.MsgOptionText(msg1, false),
     )
     if err != nil {
@@ -55,7 +54,7 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
     s.log.Debugf("Message 1 successfully sent to slack channel %s at %s", respChannel, respTimestamp)
 
     blocks := []slack.Block{
-        slack.NewSectionBlock(slack.NewTextBlockObject(slack.MarkdownType, "```"+userId+"```", false, false), nil, nil),
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, userId, false, false), nil, nil),
         slack.NewDividerBlock(),
     }
     respChannel, respTimestamp, err = s.client.PostMessage(
