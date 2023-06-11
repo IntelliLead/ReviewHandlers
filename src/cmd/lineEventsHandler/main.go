@@ -9,8 +9,12 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil"
+    zapierModel "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil/model"
+    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go/aws"
@@ -18,8 +22,13 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
+    "os"
     "time"
 )
+
+func main() {
+    lambda.Start(handleRequest)
+}
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
@@ -58,22 +67,24 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // parse message to LINE events
     var lineEvents []*linebot.Event
-    // TODO: handle local differently if needed
-    // if os.Getenv("Stage") == enum.StageLocal.String() {
-    //     log.Debug("Running in local environment. Skipping LINE event parser")
-    //     lineEvents = lineEventsHandlerTestEvents.TestReplyEvent
-    // } else {
-    err = nil
-    lineEvents, err = line.ParseRequest(&request)
-    if err != nil {
-        // Log and return an error response
-        log.Error("Error parsing Line Event request:", err)
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 400,
-            Body:       fmt.Sprintf(`{"error": "Failed to parse request: %s"}`, err),
-        }, nil
+
+    // This is useful for local development, where we can't/won't generate a new request with valid signature.
+    // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
+    if os.Getenv("Stage") == enum.StageLocal.String() {
+        log.Debug("Running in local environment. Skipping LINE event parser")
+        lineEvents = lineEventsHandlerTestEvents.TestFollowEvent
+    } else {
+        err = nil
+        lineEvents, err = line.ParseRequest(&request)
+        if err != nil {
+            // Log and return an error response
+            log.Error("Error parsing Line Event request:", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 400,
+                Body:       fmt.Sprintf(`{"error": "Failed to parse request: %s"}`, err),
+            }, nil
+        }
     }
-    // }
     log.Infof("Received %d LINE events: ", len(lineEvents))
 
     // --------------------
@@ -91,26 +102,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
-            log.Info("Follow event source: ", util.AnyToJson(event.Source))
-
-            // if not exists, create new user in DB
-            user := model.NewUser(event.Source.UserID, event.Timestamp)
-            err := userDao.CreateUser(user)
-            if err != nil {
-                if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
-                    log.Info("User already exists. No action taken on Follow event:", userAlreadyExistErr.Error())
-                    // return 200 OK
-                } else {
-                    log.Error("Error creating user:", err)
-
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Failed to create user: %s"}`, err),
-                    }, nil
-                }
-            } else {
-                log.Info("Created new user:", user)
-            }
+            slack := slackUtil.NewSlack(log)
+            return handleFollowEvent(event, userDao, slack, log)
 
         default:
             log.Info("Unhandled event type: ", event.Type)
@@ -119,6 +112,48 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // Return a 200 OK response
     return events.LambdaFunctionURLResponse{Body: `{"message": "OK"}`, StatusCode: 200}, nil
+}
+
+func handleFollowEvent(event *linebot.Event,
+    userDao *ddbDao.UserDao,
+    slack *slackUtil.Slack,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    log.Info("Received Follow event")
+    log.Info("Follow event source: ", util.AnyToJson(event.Source))
+
+    userId := event.Source.UserID
+
+    // notify Slack channel
+    err := slack.SendNewUserFollowedMessage(userId, event.Timestamp)
+    if err != nil {
+        log.Error("Error sending Slack message:", err)
+    } else {
+        log.Debug("Successfully notified Slack channel of new user follow event")
+    }
+
+    // if not exists, create new user in DB
+    user := model.NewUser(userId, event.Timestamp)
+    err = userDao.CreateUser(user)
+    if err != nil {
+        if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
+            log.Info("User already exists. No action taken on Follow event:", userAlreadyExistErr.Error())
+            // return 200 OK
+        } else {
+            log.Error("Error creating user:", err)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to create user: %s"}`, err),
+            }, nil
+        }
+    }
+
+    log.Debug("Successfully created new user in DB from Follow event:", user)
+
+    log.Info("Successfully handled Follow event for user: ", userId)
+
+    return events.LambdaFunctionURLResponse{Body: `{"message": "Successfully handled Follow event"}`, StatusCode: 200}, nil
 }
 
 // Handle LINE message events. Ignored if not from user. If it's not a text message, we notify user that we cannot yet handle it.
@@ -235,7 +270,7 @@ func handleMessageEvent(event *linebot.Event,
         // post reply to zapier
         // --------------------
         zapier := zapierUtil.NewZapier(log)
-        zapierEvent := zapierUtil.ReplyToZapierEvent{
+        zapierEvent := zapierModel.ReplyToZapierEvent{
             VendorReviewId: review.VendorReviewId,
             Message:        replyMessage.Message,
         }
@@ -340,15 +375,11 @@ func handleHealthCheckCall(request events.LambdaFunctionURLRequest, log *zap.Sug
         return false, err
     }
 
-    events, ok := body["events"].([]interface{})
-    if !ok || len(events) == 0 {
+    parsedEvents, ok := body["events"].([]interface{})
+    if !ok || len(parsedEvents) == 0 {
         log.Info("Request doesn't include any events. Likely a health check call.")
         return true, nil
     }
 
     return false, nil
-}
-
-func main() {
-    lambda.Start(handleRequest)
 }

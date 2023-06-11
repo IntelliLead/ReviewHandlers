@@ -23,7 +23,7 @@ func UtcToReadableTwTimestamp(timestamp time.Time) (string, error) {
     }
     taipeiTime := timestamp.In(loc)
 
-    return taipeiTime.Format("2006.01.02 03:04:05 PM"), nil
+    return taipeiTime.Format("2006-1-02 3:04:05PM"), nil
 }
 
 // ExtractOriginalFromGoogleTranslate extracts the original text from Google Translate

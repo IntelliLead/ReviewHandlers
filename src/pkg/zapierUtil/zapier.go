@@ -3,6 +3,7 @@ package zapierUtil
 import (
     "bytes"
     "encoding/json"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil/model"
     "go.uber.org/zap"
     "net/http"
 )
@@ -17,10 +18,10 @@ func NewZapier(logger *zap.SugaredLogger) *Zapier {
     }
 }
 
-func (z *Zapier) SendReplyEvent(webhookUrl string, payload ReplyToZapierEvent) error {
+func (z *Zapier) SendReplyEvent(webhookUrl string, payload model.ReplyToZapierEvent) error {
     // Convert the payload object to JSON
     // zapier expects array JSON payload
-    jsonData, err := json.Marshal([]ReplyToZapierEvent{payload})
+    jsonData, err := json.Marshal([]model.ReplyToZapierEvent{payload})
     if err != nil {
         z.log.Errorf("error marshaling payload to JSON: %v", err)
         return err

@@ -13,3 +13,6 @@ func HelpMessage() string {
         "如需更多幫助，請聯係我們：")
     return text + "https://line.me/R/ti/p/%40006xnyvp"
 }
+
+const SlackToken = "xoxb-5347341178258-5407525762004-7sUyTmq2kNTrK3NkkDLPgGAS"
+const NewUserBotChannelId = "C05BAB5MTL7"
