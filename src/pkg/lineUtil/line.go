@@ -3,6 +3,7 @@ package lineUtil
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -134,10 +135,8 @@ func convertToHttpRequest(request *events.LambdaFunctionURLRequest) *http.Reques
 }
 
 func newLineClient(log *zap.SugaredLogger) *linebot.Client {
-    // Create a new LINE Bot client
-    channelSecret := "aa8c492c6295d7e3857fca4b41f49604"
-    channelAccessToken := "AqTNC1x18DT0/e1rkVUEnigmwyyHj4cPa+TbX1ECE5NVfzeB7OPLUsQjRkXrbCzBp7etk9Skni4/8NZW9dBR6eDbeKTA+4CNFOtHEF5sHp+1nXDJ2dzQnuf/NV0vuqMju7iznWvpLaSGKbRonLs6FgdB04t89/1O/w1cDnyilFU="
-    lineClient, err := linebot.New(channelSecret, channelAccessToken)
+    secrets := secret.GetSecrets()
+    lineClient, err := linebot.New(secrets.LineChannelSecret, secrets.LineChannelAccessToken)
     if err != nil {
         log.Fatal("cannot create new Line Client", err)
     }

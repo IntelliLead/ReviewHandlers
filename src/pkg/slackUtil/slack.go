@@ -1,6 +1,8 @@
 package slackUtil
 
 import (
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/slack-go/slack"
     "go.uber.org/zap"
@@ -15,11 +17,11 @@ So we have to use the web API instead: https://api.slack.com/web
 type Slack struct {
     client *slack.Client
     log    *zap.SugaredLogger
+    stage  enum.Stage
 }
 
 func NewSlack(logger *zap.SugaredLogger) *Slack {
-
-    client := slack.New(util.SlackToken)
+    client := slack.New(secret.GetSecrets().SlackToken)
 
     // DEBUG: Test authentication
     // _, err := client.AuthTest()
@@ -34,6 +36,8 @@ func NewSlack(logger *zap.SugaredLogger) *Slack {
     }
 }
 
+var channelId = secret.GetSecrets().NewUserSlackBotChannelId
+
 func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) error {
     readableTimestamp, err := util.UtcToReadableTwTimestamp(timestamp)
     if err != nil {
@@ -41,9 +45,13 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
         return err
     }
 
-    msg1 := "New user followed IntelliLead App LINE Official Account at " + readableTimestamp + ". User ID: "
+    msg1 := ""
+    if s.stage != enum.StageProd {
+        msg1 += "*[" + s.stage.String() + "]* "
+    }
+    msg1 += "New user followed IntelliLead App LINE Official Account at " + readableTimestamp + ". User ID: "
     respChannel, respTimestamp, err := s.client.PostMessage(
-        util.NewUserBotChannelId,
+        channelId,
         slack.MsgOptionText(msg1, false),
     )
     if err != nil {
@@ -58,7 +66,7 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
         slack.NewDividerBlock(),
     }
     respChannel, respTimestamp, err = s.client.PostMessage(
-        util.NewUserBotChannelId,
+        channelId,
         slack.MsgOptionBlocks(blocks...),
     )
     if err != nil {
