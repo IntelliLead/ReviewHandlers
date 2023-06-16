@@ -1,0 +1,152 @@
+{
+    "type": "bubble",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "Google 地圖評價",
+                "weight": "bold",
+                "size": "xl"
+            },
+            {
+                "type": "box",
+                "layout": "baseline",
+                "margin": "md",
+                "contents": [
+                    {
+                        "type": "icon",
+                        "size": "sm",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                    },
+                    {
+                        "type": "icon",
+                        "size": "sm",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                    },
+                    {
+                        "type": "icon",
+                        "size": "sm",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                    },
+                    {
+                        "type": "icon",
+                        "size": "sm",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                    },
+                    {
+                        "type": "icon",
+                        "size": "sm",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "lg",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "評價時間",
+                                "color": "#999999",
+                                "size": "sm",
+                                "flex": 0
+                            },
+                            {
+                                "type": "text",
+                                "text": "reviewTime readable",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "評價者",
+                                "color": "#999999",
+                                "size": "sm",
+                                "flex": 0
+                            },
+                            {
+                                "type": "text",
+                                "text": "reviewer",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "text": "{REVIEW}",
+                "margin": "xl",
+                "size": "md",
+                "style": "normal",
+                "wrap": true
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "sm",
+        "contents": [
+            {
+                "type": "button",
+                "style": "link",
+                "height": "sm",
+                "action": {
+                    "type": "postback",
+                    "label": "快速回復",
+                    "data": "@{REVIEW_ID} cannedResponse"
+                },
+                "adjustMode": "shrink-to-fit",
+                "color": "#152642"
+            },
+            {
+                "type": "button",
+                "style": "link",
+                "height": "sm",
+                "action": {
+                    "type": "postback",
+                    "label": "編輯回復",
+                    "inputOption": "openKeyboard",
+                    "data": "編輯回復 postback event",
+                    "fillInText": "@{REVIEW_ID} 感謝…"
+                },
+                "adjustMode": "shrink-to-fit",
+                "color": "#152642"
+            }
+        ],
+        "flex": 0,
+        "cornerRadius": "none"
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5",
+            "separator": false
+        },
+        "footer": {
+            "backgroundColor": "#8fa6cc",
+            "separator": false
+        }
+    }
+}

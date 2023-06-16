@@ -6,6 +6,7 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -32,8 +33,9 @@ func main() {
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
+    stage := os.Getenv(util.StageEnvKey)
 
-    log.Info("Received new request: ", util.AnyToJson(request))
+    log.Infof("Received new request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // --------------------
     // Check if the request is a health check call
@@ -70,7 +72,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // This is useful for local development, where we can't/won't generate a new request with valid signature.
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
-    if os.Getenv("Stage") == enum.StageLocal.String() {
+    if stage == enum.StageLocal.String() {
         log.Debug("Running in local environment. Skipping LINE event parser")
         lineEvents = lineEventsHandlerTestEvents.TestFollowEvent
     } else {
@@ -91,7 +93,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // process LINE events
     // --------------------
     for _, event := range lineEvents {
-        log.Infof("Processing event: %s\n", util.AnyToJson(event))
+        log.Infof("Processing event: %s\n", jsonUtil.AnyToJson(event))
 
         userId := event.Source.UserID
 
@@ -103,7 +105,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
             slack := slackUtil.NewSlack(log)
-            return handleFollowEvent(event, userDao, slack, log)
+            return handleFollowEvent(event, userDao, slack, line, log)
 
         default:
             log.Info("Unhandled event type: ", event.Type)
@@ -117,10 +119,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 func handleFollowEvent(event *linebot.Event,
     userDao *ddbDao.UserDao,
     slack *slackUtil.Slack,
+    line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
     log.Info("Received Follow event")
-    log.Info("Follow event source: ", util.AnyToJson(event.Source))
+    log.Info("Follow event source: ", jsonUtil.AnyToJson(event.Source))
 
     userId := event.Source.UserID
 
@@ -132,8 +135,16 @@ func handleFollowEvent(event *linebot.Event,
         log.Debug("Successfully notified Slack channel of new user follow event")
     }
 
+    // get LINE username
+    lineUserProfile, err := line.GetUser(userId)
+    if err != nil {
+        log.Error("Error getting LINE user profile:", err)
+    } else {
+        log.Debug("Successfully retrieved LINE user profile:", jsonUtil.AnyToJson(lineUserProfile))
+    }
+
     // if not exists, create new user in DB
-    user := model.NewUser(userId, event.Timestamp)
+    user := model.NewUser(userId, lineUserProfile, event.Timestamp)
     err = userDao.CreateUser(user)
     if err != nil {
         if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
@@ -252,7 +263,7 @@ func handleMessageEvent(event *linebot.Event,
             }, err
         }
 
-        log.Debug("Got Review:", util.AnyToJson(review))
+        log.Debug("Got Review:", jsonUtil.AnyToJson(review))
 
         // validate message does not contain LINE emojis
         // --------------------------------
@@ -282,7 +293,7 @@ func handleMessageEvent(event *linebot.Event,
             _, notifyUserReplyProcessedErr := line.NotifyUserReplyProcessed(event.ReplyToken, false, review.ReviewerName)
             if notifyUserReplyProcessedErr != nil {
                 log.Errorf("Error notifying reply failure for user '%s' for review '%s' with ID '%s': %v",
-                    userId, util.AnyToJson(replyMessage), review.ReviewId.String(), err)
+                    userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String(), err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
                     Body:       fmt.Sprintf(`{"error": "Failed to notify reply failure for user '%s' : %v. Reply Failure reason: %v"}`, userId, notifyUserReplyProcessedErr, err),
@@ -290,7 +301,7 @@ func handleMessageEvent(event *linebot.Event,
             }
 
             log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was NOT processed",
-                userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+                userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
 
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
@@ -298,13 +309,13 @@ func handleMessageEvent(event *linebot.Event,
             }, err
         }
 
-        log.Infof("Sent reply event '%s' to Zapier from user '%s'", util.AnyToJson(zapierEvent), userId)
+        log.Infof("Sent reply event '%s' to Zapier from user '%s'", jsonUtil.AnyToJson(zapierEvent), userId)
 
         // reply LINE message
         // --------------------
         if err != nil {
             log.Errorf("Error notifying user '%s' for review '%s' with ID '%s': %v",
-                userId, util.AnyToJson(replyMessage), review.ReviewId.String(), err)
+                userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String(), err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to notify user '%s' : %v"}`, userId, err),
@@ -312,7 +323,7 @@ func handleMessageEvent(event *linebot.Event,
         }
 
         log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was processed",
-            userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+            userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
 
         // update DDB
         // --------------------
@@ -331,7 +342,7 @@ func handleMessageEvent(event *linebot.Event,
         }
 
         log.Infof("Successfully handled review reply event for user ID '%s', reply '%s' for review ID '%s'",
-            userId, util.AnyToJson(replyMessage), review.ReviewId.String())
+            userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
 
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,

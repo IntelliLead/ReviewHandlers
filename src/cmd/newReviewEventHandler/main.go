@@ -5,9 +5,11 @@ import (
     "encoding/json"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -15,13 +17,18 @@ import (
     "github.com/aws/aws-sdk-go/aws/session"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/go-playground/validator/v10"
+    "github.com/google/uuid"
+    "os"
 )
+
+func main() {
+    lambda.Start(handleRequest)
+}
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
-    log.Info("Received request: ", util.AnyToJson(request))
-    log.Debug("Received request header: ", request.Headers)
-    log.Debug("Received request body: ", request.Body)
+    stage := os.Getenv(util.StageEnvKey)
+    log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // --------------------
     // parse request body
@@ -48,7 +55,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
     }
     review := *reviewPtr
-    log.Debug("Review object from request: ", util.AnyToJson(review))
+    // local/alpha testing: generate a new vendor review ID to prevent duplication
+    if stage == enum.StageLocal.String() {
+        review.VendorReviewId = uuid.New().String()
+    }
+
+    log.Debug("Review object from request: ", jsonUtil.AnyToJson(review))
 
     // --------------------
     // initialize resources
@@ -108,14 +120,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     err = line.SendNewReview(review)
     if err != nil {
-        log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, util.AnyToJson(err))
+        log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
 
-    log.Debugf("Successfully sent new review to LINE user '%s': %v", review.UserId, util.AnyToJson(review))
+    log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
 
     // --------------------
-    log.Info("Successfully processed new review event: ", util.AnyToJson(review))
+    log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))
 
     return events.LambdaFunctionURLResponse{Body: `{"message": "OK"}`, StatusCode: 200}, nil
 }
@@ -127,8 +139,4 @@ func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
     if translationFound {
         event.Review = originalLine
     }
-}
-
-func main() {
-    lambda.Start(handleRequest)
 }

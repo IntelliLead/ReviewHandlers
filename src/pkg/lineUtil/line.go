@@ -1,7 +1,9 @@
 package lineUtil
 
 import (
+    "encoding/json"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -16,13 +18,25 @@ import (
 type Line struct {
     lineClient *linebot.Client
     log        *zap.SugaredLogger
+    jsons      jsonUtil.LineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
     return &Line{
         lineClient: newLineClient(logger),
         log:        logger,
+        jsons:      jsonUtil.LoadLineFlexTemplateJsons(),
     }
+}
+
+func (l *Line) GetUser(userId string) (linebot.UserProfileResponse, error) {
+    resp, err := l.lineClient.GetProfile(userId).Do()
+    if err != nil {
+        l.log.Error("Error getting user profile: ", err)
+        return linebot.UserProfileResponse{}, err
+    }
+
+    return *resp, nil
 }
 
 func (l *Line) SendUnknownResponseReply(replyToken string) error {
@@ -42,17 +56,19 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in SendUnknownResponseReply: %s", util.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in SendUnknownResponseReply: %s", jsonUtil.AnyToJson(resp))
     return nil
 }
 
 func (l *Line) SendNewReview(review model.Review) error {
-    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    // compose flex message
+    // Convert the original JSON to a map[string]interface{}
+    reviewMsgJson, err := jsonUtil.JsonToMap(l.jsons.ReviewMessage)
     if err != nil {
-        l.log.Error("Error converting review timestamp to readable format: ", err)
-        return err
+        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
     }
 
+    // update review message
     isEmptyReview := review.Review == ""
 
     var reviewMessage string
@@ -62,28 +78,98 @@ func (l *Line) SendNewReview(review model.Review) error {
         reviewMessage = review.Review
     }
 
-    msg := fmt.Sprintf("$ 您有新評論 @%s ！\n\n評論內容：\n%s\n\n評價：%s\n評論者：%s\n評論時間：%s\n",
-        review.ReviewId.String(), reviewMessage, review.NumberRating.String(), review.ReviewerName, readableReviewTimestamp)
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[3].(map[string]interface{})["text"] = reviewMessage
+        }
+    }
 
-    lineTextMessage := linebot.NewTextMessage(msg)
+    // update stars
+    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
+    if err != nil {
+        l.log.Error("Error creating starRating JSON: ", err)
+        return err
+    }
 
-    lineTextMessage.WithQuickReplies(linebot.NewQuickReplyItems(
-        // label` must not be longer than 20 characters
-        linebot.NewQuickReplyButton(
-            "",
-            linebot.NewPostbackAction("快速回復", "any", "", "", linebot.InputOptionOpenKeyboard, fmt.Sprintf("@%s 感謝…", review.ReviewId.String())),
-        ),
-    ))
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
+        }
+    }
 
-    lineTextMessage.AddEmoji(linebot.NewEmoji(0, "5ac2280f031a6752fb806d65", "001"))
+    // update review time
+    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    if err != nil {
+        l.log.Error("Error converting review timestamp to readable format: ", err)
+        return err
+    }
 
-    resp, err := l.lineClient.PushMessage(review.UserId, lineTextMessage).Do()
+    // Modify the desired key in the map
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                if subContentsArr, ok := subContents.([]interface{}); ok {
+                    // reviewer and timestamp subtext level
+
+                    // modify review timestamp
+                    if subSubContents, ok := subContentsArr[0].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = readableReviewTimestamp
+                        }
+                    }
+
+                    // modify reviewer
+                    if subSubContents, ok := subContentsArr[1].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = review.ReviewerName
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    // update edit reply button
+    fillInText := fmt.Sprintf("@%s 感謝…", review.ReviewId.String())
+    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
+                action.(map[string]interface{})["fillInText"] = fillInText
+            }
+        }
+    }
+
+    // update quick reply button
+    // TODO: enable quick reply button. It is disabled for now because quick reply is not implemented
+    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            // skip 1st element
+            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
+        }
+    }
+
+    // Convert the map to LINE flex message
+    // first convert back to json
+    reviewMsgJsonBytes, err := json.Marshal(reviewMsgJson)
+    if err != nil {
+        l.log.Error("Error marshalling reviewMessage JSON: ", err)
+        return err
+    }
+    reviewMsgFlexContainer, err := linebot.UnmarshalFlexMessageJSON(reviewMsgJsonBytes)
+    if err != nil {
+        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
+        return err
+    }
+
+    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有 Google Map 新評價", reviewMsgFlexContainer)).Do()
     if err != nil {
         l.log.Error("Error sending lineTextMessage to line: ", err)
         return err
     }
 
-    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", review.UserId, util.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
+
     return nil
 }
 

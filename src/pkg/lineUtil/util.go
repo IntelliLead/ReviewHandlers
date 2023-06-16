@@ -3,9 +3,9 @@ package lineUtil
 import (
     "encoding/json"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "strings"
     "unicode"
@@ -16,6 +16,7 @@ func IsReviewReplyMessage(message string) bool {
 }
 
 func IsHelpMessage(message string) bool {
+    // TODO: [INT-49] fix /h not working
     return isCommand(message, "/help") || isCommand(message, "/h ") || isCommand(message, "/幫助")
 }
 
@@ -57,7 +58,7 @@ func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     // log.Debug("message type is ", event.Message.Type)        // message type is 0xa13460
     // log.Debug("message type() is ", event.Message.Type())    // message type() is
 
-    jsonObj := util.AnyToJsonObject(event)
+    jsonObj := jsonUtil.AnyToJsonObject(event)
 
     // Define a struct to hold the JSON object
     var data struct {

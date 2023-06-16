@@ -2,7 +2,10 @@ package _type
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "strconv"
     "strings"
 )
 
@@ -45,4 +48,37 @@ func (nr *NumberRating) String() string {
     blackStars := strings.Repeat(hollowStar, 5-n)
 
     return whiteStars + blackStars
+}
+
+func (nr *NumberRating) LineFlexTemplateJson() ([]interface{}, error) {
+    n := int(*nr)
+    if n < 1 || n > 5 {
+        return nil, errors.New("invalid numberRating value: " + strconv.Itoa(n))
+    }
+
+    jsons := jsonUtil.LoadLineFlexTemplateJsons()
+
+    goldStarJson, err := jsonUtil.JsonToMap(jsons.GoldStarIcon)
+    if err != nil {
+        return nil, err
+    }
+
+    grayStarJson, err := jsonUtil.JsonToMap(jsons.GrayStarIcon)
+    if err != nil {
+        return nil, err
+    }
+
+    stars := make([]interface{}, 5)
+
+    for i := 0; i < 5; i++ {
+        if i < n {
+            // Use goldStarJson for filled stars
+            stars[i] = goldStarJson
+        } else {
+            // Use grayStarJson for empty stars
+            stars[i] = grayStarJson
+        }
+    }
+
+    return stars, nil
 }

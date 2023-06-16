@@ -5,9 +5,9 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -29,7 +29,7 @@ func NewReviewDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *ReviewD
 }
 
 func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
-    // Define the expression to retrieve the largest ReviewId for the given UserID
+    // Define the expression to retrieve the largest ReviewId for the given UserId
     expr, err := expression.NewBuilder().
         WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).Build()
     if err != nil {
@@ -72,7 +72,7 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
 func (d *ReviewDao) CreateReview(review model.Review) error {
     err := model.ValidateReview(&review)
     if err != nil {
-        d.log.Error("CreateReview failed due to invalid review: ", util.AnyToJson(review))
+        d.log.Error("CreateReview failed due to invalid review: ", jsonUtil.AnyToJson(review))
         return err
     }
 
@@ -125,7 +125,7 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 
             return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons: ", err)
         default:
-            d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", util.AnyToJson(err))
+            d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
             return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
         }
     }
@@ -186,7 +186,7 @@ func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Rev
         Key:       key,
     })
     if err != nil {
-        d.log.Debugf("GetReview failed for userId %s reviewId %s: %s", userId, reviewId, util.AnyToJson(err))
+        d.log.Debugf("GetReview failed for userId %s reviewId %s: %s", userId, reviewId, jsonUtil.AnyToJson(err))
 
         return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for userId %s reviewId %s with unknown error: ", userId, reviewId), err)
     }

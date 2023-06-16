@@ -1,20 +1,9 @@
 package util
 
 import (
-    "encoding/json"
     "strings"
     "time"
 )
-
-func AnyToJson(obj any) string {
-    return string(AnyToJsonObject(obj))
-}
-
-func AnyToJsonObject(obj any) []byte {
-    // Convert the Person object to JSON
-    jsonData, _ := json.Marshal(obj)
-    return jsonData
-}
 
 func UtcToReadableTwTimestamp(timestamp time.Time) (string, error) {
     loc, err := time.LoadLocation("Asia/Taipei")

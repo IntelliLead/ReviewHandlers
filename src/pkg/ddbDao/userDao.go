@@ -51,7 +51,7 @@ func (d *UserDao) CreateUser(user model.User) error {
 
         if awsErr, ok := err.(awserr.Error); ok {
             if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
-                return exception.NewUserAlreadyExistException(fmt.Sprintf("User with userID %s already exists", user.UserID), err)
+                return exception.NewUserAlreadyExistException(fmt.Sprintf("User with userID %s already exists", user.UserId), err)
             } else {
                 return awsErr
             }
