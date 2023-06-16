@@ -60,17 +60,16 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
     return nil
 }
 
-func (l *Line) SendNewReview(review model.Review) error {
-    // compose flex message
+func (l *Line) buildFlexMessage(review model.Review) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     reviewMsgJson, err := jsonUtil.JsonToMap(l.jsons.ReviewMessage)
     if err != nil {
         l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
+        return nil, err
     }
 
     // update review message
     isEmptyReview := review.Review == ""
-
     var reviewMessage string
     if isEmptyReview {
         reviewMessage = "（星評無內容）"
@@ -88,7 +87,7 @@ func (l *Line) SendNewReview(review model.Review) error {
     starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
     if err != nil {
         l.log.Error("Error creating starRating JSON: ", err)
-        return err
+        return nil, err
     }
 
     if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
@@ -101,7 +100,7 @@ func (l *Line) SendNewReview(review model.Review) error {
     readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
         l.log.Error("Error converting review timestamp to readable format: ", err)
-        return err
+        return nil, err
     }
 
     // Modify the desired key in the map
@@ -154,15 +153,23 @@ func (l *Line) SendNewReview(review model.Review) error {
     reviewMsgJsonBytes, err := json.Marshal(reviewMsgJson)
     if err != nil {
         l.log.Error("Error marshalling reviewMessage JSON: ", err)
-        return err
+        return nil, err
     }
     reviewMsgFlexContainer, err := linebot.UnmarshalFlexMessageJSON(reviewMsgJsonBytes)
     if err != nil {
         l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
-        return err
+        return nil, err
     }
 
-    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有 Google Map 新評價", reviewMsgFlexContainer)).Do()
+    return reviewMsgFlexContainer, nil
+}
+func (l *Line) SendNewReview(review model.Review) error {
+    flexMessage, err := l.buildFlexMessage(review)
+    if err != nil {
+        l.log.Error("Error building flex message: ", err)
+    }
+
+    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有新評價!", flexMessage)).Do()
     if err != nil {
         l.log.Error("Error sending lineTextMessage to line: ", err)
         return err
