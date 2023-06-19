@@ -78,13 +78,7 @@ func (l *Line) SendNewReview(review model.Review) error {
 }
 
 func (l *Line) ShowQuickReplySettings(user model.User, replyToken string, isUpdated bool) error {
-    var flexMessage linebot.FlexContainer
-    var err error
-    if isUpdated {
-        flexMessage, err = l.buildUpdateQuickReplyMessageResponseFlexMessage(user)
-    } else {
-        flexMessage, err = l.buildQuickReplySettingsFlexMessage(user)
-    }
+    flexMessage, err := l.buildQuickReplySettingsFlexMessage(user, isUpdated)
 
     if err != nil {
         l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)

@@ -108,84 +108,68 @@ type message struct {
     Type linebot.MessageType `json:"type"`
 }
 
-func (l *Line) buildUpdateQuickReplyMessageResponseFlexMessage(user model.User) (linebot.FlexContainer, error) {
-    jsonMap := l.buildQuickReplySettingsJsonMap(user)
+func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMessage bool) (linebot.FlexContainer, error) {
+    var jsonBytes []byte
+    hasNoQuickReplyMessage := user.QuickReplyMessage == nil || *user.QuickReplyMessage == ""
+    if hasNoQuickReplyMessage {
+        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
+    } else {
+        jsonBytes = l.quickReplyJsons.QuickReplySettings
+    }
 
     // Convert the original JSON to a map[string]interface{}
-    quickReplyUpdatedMessageTextBox, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplyMessageUpdatedTextBox)
-    if err != nil {
-        l.log.Fatal("Error unmarshalling QuickReplyMessageUpdatedTextBox JSON: ", err)
-    }
-
-    // insert quick reply updated message in contents array
-    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                if subContentsArr, ok := subContents.([]interface{}); ok {
-                    contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1:])
-                }
-            }
-        }
-    }
-
-    jsonBytes, err := json.Marshal(jsonMap)
-    if err != nil {
-        l.log.Error("Error marshalling UpdateQuickReplyMessageResponseFlexMessage JSON: ", err)
-        return nil, err
-    }
-
-    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
-    if err != nil {
-        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON in buildUpdateQuickReplyMessageResponseFlexMessage: ", err)
-        return nil, err
-    }
-
-    return flexContainer, nil
-}
-
-func (l *Line) buildQuickReplySettingsJsonMap(user model.User) map[string]interface{} {
-    // Convert the original JSON to a map[string]interface{}
-    jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
+    jsonMap, err := jsonUtil.JsonToMap(jsonBytes)
     if err != nil {
         l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
     }
 
-    // substitute current quick reply message
-    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                if subContentsArr, ok := subContents.([]interface{}); ok {
-                    subContentsArr[1].(map[string]interface{})["text"] = *user.QuickReplyMessage
+    if !hasNoQuickReplyMessage {
+        // substitute current quick reply message
+        if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+            if contentsArr, ok := contents.([]interface{}); ok {
+                if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                    if subContentsArr, ok := subContents.([]interface{}); ok {
+                        subContentsArr[1].(map[string]interface{})["text"] = *user.QuickReplyMessage
+                    }
                 }
+            }
+        }
+
+        // substitute update button fill with current quick reply message
+        if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
+            if contentsArr, ok := contents.([]interface{}); ok {
+                contentsArr[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + *user.QuickReplyMessage
             }
         }
     }
 
-    // substitute update button fill with current quick reply message
-    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            contentsArr[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + *user.QuickReplyMessage
-        }
-    }
-
-    return jsonMap
-}
-
-func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
-    var jsonBytes []byte
-    if user.QuickReplyMessage == nil || *user.QuickReplyMessage == "" {
-        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
-    } else {
-        jsonMap := l.buildQuickReplySettingsJsonMap(user)
-        var err error
-        jsonBytes, err = json.Marshal(jsonMap)
+    if addUpdateMessage {
+        // Convert the original JSON to a map[string]interface{}
+        quickReplyUpdatedMessageTextBox, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplyMessageUpdatedTextBox)
         if err != nil {
-            l.log.Error("Error marshalling QuickReplySettings JSON: ", err)
-            return nil, err
+            l.log.Fatal("Error unmarshalling QuickReplyMessageUpdatedTextBox JSON: ", err)
         }
+
+        // insert quick reply updated message in contents array
+        if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+            if contentsArr, ok := contents.([]interface{}); ok {
+                if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                    if subContentsArr, ok := subContents.([]interface{}); ok {
+                        contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1:])
+                    }
+                }
+            }
+        }
+
     }
 
-    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
+    outputJsonBytes, err := json.Marshal(jsonMap)
+    if err != nil {
+        l.log.Error("Error marshalling output JSON in buildQuickReplySettingsFlexMessage: ", err)
+        return nil, err
+    }
+
+    flexContainer, err := linebot.UnmarshalFlexMessageJSON(outputJsonBytes)
     if err != nil {
         l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON in buildQuickReplySettingsFlexMessage: ", err)
         return nil, err
