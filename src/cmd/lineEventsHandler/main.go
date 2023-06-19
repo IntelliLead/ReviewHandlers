@@ -314,6 +314,7 @@ func handleMessageEvent(event *linebot.Event,
 
         // reply LINE message
         // --------------------
+        _, err = line.NotifyUserReplyProcessed(event.ReplyToken, true, review.ReviewerName)
         if err != nil {
             log.Errorf("Error notifying user '%s' for review '%s' with ID '%s': %v",
                 userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String(), err)
