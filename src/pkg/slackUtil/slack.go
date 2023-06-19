@@ -20,7 +20,7 @@ type Slack struct {
     stage  enum.Stage
 }
 
-func NewSlack(logger *zap.SugaredLogger) *Slack {
+func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
     client := slack.New(secret.GetSecrets().SlackToken)
 
     // DEBUG: Test authentication
@@ -33,6 +33,7 @@ func NewSlack(logger *zap.SugaredLogger) *Slack {
     return &Slack{
         client: client,
         log:    logger,
+        stage:  stage,
     }
 }
 
