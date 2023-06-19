@@ -147,6 +147,9 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
         return err
     }
 
+    // [INT-44] BUG observation
+    d.log.Debug("UpdateReview ExpressionAttributeValues: ", jsonUtil.AnyToJson(input))
+
     // Create the key for the UpdateItem request
     key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
         "userId":   input.UserId,

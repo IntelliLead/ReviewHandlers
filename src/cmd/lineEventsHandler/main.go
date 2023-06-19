@@ -33,9 +33,10 @@ func main() {
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
-    stage := os.Getenv(util.StageEnvKey)
+    stageStr := os.Getenv(util.StageEnvKey)
+    stage := enum.StringToStage(stageStr) // panic if invalid stage
 
-    log.Infof("Received new request in %s: %s", stage, jsonUtil.AnyToJson(request))
+    log.Infof("Received new request in %s: %s", stage.String(), jsonUtil.AnyToJson(request))
 
     // --------------------
     // Check if the request is a health check call
@@ -72,7 +73,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // This is useful for local development, where we can't/won't generate a new request with valid signature.
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
-    if stage == enum.StageLocal.String() {
+    if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
         lineEvents = lineEventsHandlerTestEvents.TestFollowEvent
     } else {
@@ -104,7 +105,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
-            slack := slackUtil.NewSlack(log)
+            slack := slackUtil.NewSlack(log, stage)
             return handleFollowEvent(event, userDao, slack, line, log)
 
         default:
@@ -335,6 +336,7 @@ func handleMessageEvent(event *linebot.Event,
             Reply:       replyMessage.Message,
         })
         if err != nil {
+            log.Errorf("Error updating review '%s' from user '%s': %v", review.ReviewId, userId, err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update review DB record: %s"}`, err),
