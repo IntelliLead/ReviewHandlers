@@ -16,6 +16,15 @@ func HelpMessage() string {
     return text + "https://line.me/R/ti/p/%40006xnyvp"
 }
 
-const DefaultUniqueKey = "#"
+// TODO: write
+func MoreMessage() string {
+    text := fmt.Sprint("本服務目前\n" +
+        "如需更多幫助，請聯係我們：")
+    return text + "https://line.me/R/ti/p/%40006xnyvp"
+}
+
+const DefaultUniqueId = "#"
 
 const StageEnvKey = "STAGE"
+
+const UpdateQuickReplyMessageCmd = "/QuickReply"

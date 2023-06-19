@@ -5,16 +5,22 @@ import (
     "log"
 )
 
-type LineFlexTemplateJsons struct {
+type ReviewMessageLineFlexTemplateJsons struct {
     GoldStarIcon  []byte
     GrayStarIcon  []byte
     ReviewMessage []byte
 }
 
+type QuickReplySettingsLineFlexTemplateJsons struct {
+    QuickReplySettings              []byte
+    QuickReplySettingsNoQuickReply  []byte
+    QuickReplyMessageUpdatedTextBox []byte
+}
+
 //go:embed json/lineFlexTemplate/*
 var embeddedFileSystem embed.FS
 
-func LoadLineFlexTemplateJsons() LineFlexTemplateJsons {
+func LoadReviewMessageLineFlexTemplateJsons() ReviewMessageLineFlexTemplateJsons {
     goldStarIcon, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/goldStarIcon.json")
     if err != nil {
         log.Fatal("Error reading goldStarIcon.json: ", err)
@@ -28,9 +34,31 @@ func LoadLineFlexTemplateJsons() LineFlexTemplateJsons {
         log.Fatal("Error reading reviewMessage.json: ", err)
     }
 
-    return LineFlexTemplateJsons{
+    return ReviewMessageLineFlexTemplateJsons{
         goldStarIcon,
         grayStarIcon,
         reviewMessage,
+    }
+}
+
+func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTemplateJsons {
+    quickReplySettings, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplySettings.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings.json: ", err)
+    }
+    quickReplySettingsNoQuickReply, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplySettings_noQuickReply.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
+
+    quickReplyMessageUpdatedTextBox, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplyMessageUpdatedTextBox.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
+
+    return QuickReplySettingsLineFlexTemplateJsons{
+        QuickReplySettings:              quickReplySettings,
+        QuickReplySettingsNoQuickReply:  quickReplySettingsNoQuickReply,
+        QuickReplyMessageUpdatedTextBox: quickReplyMessageUpdatedTextBox,
     }
 }

@@ -40,21 +40,8 @@
                         ]
                     },
                     {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "margin": "xl",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "{CANNED_REPLY}",
-                                "size": "md",
-                                "color": "#555555"
-                            }
-                        ],
-                        "borderWidth": "none",
-                        "backgroundColor": "#FFFFFF",
-                        "cornerRadius": "md",
-                        "paddingAll": "lg"
+                        "type": "text",
+                        "text": "無"
                     }
                 ]
             },
@@ -121,18 +108,10 @@
                 "type": "button",
                 "action": {
                     "type": "postback",
-                    "label": "更改",
+                    "label": "新建",
                     "inputOption": "openKeyboard",
                     "data": "/QuickReply/UpdateQuickReplyMessage",
                     "fillInText": "/QuickReply 感謝…"
-                }
-            },
-            {
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": "刪除",
-                    "data": "/QuickReply/DeleteQuickReplyMessage"
                 }
             }
         ]

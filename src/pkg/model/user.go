@@ -20,6 +20,7 @@ type User struct {
     SubscriptionTier      enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
     ExpireAt              *time.Time            `dynamodbav:"expireAt,omitempty"`
     LastUpdated           time.Time             `dynamodbav:"lastUpdated"`
+    QuickReplyMessage     *string               `dynamodbav:"quickReplyMessage,omitempty"`
 }
 
 func NewUser(lineUserId string,
@@ -44,7 +45,7 @@ func (u User) GetKey() map[string]dynamodb.AttributeValue {
         panic(err)
     }
 
-    uniqueId := util.DefaultUniqueKey
+    uniqueId := util.DefaultUniqueId
     return map[string]dynamodb.AttributeValue{
         "userId": {
             S: userId.S,

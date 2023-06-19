@@ -6,6 +6,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "strings"
     "unicode"
@@ -18,6 +19,10 @@ func IsReviewReplyMessage(message string) bool {
 func IsHelpMessage(message string) bool {
     // TODO: [INT-49] fix /h not working
     return isCommand(message, "/help") || isCommand(message, "/h ") || isCommand(message, "/幫助")
+}
+
+func IsUpdateQuickReplyMessage(message string) bool {
+    return isCommand(message, "/QuickReply")
 }
 
 func isCommand(s string, cmd string) bool {
@@ -73,13 +78,17 @@ func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     return data.Message.Type, nil
 }
 
+func IsEventFromUser(event *linebot.Event) bool {
+    return event.Source.Type == linebot.EventSourceTypeUser
+}
+
 func IsMessageFromUser(event *linebot.Event) bool {
     if event.Type != linebot.EventTypeMessage {
         // not even message event
         return false
     }
 
-    return event.Source.Type == linebot.EventSourceTypeUser
+    return IsEventFromUser(event)
 }
 
 func IsTextMessage(event *linebot.Event) (bool, error) {
@@ -97,4 +106,194 @@ func IsTextMessage(event *linebot.Event) (bool, error) {
 
 type message struct {
     Type linebot.MessageType `json:"type"`
+}
+
+func (l *Line) buildUpdateQuickReplyMessageResponseFlexMessage(user model.User) (linebot.FlexContainer, error) {
+    jsonMap := l.buildQuickReplySettingsJsonMap(user)
+
+    // Convert the original JSON to a map[string]interface{}
+    quickReplyUpdatedMessageTextBox, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplyMessageUpdatedTextBox)
+    if err != nil {
+        l.log.Fatal("Error unmarshalling QuickReplyMessageUpdatedTextBox JSON: ", err)
+    }
+
+    // insert quick reply updated message in contents array
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                if subContentsArr, ok := subContents.([]interface{}); ok {
+                    contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1:])
+                }
+            }
+        }
+    }
+
+    jsonBytes, err := json.Marshal(jsonMap)
+    if err != nil {
+        l.log.Error("Error marshalling UpdateQuickReplyMessageResponseFlexMessage JSON: ", err)
+        return nil, err
+    }
+
+    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
+    if err != nil {
+        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON in buildUpdateQuickReplyMessageResponseFlexMessage: ", err)
+        return nil, err
+    }
+
+    return flexContainer, nil
+}
+
+func (l *Line) buildQuickReplySettingsJsonMap(user model.User) map[string]interface{} {
+    // Convert the original JSON to a map[string]interface{}
+    jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
+    if err != nil {
+        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+    }
+
+    // substitute current quick reply message
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                if subContentsArr, ok := subContents.([]interface{}); ok {
+                    subContentsArr[1].(map[string]interface{})["text"] = *user.QuickReplyMessage
+                }
+            }
+        }
+    }
+
+    // substitute update button fill with current quick reply message
+    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + *user.QuickReplyMessage
+        }
+    }
+
+    return jsonMap
+}
+
+func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+    var jsonBytes []byte
+    if user.QuickReplyMessage == nil || *user.QuickReplyMessage == "" {
+        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
+    } else {
+        jsonMap := l.buildQuickReplySettingsJsonMap(user)
+        var err error
+        jsonBytes, err = json.Marshal(jsonMap)
+        if err != nil {
+            l.log.Error("Error marshalling QuickReplySettings JSON: ", err)
+            return nil, err
+        }
+    }
+
+    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
+    if err != nil {
+        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON in buildQuickReplySettingsFlexMessage: ", err)
+        return nil, err
+    }
+
+    return flexContainer, nil
+}
+
+func (l *Line) buildReviewFlexMessage(review model.Review) (linebot.FlexContainer, error) {
+    // Convert the original JSON to a map[string]interface{}
+    reviewMsgJson, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
+    if err != nil {
+        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
+        return nil, err
+    }
+
+    // update review message
+    isEmptyReview := review.Review == ""
+    var reviewMessage string
+    if isEmptyReview {
+        reviewMessage = "（星評無內容）"
+    } else {
+        reviewMessage = review.Review
+    }
+
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[3].(map[string]interface{})["text"] = reviewMessage
+        }
+    }
+
+    // update stars
+    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
+    if err != nil {
+        l.log.Error("Error creating starRating JSON: ", err)
+        return nil, err
+    }
+
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
+        }
+    }
+
+    // update review time
+    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    if err != nil {
+        l.log.Error("Error converting review timestamp to readable format: ", err)
+        return nil, err
+    }
+
+    // Modify the desired key in the map
+    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                if subContentsArr, ok := subContents.([]interface{}); ok {
+                    // reviewer and timestamp subtext level
+
+                    // modify review timestamp
+                    if subSubContents, ok := subContentsArr[0].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = readableReviewTimestamp
+                        }
+                    }
+
+                    // modify reviewer
+                    if subSubContents, ok := subContentsArr[1].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = review.ReviewerName
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    // update edit reply button
+    fillInText := fmt.Sprintf("@%s 感謝…", review.ReviewId.String())
+    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
+                action.(map[string]interface{})["fillInText"] = fillInText
+            }
+        }
+    }
+
+    // update quick reply button
+    // TODO: enable quick reply button. It is disabled for now because quick reply is not implemented
+    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            // skip 1st element
+            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
+        }
+    }
+
+    // Convert the map to LINE flex message
+    // first convert back to json
+    reviewMsgJsonBytes, err := json.Marshal(reviewMsgJson)
+    if err != nil {
+        l.log.Error("Error marshalling reviewMessage JSON: ", err)
+        return nil, err
+    }
+    reviewMsgFlexContainer, err := linebot.UnmarshalFlexMessageJSON(reviewMsgJsonBytes)
+    if err != nil {
+        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
+        return nil, err
+    }
+
+    return reviewMsgFlexContainer, nil
 }

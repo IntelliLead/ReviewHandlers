@@ -1,7 +1,6 @@
 package lineUtil
 
 import (
-    "encoding/json"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -16,16 +15,17 @@ import (
 )
 
 type Line struct {
-    lineClient *linebot.Client
-    log        *zap.SugaredLogger
-    jsons      jsonUtil.LineFlexTemplateJsons
+    lineClient         *linebot.Client
+    log                *zap.SugaredLogger
+    reviewMessageJsons jsonUtil.ReviewMessageLineFlexTemplateJsons
+    quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
     return &Line{
-        lineClient: newLineClient(logger),
-        log:        logger,
-        jsons:      jsonUtil.LoadLineFlexTemplateJsons(),
+        lineClient:         newLineClient(logger),
+        log:                logger,
+        reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
     }
 }
 
@@ -60,111 +60,8 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
     return nil
 }
 
-func (l *Line) buildFlexMessage(review model.Review) (linebot.FlexContainer, error) {
-    // Convert the original JSON to a map[string]interface{}
-    reviewMsgJson, err := jsonUtil.JsonToMap(l.jsons.ReviewMessage)
-    if err != nil {
-        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
-        return nil, err
-    }
-
-    // update review message
-    isEmptyReview := review.Review == ""
-    var reviewMessage string
-    if isEmptyReview {
-        reviewMessage = "（星評無內容）"
-    } else {
-        reviewMessage = review.Review
-    }
-
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            contentsArr[3].(map[string]interface{})["text"] = reviewMessage
-        }
-    }
-
-    // update stars
-    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
-    if err != nil {
-        l.log.Error("Error creating starRating JSON: ", err)
-        return nil, err
-    }
-
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
-        }
-    }
-
-    // update review time
-    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
-    if err != nil {
-        l.log.Error("Error converting review timestamp to readable format: ", err)
-        return nil, err
-    }
-
-    // Modify the desired key in the map
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                if subContentsArr, ok := subContents.([]interface{}); ok {
-                    // reviewer and timestamp subtext level
-
-                    // modify review timestamp
-                    if subSubContents, ok := subContentsArr[0].(map[string]interface{})["contents"]; ok {
-                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
-                            subSubContentsArr[1].(map[string]interface{})["text"] = readableReviewTimestamp
-                        }
-                    }
-
-                    // modify reviewer
-                    if subSubContents, ok := subContentsArr[1].(map[string]interface{})["contents"]; ok {
-                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
-                            subSubContentsArr[1].(map[string]interface{})["text"] = review.ReviewerName
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-
-    // update edit reply button
-    fillInText := fmt.Sprintf("@%s 感謝…", review.ReviewId.String())
-    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
-                action.(map[string]interface{})["fillInText"] = fillInText
-            }
-        }
-    }
-
-    // update quick reply button
-    // TODO: enable quick reply button. It is disabled for now because quick reply is not implemented
-    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            // skip 1st element
-            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
-        }
-    }
-
-    // Convert the map to LINE flex message
-    // first convert back to json
-    reviewMsgJsonBytes, err := json.Marshal(reviewMsgJson)
-    if err != nil {
-        l.log.Error("Error marshalling reviewMessage JSON: ", err)
-        return nil, err
-    }
-    reviewMsgFlexContainer, err := linebot.UnmarshalFlexMessageJSON(reviewMsgJsonBytes)
-    if err != nil {
-        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
-        return nil, err
-    }
-
-    return reviewMsgFlexContainer, nil
-}
 func (l *Line) SendNewReview(review model.Review) error {
-    flexMessage, err := l.buildFlexMessage(review)
+    flexMessage, err := l.buildReviewFlexMessage(review)
     if err != nil {
         l.log.Error("Error building flex message: ", err)
     }
@@ -180,6 +77,30 @@ func (l *Line) SendNewReview(review model.Review) error {
     return nil
 }
 
+func (l *Line) ShowQuickReplySettings(user model.User, replyToken string, isUpdated bool) error {
+    var flexMessage linebot.FlexContainer
+    var err error
+    if isUpdated {
+        flexMessage, err = l.buildUpdateQuickReplyMessageResponseFlexMessage(user)
+    } else {
+        flexMessage, err = l.buildQuickReplySettingsFlexMessage(user)
+    }
+
+    if err != nil {
+        l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)
+    }
+
+    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("設定快速回復", flexMessage)).Do()
+    if err != nil {
+        l.log.Error("Error replying message in ShowQuickReplySettings: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
 func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string) (*linebot.BasicResponse, error) {
     var text string
     if succeeded {
@@ -191,8 +112,18 @@ func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, revie
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }
 
+func (l *Line) NotifyUserUpdateQuickReplyMessageFailed(replyToken string) (*linebot.BasicResponse, error) {
+    text := fmt.Sprintf("快速回復訊息更新失敗，請稍後再試。很抱歉為您造成不便。")
+
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+}
+
 func (l *Line) ReplyHelpMessage(replyToken string) (*linebot.BasicResponse, error) {
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(util.HelpMessage())).Do()
+}
+
+func (l *Line) ReplyMoreMessage(replyToken string) (*linebot.BasicResponse, error) {
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(util.MoreMessage())).Do()
 }
 
 func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {

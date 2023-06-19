@@ -56,7 +56,7 @@ func (nr *NumberRating) LineFlexTemplateJson() ([]interface{}, error) {
         return nil, errors.New("invalid numberRating value: " + strconv.Itoa(n))
     }
 
-    jsons := jsonUtil.LoadLineFlexTemplateJsons()
+    jsons := jsonUtil.LoadReviewMessageLineFlexTemplateJsons()
 
     goldStarJson, err := jsonUtil.JsonToMap(jsons.GoldStarIcon)
     if err != nil {

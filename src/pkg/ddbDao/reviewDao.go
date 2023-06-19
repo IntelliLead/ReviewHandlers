@@ -59,7 +59,6 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
     // Extract the largest ReviewId
     var review model.Review
     err = dynamodbattribute.UnmarshalMap(result.Items[0], &review)
-    // review, err := reviewUnmarshalMap(result.Items[0])
     if err != nil {
         d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
         return "", err
@@ -160,14 +159,16 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     }
 
     // Execute the UpdateItem operation
-    _, err = d.client.UpdateItem(&dynamodb.UpdateItemInput{
+    ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableReview.String()),
         Key:                       key,
         UpdateExpression:          aws.String("SET #lu = :lu, #lr = :lr, #rep = :rep"),
         ExpressionAttributeNames:  map[string]*string{"#lu": aws.String("lastUpdated"), "#lr": aws.String("lastReplied"), "#rep": aws.String("reply")},
         ExpressionAttributeValues: av,
-    })
+    }
+    _, err = d.client.UpdateItem(ddbInput)
     if err != nil {
+        d.log.Errorf("UpdateItem failed in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
         return err
     }
 
@@ -195,7 +196,7 @@ func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Rev
     }
 
     // Check if the item was found
-    if result.Item == nil || len(result.Item) == 0 {
+    if result.Item == nil {
         return model.Review{}, exception.NewReviewDoesNotExistException(fmt.Sprintf("Review with userId '%s' reviewID '%s' not found", userId, reviewId))
     }
 
