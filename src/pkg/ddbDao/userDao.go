@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
@@ -11,7 +12,6 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
-    "strconv"
 )
 
 type UserDao struct {
@@ -65,34 +65,125 @@ func (d *UserDao) CreateUser(user model.User) error {
 }
 
 // IsUserExist checks if a user with the given userId exists in the User table
-func (d *UserDao) IsUserExist(userId string) (bool, error) {
-    // Define the key condition expression for the query
-    expr, err := expression.NewBuilder().WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).Build()
+func (d *UserDao) IsUserExist(userId string) (bool, model.User, error) {
+    user, err := d.GetUser(userId)
     if err != nil {
-        d.log.Errorf("Unable to produce key condition expression in IsUserExist with userId %s: %v", userId, err)
-        return false, err
+        if _, ok := err.(*exception.UserDoesNotExistException); ok {
+            return false, model.User{}, nil
+        }
+        return false, model.User{}, err
     }
 
-    // TODO: [INT-31] use GetItem instead to improve performance and reduce cost
-    // Execute the query
-    result, err := d.client.Query(&dynamodb.QueryInput{
-        TableName:                 aws.String(enum.TableUser.String()),
-        KeyConditionExpression:    expr.KeyCondition(),
-        ExpressionAttributeNames:  expr.Names(),
-        ExpressionAttributeValues: expr.Values(),
-        Limit:                     aws.Int64(1),
+    return true, user, nil
+}
+
+// GetUser gets a user with the given userId from the User table
+// error handling
+// 1. user does not exist UserDoesNotExistException
+// 2. aws error
+func (d *UserDao) GetUser(userId string) (model.User, error) {
+    response, err := d.client.GetItem(&dynamodb.GetItemInput{
+        TableName: aws.String(enum.TableUser.String()),
+        Key:       model.BuildUserDdbKey(userId),
     })
     if err != nil {
-        d.log.Error("Unable to query with userId %s: ", userId, err)
-        return false, err
+        d.log.Errorf("Unable to get item with userId '%s' in GetUser: %v", userId, err)
+
+        switch err.(type) {
+        case *dynamodb.ResourceNotFoundException:
+            return model.User{}, exception.NewUserDoesNotExistExceptionWithErr(fmt.Sprintf("User with userId %s does not exist", userId), err)
+        default:
+            d.log.Error("Unknown error in GetUser: ", err)
+        }
+        return model.User{}, exception.NewUnknownDDBException(fmt.Sprintf("GetUser failed for userId '%s' with unknown error: ", userId), err)
     }
 
-    // Check if any items were returned
-    if len(result.Items) > 0 {
-        return true, nil
+    var user model.User
+    err = dynamodbattribute.UnmarshalMap(response.Item, &user)
+    if err != nil {
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
+            jsonUtil.AnyToJson(response.Item), err)
+        return model.User{}, err
     }
 
-    return false, nil
+    return user, nil
+}
+
+func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage string) (model.User, error) {
+    update := expression.Set(
+        expression.Name("quickReplyMessage"),
+        expression.Value(quickReplyMessage),
+    )
+    expr, err := expression.NewBuilder().
+        WithUpdate(update).
+        Build()
+    if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
+        return model.User{}, err
+    }
+
+    allNewStr := dynamodb.ReturnValueAllNew
+    // Execute the UpdateItem operation
+    ddbInput := &dynamodb.UpdateItemInput{
+        TableName:                 aws.String(enum.TableUser.String()),
+        Key:                       model.BuildUserDdbKey(userId),
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ReturnValues:              &allNewStr,
+    }
+    response, err := d.client.UpdateItem(ddbInput)
+    if err != nil {
+        d.log.Errorf("DDB UpdateItem failed in UpdateQuickReplyMessage with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        return model.User{}, err
+    }
+
+    var user model.User
+    err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
+    if err != nil {
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
+            jsonUtil.AnyToJson(response.Attributes), err)
+        return model.User{}, err
+    }
+
+    return user, nil
+}
+
+func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
+    update := expression.Remove(expression.Name("quickReplyMessage"))
+    expr, err := expression.NewBuilder().
+        WithUpdate(update).
+        Build()
+    if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
+        return model.User{}, err
+    }
+
+    allNewStr := dynamodb.ReturnValueAllNew
+    // Execute the UpdateItem operation
+    ddbInput := &dynamodb.UpdateItemInput{
+        TableName:                 aws.String(enum.TableUser.String()),
+        Key:                       model.BuildUserDdbKey(userId),
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ReturnValues:              &allNewStr,
+    }
+    response, err := d.client.UpdateItem(ddbInput)
+    if err != nil {
+        d.log.Errorf("DDB UpdateItem failed in UpdateQuickReplyMessage with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        return model.User{}, err
+    }
+
+    var user model.User
+    err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
+    if err != nil {
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
+            jsonUtil.AnyToJson(response.Attributes), err)
+        return model.User{}, err
+    }
+
+    return user, nil
 }
 
 func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error) {
@@ -102,25 +193,13 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
         return av, err
     }
 
-    // Replace attribute values with their numeric representation
-    av["createdAt"] = &dynamodb.AttributeValue{
-        N: aws.String(strconv.FormatInt(user.CreatedAt.UnixNano(), 10)),
-    }
-    av["lastUpdated"] = &dynamodb.AttributeValue{
-        N: aws.String(strconv.FormatInt(user.LastUpdated.UnixNano(), 10)),
-    }
-    if user.ExpireAt != nil {
-        av["expireAt"] = &dynamodb.AttributeValue{
-            N: aws.String(strconv.FormatInt(user.ExpireAt.UnixNano(), 10)),
-        }
-    }
-
     // add sort key
     // (sort key appears already added somehow, just mistakenly as 'N' type)
     av["uniqueId"] = &dynamodb.AttributeValue{
         S: aws.String("#"),
     }
 
+    // // DEBUG
     // logger.NewLogger().Debug("userMarshalMap after uniqueId add: ", av)
 
     return av, nil

@@ -38,3 +38,11 @@ func ExtractOriginalFromGoogleTranslate(text string) (originalLines string, foun
     }
     return originalLines, found
 }
+
+func IsEmptyString(s string) bool {
+    return len(strings.TrimSpace(s)) == 0
+}
+
+func IsEmptyStringPtr(s *string) bool {
+    return s == nil || len(strings.TrimSpace(*s)) == 0
+}

@@ -1,0 +1,61 @@
+{
+    "size":
+    {
+        "width": 2500,
+        "height": 844
+    },
+    "selected": true,
+    "name": "v2",
+    "chatBarText": "選單",
+    "areas":
+    [
+        {
+            "bounds":
+            {
+                "x": 0,
+                "y": 0,
+                "width": 833,
+                "height": 844
+            },
+            "action":
+            {
+                "type": "postback",
+                "label": "QuickReplySettings",
+                "inputOption": "closeRichMenu",
+                "data": "/RichMenu/QuickReplySettings"
+            }
+        },
+        {
+            "bounds":
+            {
+                "x": 834,
+                "y": 0,
+                "width": 843,
+                "height": 850
+            },
+            "action":
+            {
+                "type": "postback",
+                "label": "Help",
+                "inputOption": "closeRichMenu",
+                "data": "/RichMenu/Help"
+            }
+        },
+        {
+            "bounds":
+            {
+                "x": 1667,
+                "y": 0,
+                "width": 833,
+                "height": 844
+            },
+            "action":
+            {
+                "type": "postback",
+                "label": "More",
+                "inputOption": "closeRichMenu",
+                "data": "/RichMenu/More"
+            }
+        }
+    ]
+}
