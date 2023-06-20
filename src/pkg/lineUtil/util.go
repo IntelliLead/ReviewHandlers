@@ -267,17 +267,18 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         }
     }
 
+    quickReplyMsg := user.GetFinalQuickReplyMessage(review)
     // update quick reply button
     if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
-            if util.IsEmptyStringPtr(user.QuickReplyMessage) {
+            if util.IsEmptyString(quickReplyMsg) {
                 // remove quick reply button
                 reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
             } else {
                 // update quick reply message in button
                 reviewMsgJson["footer"].(map[string]interface{})["contents"].([]interface{})[0].
                 (map[string]interface{})["action"].
-                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + *user.QuickReplyMessage
+                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMsg
             }
         }
     }

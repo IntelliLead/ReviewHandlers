@@ -6,6 +6,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/line/line-bot-sdk-go/v7/linebot"
+    "strings"
     "time"
 )
 
@@ -64,4 +65,12 @@ func BuildUserDdbKey(userId string) map[string]*dynamodb.AttributeValue {
         "uniqueId": {
             S: &uniqueId,
         }}
+}
+
+func (u User) GetFinalQuickReplyMessage(review Review) string {
+    if util.IsEmptyStringPtr(u.QuickReplyMessage) {
+        return ""
+    }
+
+    return strings.ReplaceAll(*u.QuickReplyMessage, "{評價者}", review.ReviewerName)
 }
