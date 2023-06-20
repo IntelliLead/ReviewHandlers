@@ -26,14 +26,13 @@ type Review struct {
 }
 
 func NewReview(event ZapierNewReviewEvent) (*Review, error) {
-    var replyCopy string
+    var replyCopy *string = nil
     if event.Reply != nil {
-        replyCopy = *event.Reply
+        *replyCopy = *event.Reply
     }
 
-    var lastRepliedCopy *time.Time
+    var lastRepliedCopy *time.Time = nil
     if event.LastReplied != nil {
-        lastRepliedCopy = new(time.Time)
         *lastRepliedCopy = *event.LastReplied
     }
 
@@ -47,7 +46,7 @@ func NewReview(event ZapierNewReviewEvent) (*Review, error) {
         ReviewLastUpdated:    event.ReviewLastUpdated,
         ReviewerProfilePhoto: event.ReviewerProfilePhoto,
         ReviewerName:         event.ReviewerName,
-        Reply:                &replyCopy,
+        Reply:                replyCopy,
         LastReplied:          lastRepliedCopy,
         LastUpdated:          time.Now(),
         Vendor:               enum.VendorGoogle,
@@ -76,5 +75,4 @@ func ValidateReview(review *Review) error {
         return err
     }
     return validate.Struct(review)
-
 }

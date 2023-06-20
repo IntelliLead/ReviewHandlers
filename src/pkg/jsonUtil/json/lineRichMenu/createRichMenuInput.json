@@ -5,7 +5,7 @@
         "height": 844
     },
     "selected": true,
-    "name": "v2",
+    "name": "v3",
     "chatBarText": "選單",
     "areas":
     [
@@ -31,7 +31,7 @@
                 "x": 834,
                 "y": 0,
                 "width": 843,
-                "height": 850
+                "height": 844
             },
             "action":
             {
