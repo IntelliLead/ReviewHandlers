@@ -115,8 +115,10 @@
                 "height": "sm",
                 "action": {
                     "type": "postback",
-                    "label": "快速回復",
-                    "data": "@{REVIEW_ID} cannedResponse"
+                    "label": "快速回覆",
+                    "inputOption": "openKeyboard",
+                    "data": "/NewReview/QuickReply",
+                    "fillInText": "@{REVIEW_ID} {CANNED_REPLY}"
                 },
                 "adjustMode": "shrink-to-fit",
                 "color": "#152642"
@@ -127,10 +129,10 @@
                 "height": "sm",
                 "action": {
                     "type": "postback",
-                    "label": "編輯回復",
+                    "label": "編輯回覆",
                     "inputOption": "openKeyboard",
-                    "data": "編輯回復 postback event",
-                    "fillInText": "@{REVIEW_ID} 感謝…"
+                    "data": "/NewReview/Reply",
+                    "fillInText": "@{REVIEW_ID} {TEMPLATE_REPLY}"
                 },
                 "adjustMode": "shrink-to-fit",
                 "color": "#152642"

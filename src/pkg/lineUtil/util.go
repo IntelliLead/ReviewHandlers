@@ -213,7 +213,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
     return flexContainer, nil
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     reviewMsgJson, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
@@ -283,7 +283,8 @@ func (l *Line) buildReviewFlexMessage(review model.Review) (linebot.FlexContaine
     }
 
     // update edit reply button
-    fillInText := fmt.Sprintf("@%s 感謝…", review.ReviewId.String())
+    ReplyMessagePrefix := fmt.Sprintf("@%s ", review.ReviewId.String())
+    fillInText := ReplyMessagePrefix + "感謝…"
     if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
@@ -293,11 +294,17 @@ func (l *Line) buildReviewFlexMessage(review model.Review) (linebot.FlexContaine
     }
 
     // update quick reply button
-    // TODO: enable quick reply button. It is disabled for now because quick reply is not implemented
     if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
-            // skip 1st element
-            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
+            if util.IsEmptyStringPtr(user.QuickReplyMessage) {
+                // skip 1st element
+                reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
+            } else {
+                // populate message
+                reviewMsgJson["footer"].(map[string]interface{})["contents"].([]interface{})[0].
+                (map[string]interface{})["action"].
+                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + *user.QuickReplyMessage
+            }
         }
     }
 

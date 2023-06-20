@@ -65,16 +65,16 @@ func (d *UserDao) CreateUser(user model.User) error {
 }
 
 // IsUserExist checks if a user with the given userId exists in the User table
-func (d *UserDao) IsUserExist(userId string) (bool, error) {
-    _, err := d.GetUser(userId)
+func (d *UserDao) IsUserExist(userId string) (bool, model.User, error) {
+    user, err := d.GetUser(userId)
     if err != nil {
         if _, ok := err.(*exception.UserDoesNotExistException); ok {
-            return false, nil
+            return false, model.User{}, nil
         }
-        return false, err
+        return false, model.User{}, err
     }
 
-    return true, nil
+    return true, user, nil
 }
 
 // GetUser gets a user with the given userId from the User table

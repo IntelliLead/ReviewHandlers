@@ -61,8 +61,8 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
     return nil
 }
 
-func (l *Line) SendNewReview(review model.Review) error {
-    flexMessage, err := l.buildReviewFlexMessage(review)
+func (l *Line) SendNewReview(review model.Review, user model.User) error {
+    flexMessage, err := l.buildReviewFlexMessage(review, user)
     if err != nil {
         l.log.Error("Error building flex message: ", err)
     }
