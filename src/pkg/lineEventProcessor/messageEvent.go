@@ -3,14 +3,12 @@ package lineEventProcessor
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil"
-    zapierModel "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
-    "time"
 )
 
 // ProcessMessageEvent processes a message event from LINE
@@ -66,9 +64,17 @@ func ProcessMessageEvent(event *linebot.Event,
     message := textMessage.Text
     log.Infof("Received text message from user '%s': %s", userId, message)
 
-    // process help request
+    // process review reply request
     // --------------------------------
-    if lineUtil.IsHelpMessage(message) {
+    if lineUtil.IsReviewReplyMessage(message) {
+        return messageEvent.ProcessReviewReplyMessage(userId, event, reviewDao, line, log)
+    }
+
+    // process command requests
+    cmdMsg := lineUtil.ParseCommandMessage(message, false)
+    args := cmdMsg.Args[0]
+    switch cmdMsg.Command {
+    case "h", "Help", "help", "幫助", "協助":
         _, err := line.ReplyHelpMessage(event.ReplyToken)
         if err != nil {
             return events.LambdaFunctionURLResponse{
@@ -82,13 +88,10 @@ func ProcessMessageEvent(event *linebot.Event,
             StatusCode: 200,
             Body:       `{"message": "Successfully processed help request"}`,
         }, nil
-    }
 
-    // process update quick reply message request
-    // --------------------------------
-    if lineUtil.IsUpdateQuickReplyMessage(message) {
-        cmdMsg := lineUtil.ParseCommandMessage(message, false)
-        quickReplyMessage := cmdMsg.Args[0]
+    case "q", util.UpdateQuickReplyMessageCmd, "快速回復":
+        // process update quick reply message request
+        quickReplyMessage := args
 
         // update DDB
         updatedUser, err := userDao.UpdateQuickReplyMessage(userId, quickReplyMessage)
@@ -124,133 +127,23 @@ func ProcessMessageEvent(event *linebot.Event,
             StatusCode: 200,
             Body:       `{"message": "Successfully processed help request"}`,
         }, nil
-    }
 
-    // process review reply request
-    // --------------------------------
-    if lineUtil.IsReviewReplyMessage(message) {
-        replyMessage, err := lineUtil.ParseReplyMessage(message)
+    default:
+        // handle unknown message from user
+        err = line.SendUnknownResponseReply(event.ReplyToken)
         if err != nil {
-            log.Error("Error parsing reply message:", err)
+            log.Error("Error executing SendUnknownResponseReply: ", err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to parse reply message: %s"}`, err),
+                Body:       fmt.Sprintf(`{"error": "Error executing SendUnknownResponseReply: %s"}`, err),
             }, err
         }
-
-        // fetch review from DDB
-        // --------------------
-        review, err := reviewDao.GetReview(userId, replyMessage.ReviewId)
-        if err != nil {
-            log.Errorf("Error getting review for review reply %s from user '%s': %v", replyMessage, userId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
-            }, err
-        }
-
-        log.Debug("Got Review:", jsonUtil.AnyToJson(review))
-
-        // validate message does not contain LINE emojis
-        // --------------------------------
-        emojis := textMessage.Emojis
-        if len(emojis) > 0 {
-            _, err = line.NotifyUserReplyProcessedWithReason(event.ReplyToken, false, review.ReviewerName,
-                "暫時不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。️很抱歉為您造成不便。")
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 200,
-                Body:       `{"message": "Notified Emoji not yet supported"}`,
-            }, nil
-        }
-
-        // post reply to zapier
-        // --------------------
-        zapier := zapierUtil.NewZapier(log)
-        zapierEvent := zapierModel.ReplyToZapierEvent{
-            VendorReviewId: review.VendorReviewId,
-            Message:        replyMessage.Message,
-        }
-
-        err = zapier.SendReplyEvent(review.ZapierReplyWebhook, zapierEvent)
-        if err != nil {
-            log.Errorf("Error sending reply event to Zapier for review %s from user '%s': %v", replyMessage, userId, err)
-
-            _, notifyUserReplyProcessedErr := line.NotifyUserReplyProcessed(event.ReplyToken, false, review.ReviewerName)
-            if notifyUserReplyProcessedErr != nil {
-                log.Errorf("Error notifying reply failure for user '%s' for review '%s' with ID '%s': %v",
-                    userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String(), err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify reply failure for user '%s' : %v. Reply Failure reason: %v"}`, userId, notifyUserReplyProcessedErr, err),
-                }, notifyUserReplyProcessedErr
-            }
-
-            log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was NOT processed",
-                userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to send reply event to Zapier: %s"}`, err),
-            }, err
-        }
-
-        log.Infof("Sent reply event '%s' to Zapier from user '%s'", jsonUtil.AnyToJson(zapierEvent), userId)
-
-        // reply LINE message
-        // --------------------
-        _, err = line.NotifyUserReplyProcessed(event.ReplyToken, true, review.ReviewerName)
-        if err != nil {
-            log.Errorf("Error notifying user '%s' for review '%s' with ID '%s': %v",
-                userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String(), err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to notify user '%s' : %v"}`, userId, err),
-            }, err
-        }
-
-        log.Infof("Successfully notified user '%s' reply '%s' for review ID '%s' was processed",
-            userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
-
-        // update DDB
-        // --------------------
-        err = reviewDao.UpdateReview(ddbDao.UpdateReviewInput{
-            UserId:      userId,
-            ReviewId:    *review.ReviewId,
-            LastUpdated: time.Now(),
-            LastReplied: time.Now(),
-            Reply:       replyMessage.Message,
-        })
-        if err != nil {
-            log.Errorf("Error updating review '%s' from user '%s': %v", review.ReviewId, userId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to update review DB record: %s"}`, err),
-            }, err
-        }
-
-        log.Infof("Successfully handled review reply event for user ID '%s', reply '%s' for review ID '%s'",
-            userId, jsonUtil.AnyToJson(replyMessage), review.ReviewId.String())
 
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
-            Body:       fmt.Sprintf(`{"message": "Successfully handled review reply event for user ID '%s'"}`, userId),
+            Body:       `{"message": "Text message from user is not handled."}`,
         }, nil
+
     }
 
-    // handle unknown message from user
-    // --------------------
-    err = line.SendUnknownResponseReply(event.ReplyToken)
-    if err != nil {
-        log.Error("Error executing SendUnknownResponseReply: ", err)
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       fmt.Sprintf(`{"error": "Error executing SendUnknownResponseReply: %s"}`, err),
-        }, err
-    }
-
-    return events.LambdaFunctionURLResponse{
-        StatusCode: 200,
-        Body:       `{"message": "Text message from user is not handled."}`,
-    }, nil
 }

@@ -190,9 +190,17 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     }
     _, err = d.client.UpdateItem(ddbInput)
     if err != nil {
-        d.log.Errorf("UpdateItem failed in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
-        return err
+        switch err.(type) {
+        case *dynamodb.ResourceNotFoundException:
+            return exception.NewReviewDoesNotExistExceptionWithErr(
+                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", input.UserId, input.ReviewId), err)
+        default:
+            d.log.Errorf("Unknown DDB error in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+            return err
+        }
     }
+
+    // TODO: unmarshal to review and return when necessary
 
     return nil
 }
@@ -212,14 +220,20 @@ func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Rev
         Key:       key,
     })
     if err != nil {
-        d.log.Debugf("GetReview failed for userId %s reviewId %s: %s", userId, reviewId, jsonUtil.AnyToJson(err))
+        switch err.(type) {
+        case *dynamodb.ResourceNotFoundException:
+            return model.Review{}, exception.NewReviewDoesNotExistExceptionWithErr(
+                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", userId, reviewId), err)
+        default:
+            d.log.Errorf("Unknown DDB error in GetReview for userId %s reviewId %s: %s", userId, reviewId, jsonUtil.AnyToJson(err))
+        }
 
         return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for userId %s reviewId %s with unknown error: ", userId, reviewId), err)
     }
 
     // Check if the item was found
     if result.Item == nil {
-        return model.Review{}, exception.NewReviewDoesNotExistException(fmt.Sprintf("Review with userId '%s' reviewID '%s' not found", userId, reviewId))
+        return model.Review{}, exception.NewUnknownDDBException("GetReview failed for unknown reason: no error thrown but result.Item was nil", nil)
     }
 
     // Unmarshal the item into a review object

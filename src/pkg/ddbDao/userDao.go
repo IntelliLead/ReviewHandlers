@@ -94,8 +94,8 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
             return model.User{}, exception.NewUserDoesNotExistExceptionWithErr(fmt.Sprintf("User with userId %s does not exist", userId), err)
         default:
             d.log.Error("Unknown error in GetUser: ", err)
-            return model.User{}, err
         }
+        return model.User{}, exception.NewUnknownDDBException(fmt.Sprintf("GetUser failed for userId '%s' with unknown error: ", userId), err)
     }
 
     var user model.User
@@ -181,11 +181,6 @@ func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
         d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
             jsonUtil.AnyToJson(response.Attributes), err)
         return model.User{}, err
-    }
-
-    // DEBUG assert that quickReplyMessage is null
-    if user.QuickReplyMessage != nil {
-        d.log.Fatal("quickReplyMessage is not null after deletion in DeleteQuickReplyMessage")
     }
 
     return user, nil

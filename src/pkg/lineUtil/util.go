@@ -16,27 +16,6 @@ func IsReviewReplyMessage(message string) bool {
     return strings.HasPrefix(message, "@")
 }
 
-func IsHelpMessage(message string) bool {
-    // TODO: [INT-49] fix /h not working
-    return isCommand(message, "/help") || isCommand(message, "/h ") || isCommand(message, "/幫助")
-}
-
-func IsUpdateQuickReplyMessage(message string) bool {
-    return isCommand(message, "/QuickReply")
-}
-
-func isCommand(s string, cmd string) bool {
-    if strings.HasPrefix(s, cmd) {
-        remaining := strings.TrimPrefix(s, cmd)
-
-        if remaining == "" || strings.TrimSpace(remaining) == "" || strings.HasPrefix(remaining, " ") {
-            return true
-        }
-    }
-
-    return false
-}
-
 // CommandMessage format: "/<command> <args>"
 // e.g., "/Help xxx"
 type CommandMessage struct {
@@ -170,7 +149,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         // substitute update button fill with current quick reply message
         if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
             if _, ok := contents.([]interface{}); ok {
-                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + " " + *user.QuickReplyMessage
+                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmdPrefix + *user.QuickReplyMessage
             }
         }
     }
@@ -200,9 +179,6 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         l.log.Error("Error marshalling output JSON in buildQuickReplySettingsFlexMessage: ", err)
         return nil, err
     }
-
-    // DEBUG
-    l.log.Debug("outputJsonBytes: ", string(outputJsonBytes))
 
     flexContainer, err := linebot.UnmarshalFlexMessageJSON(outputJsonBytes)
     if err != nil {
@@ -256,13 +232,11 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         return nil, err
     }
 
-    // Modify the desired key in the map
+    // Modify reviewer and timestamp
     if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
                 if subContentsArr, ok := subContents.([]interface{}); ok {
-                    // reviewer and timestamp subtext level
-
                     // modify review timestamp
                     if subSubContents, ok := subContentsArr[0].(map[string]interface{})["contents"]; ok {
                         if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
@@ -297,10 +271,10 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if util.IsEmptyStringPtr(user.QuickReplyMessage) {
-                // skip 1st element
+                // remove quick reply button
                 reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
             } else {
-                // populate message
+                // update quick reply message in button
                 reviewMsgJson["footer"].(map[string]interface{})["contents"].([]interface{})[0].
                 (map[string]interface{})["action"].
                 (map[string]interface{})["fillInText"] = ReplyMessagePrefix + *user.QuickReplyMessage

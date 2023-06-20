@@ -28,4 +28,5 @@ const DefaultUniqueId = "#"
 
 const StageEnvKey = "STAGE"
 
-const UpdateQuickReplyMessageCmd = "/QuickReply"
+const UpdateQuickReplyMessageCmd = "QuickReply"
+const UpdateQuickReplyMessageCmdPrefix = "/" + UpdateQuickReplyMessageCmd + " "

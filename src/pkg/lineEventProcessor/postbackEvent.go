@@ -3,6 +3,7 @@ package lineEventProcessor
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -115,15 +116,15 @@ func ProcessPostbackEvent(event *linebot.Event,
 
         }
     default:
-        log.Error("Unknown QuickReply postback data: ", dataSlice[0])
+        log.Warn("Unknown QuickReply postback data: ", dataSlice)
         return events.LambdaFunctionURLResponse{
             StatusCode: 400,
-            Body:       fmt.Sprintf(`{"message": "Unknown QuickReply postback data: %s"}`, dataSlice[1]),
+            Body:       "{\"message\": \"Unknown QuickReply postback data\"}",
         }, nil
-
     }
 
-    log.Info("Successfully handled Postback event for user: ", userId)
+    log.Infof("Successfully handled Postback event from user '%s': %s", userId, jsonUtil.AnyToJson(event.Postback.Data))
+
     return events.LambdaFunctionURLResponse{Body: `{"message": "Successfully handled Postback event"}`, StatusCode: 200}, nil
 }
 
