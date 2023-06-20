@@ -87,10 +87,13 @@ func ProcessMessageEvent(event *linebot.Event,
     // process update quick reply message request
     // --------------------------------
     if lineUtil.IsUpdateQuickReplyMessage(message) {
+        cmdMsg := lineUtil.ParseCommandMessage(message, false)
+        quickReplyMessage := cmdMsg.Args[0]
+
         // update DDB
-        updatedUser, err := userDao.UpdateQuickReplyMessage(userId, message)
+        updatedUser, err := userDao.UpdateQuickReplyMessage(userId, quickReplyMessage)
         if err != nil {
-            log.Errorf("Error updating quick reply message '%s' for user '%s': %v", message, userId, err)
+            log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
 
             _, err := line.NotifyUserUpdateQuickReplyMessageFailed(event.ReplyToken)
             if err != nil {

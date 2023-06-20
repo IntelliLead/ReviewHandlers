@@ -11,15 +11,15 @@ import (
 
 type User struct {
     UserId                string                `dynamodbav:"userId"` // partition key
-    CreatedAt             time.Time             `dynamodbav:"createdAt"`
+    CreatedAt             time.Time             `dynamodbav:"createdAt,unixtime"`
     LineId                *string               `dynamodbav:"lineId,omitempty"`
     LineUsername          string                `dynamodbav:"lineUsername"`
     LineProfilePictureUrl *string               `dynamodbav:"lineProfilePicture,omitempty" validate:"url"`
     Language              *string               `dynamodbav:"language,omitempty"`
     ZapierReplyWebhook    *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
     SubscriptionTier      enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
-    ExpireAt              *time.Time            `dynamodbav:"expireAt,omitempty"`
-    LastUpdated           time.Time             `dynamodbav:"lastUpdated"`
+    ExpireAt              *time.Time            `dynamodbav:"expireAt,omitempty,unixtime"`
+    LastUpdated           time.Time             `dynamodbav:"lastUpdated,unixtime"`
     QuickReplyMessage     *string               `dynamodbav:"quickReplyMessage,omitempty"`
 }
 
@@ -40,7 +40,7 @@ func NewUser(lineUserId string,
 }
 
 func (u User) GetKey() map[string]dynamodb.AttributeValue {
-    userId, err := dynamodbattribute.Marshal(u.UserId)
+    userIdAttributeValue, err := dynamodbattribute.Marshal(u.UserId)
     if err != nil {
         panic(err)
     }
@@ -48,7 +48,18 @@ func (u User) GetKey() map[string]dynamodb.AttributeValue {
     uniqueId := util.DefaultUniqueId
     return map[string]dynamodb.AttributeValue{
         "userId": {
-            S: userId.S,
+            S: userIdAttributeValue.S,
+        },
+        "uniqueId": {
+            S: &uniqueId,
+        }}
+}
+
+func BuildUserDdbKey(userId string) map[string]*dynamodb.AttributeValue {
+    uniqueId := util.DefaultUniqueId
+    return map[string]*dynamodb.AttributeValue{
+        "userId": {
+            S: &userId,
         },
         "uniqueId": {
             S: &uniqueId,

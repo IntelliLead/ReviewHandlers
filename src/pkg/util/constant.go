@@ -16,11 +16,12 @@ func HelpMessage() string {
     return text + "https://line.me/R/ti/p/%40006xnyvp"
 }
 
-// TODO: write
 func MoreMessage() string {
-    text := fmt.Sprint("本服務目前\n" +
-        "如需更多幫助，請聯係我們：")
-    return text + "https://line.me/R/ti/p/%40006xnyvp"
+    url := "https://line.me/R/ti/p/%40006xnyvp"
+    text := fmt.Sprint("更多功能開發中，敬請期待。\n" +
+        "Customer Obsession 是我們的 DNA。我們承諾持續聆聽用戶聲音，力圖為願意給我們機會的您提供最好的服務。\n\n" +
+        "若有任何建議或需要協助，請隨時聯係我們：")
+    return text + url + "\n我們將第一時間回復。智引力感激您的支持！"
 }
 
 const DefaultUniqueId = "#"

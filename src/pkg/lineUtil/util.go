@@ -37,6 +37,37 @@ func isCommand(s string, cmd string) bool {
     return false
 }
 
+// CommandMessage format: "/<command> <args>"
+// e.g., "/Help xxx"
+type CommandMessage struct {
+    Command string
+    Args    []string
+}
+
+func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
+    if !strings.HasPrefix(str, "/") {
+        return CommandMessage{}
+    }
+
+    // Find the first whitespace character after '/'
+    index := strings.IndexFunc(str[1:], isWhitespace)
+    if index == -1 {
+        return CommandMessage{Command: str[1:]}
+    }
+
+    cmd := str[1 : index+1]
+    afterCmd := strings.TrimSpace(str[index+2:])
+
+    var args []string
+    if isMultiArgs {
+        // Only return the first argument
+        args = strings.Fields(afterCmd)
+    } else {
+        args = []string{afterCmd}
+    }
+    return CommandMessage{Command: cmd, Args: args}
+}
+
 func ParseReplyMessage(str string) (model.ReplyMessage, error) {
     if !strings.HasPrefix(str, "@") {
         return model.ReplyMessage{}, fmt.Errorf("message is not a reply message: %s", str)
@@ -110,11 +141,11 @@ type message struct {
 
 func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMessage bool) (linebot.FlexContainer, error) {
     var jsonBytes []byte
-    hasNoQuickReplyMessage := user.QuickReplyMessage == nil || *user.QuickReplyMessage == ""
-    if hasNoQuickReplyMessage {
-        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
-    } else {
+    hasQuickReplyMessage := user.QuickReplyMessage != nil && strings.TrimSpace(*user.QuickReplyMessage) != ""
+    if hasQuickReplyMessage {
         jsonBytes = l.quickReplyJsons.QuickReplySettings
+    } else {
+        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
     }
 
     // Convert the original JSON to a map[string]interface{}
@@ -123,22 +154,23 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
     }
 
-    if !hasNoQuickReplyMessage {
+    if hasQuickReplyMessage {
         // substitute current quick reply message
         if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
             if contentsArr, ok := contents.([]interface{}); ok {
-                if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                    if subContentsArr, ok := subContents.([]interface{}); ok {
-                        subContentsArr[1].(map[string]interface{})["text"] = *user.QuickReplyMessage
-                    }
+                if _, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                    jsonMap["body"].(map[string]interface{})["contents"].([]interface{})[2].
+                    (map[string]interface{})["contents"].([]interface{})[1].
+                    (map[string]interface{})["contents"].([]interface{})[0].
+                    (map[string]interface{})["text"] = *user.QuickReplyMessage
                 }
             }
         }
 
         // substitute update button fill with current quick reply message
         if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
-            if contentsArr, ok := contents.([]interface{}); ok {
-                contentsArr[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + *user.QuickReplyMessage
+            if _, ok := contents.([]interface{}); ok {
+                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmd + " " + *user.QuickReplyMessage
             }
         }
     }
@@ -155,12 +187,12 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
             if contentsArr, ok := contents.([]interface{}); ok {
                 if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
                     if subContentsArr, ok := subContents.([]interface{}); ok {
-                        contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1:])
+                        // we know there's only 2 elements prior to insertion
+                        contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1])
                     }
                 }
             }
         }
-
     }
 
     outputJsonBytes, err := json.Marshal(jsonMap)
@@ -168,6 +200,9 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         l.log.Error("Error marshalling output JSON in buildQuickReplySettingsFlexMessage: ", err)
         return nil, err
     }
+
+    // DEBUG
+    l.log.Debug("outputJsonBytes: ", string(outputJsonBytes))
 
     flexContainer, err := linebot.UnmarshalFlexMessageJSON(outputJsonBytes)
     if err != nil {

@@ -6,14 +6,12 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
-    "strconv"
 )
 
 type UserDao struct {
@@ -84,16 +82,9 @@ func (d *UserDao) IsUserExist(userId string) (bool, error) {
 // 1. user does not exist UserDoesNotExistException
 // 2. aws error
 func (d *UserDao) GetUser(userId string) (model.User, error) {
-    expr, err := expression.NewBuilder().WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).Build()
-    if err != nil {
-        d.log.Errorf("Unable to produce key condition expression in GetUser with userId %s: %v", userId, err)
-        return model.User{}, err
-    }
-
     response, err := d.client.GetItem(&dynamodb.GetItemInput{
-        TableName:                aws.String(enum.TableUser.String()),
-        Key:                      expr.Values(),
-        ExpressionAttributeNames: expr.Names(),
+        TableName: aws.String(enum.TableUser.String()),
+        Key:       model.BuildUserDdbKey(userId),
     })
     if err != nil {
         d.log.Errorf("Unable to get item with userId '%s' in GetUser: %v", userId, err)
@@ -118,24 +109,16 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
     return user, nil
 }
 
-type updateQuickReplyMessageAttributeValue struct {
-    QuickReplyMessage string `dynamodbav:"quickReplyMessage"`
-}
-
 func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage string) (model.User, error) {
-    av, err := dynamodbattribute.MarshalMap(updateQuickReplyMessageAttributeValue{
-        QuickReplyMessage: quickReplyMessage,
-    })
+    update := expression.Set(
+        expression.Name("quickReplyMessage"),
+        expression.Value(quickReplyMessage),
+    )
+    expr, err := expression.NewBuilder().
+        WithUpdate(update).
+        Build()
     if err != nil {
-        d.log.Errorf("Unable to marshal attribute value '%s' in UpdateQuickReplyMessage: %v", quickReplyMessage, err)
-        return model.User{}, err
-    }
-
-    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
-        "userId":   userId,
-        "uniqueId": util.DefaultUniqueId,
-    })
-    if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
         return model.User{}, err
     }
 
@@ -143,10 +126,10 @@ func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage strin
     // Execute the UpdateItem operation
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableUser.String()),
-        Key:                       key,
-        UpdateExpression:          aws.String("SET #qrm = :qrm"),
-        ExpressionAttributeNames:  map[string]*string{"#qrm": aws.String("quickReplyMessage")},
-        ExpressionAttributeValues: av,
+        Key:                       model.BuildUserDdbKey(userId),
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
         ReturnValues:              &allNewStr,
     }
     response, err := d.client.UpdateItem(ddbInput)
@@ -167,22 +150,24 @@ func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage strin
 }
 
 func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
-    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
-        "userId":   userId,
-        "uniqueId": util.DefaultUniqueId,
-    })
+    update := expression.Remove(expression.Name("quickReplyMessage"))
+    expr, err := expression.NewBuilder().
+        WithUpdate(update).
+        Build()
     if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
         return model.User{}, err
     }
 
     allNewStr := dynamodb.ReturnValueAllNew
     // Execute the UpdateItem operation
     ddbInput := &dynamodb.UpdateItemInput{
-        TableName:                aws.String(enum.TableUser.String()),
-        Key:                      key,
-        UpdateExpression:         aws.String("REMOVE #qrm = :qrm"),
-        ExpressionAttributeNames: map[string]*string{"#qrm": aws.String("quickReplyMessage")},
-        ReturnValues:             &allNewStr,
+        TableName:                 aws.String(enum.TableUser.String()),
+        Key:                       model.BuildUserDdbKey(userId),
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ReturnValues:              &allNewStr,
     }
     response, err := d.client.UpdateItem(ddbInput)
     if err != nil {
@@ -213,26 +198,13 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
         return av, err
     }
 
-    // Replace attribute values with their numeric representation
-    av["createdAt"] = &dynamodb.AttributeValue{
-        N: aws.String(strconv.FormatInt(user.CreatedAt.UnixNano(), 10)),
-    }
-    av["lastUpdated"] = &dynamodb.AttributeValue{
-        N: aws.String(strconv.FormatInt(user.LastUpdated.UnixNano(), 10)),
-    }
-    if user.ExpireAt != nil {
-        av["expireAt"] = &dynamodb.AttributeValue{
-            N: aws.String(strconv.FormatInt(user.ExpireAt.UnixNano(), 10)),
-        }
-    }
-
     // add sort key
     // (sort key appears already added somehow, just mistakenly as 'N' type)
     av["uniqueId"] = &dynamodb.AttributeValue{
         S: aws.String("#"),
     }
 
-    // DEBUG
+    // // DEBUG
     // logger.NewLogger().Debug("userMarshalMap after uniqueId add: ", av)
 
     return av, nil

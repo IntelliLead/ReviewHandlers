@@ -26,6 +26,7 @@ func NewLine(logger *zap.SugaredLogger) *Line {
         lineClient:         newLineClient(logger),
         log:                logger,
         reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
+        quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
     }
 }
 
