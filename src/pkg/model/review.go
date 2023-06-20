@@ -19,17 +19,16 @@ type Review struct {
     ReviewLastUpdated    time.Time          `dynamodbav:"reviewLastUpdated,unixtime"`
     ReviewerProfilePhoto string             `dynamodbav:"reviewerProfilePhoto" validate:"url"`
     ReviewerName         string             `dynamodbav:"reviewerName"`
-    reply                *string            `dynamodbav:"reply,omitempty" validate:"required_with=LastReplied"`          // optional
+    Reply                *string            `dynamodbav:"reply,omitempty" validate:"required_with=LastReplied"`          // optional
     LastReplied          *time.Time         `dynamodbav:"lastReplied,omitempty,unixtime" validate:"required_with=Reply"` // optional
     LastUpdated          time.Time          `dynamodbav:"lastUpdated,unixtime"`
     Vendor               enum.Vendor        `dynamodbav:"vendor"`
 }
 
 func NewReview(event ZapierNewReviewEvent) (*Review, error) {
-    var replyCopy *string
+    var replyCopy string
     if event.Reply != nil {
-        replyCopy = new(string)
-        *replyCopy = *event.Reply
+        replyCopy = *event.Reply
     }
 
     var lastRepliedCopy *time.Time
@@ -48,7 +47,7 @@ func NewReview(event ZapierNewReviewEvent) (*Review, error) {
         ReviewLastUpdated:    event.ReviewLastUpdated,
         ReviewerProfilePhoto: event.ReviewerProfilePhoto,
         ReviewerName:         event.ReviewerName,
-        reply:                replyCopy,
+        Reply:                &replyCopy,
         LastReplied:          lastRepliedCopy,
         LastUpdated:          time.Now(),
         Vendor:               enum.VendorGoogle,

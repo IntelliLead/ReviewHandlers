@@ -135,19 +135,41 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 type UpdateReviewInput struct {
     UserId      string         `dynamodbav:"userId"`
     ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
-    LastUpdated time.Time      `dynamodbav:"lastUpdated"`
-    LastReplied time.Time      `dynamodbav:"lastReplied"`
+    LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
+    LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
     Reply       string         `dynamodbav:"reply"`
 }
 
 func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
-    av, err := dynamodbattribute.MarshalMap(input)
+    var lastUpdatedAv dynamodb.AttributeValue
+    err := dynamodbattribute.UnixTime(input.LastUpdated).MarshalDynamoDBAttributeValue(&lastUpdatedAv)
     if err != nil {
-        return err
+        d.log.Error("Unable to marshal lastUpdated in UpdateReview: ", err)
     }
 
-    // [INT-44] BUG observation
-    d.log.Debug("UpdateReview ExpressionAttributeValues: ", jsonUtil.AnyToJson(input))
+    var lastRepliedAv dynamodb.AttributeValue
+    err = dynamodbattribute.UnixTime(input.LastReplied).MarshalDynamoDBAttributeValue(&lastRepliedAv)
+    if err != nil {
+        d.log.Error("Unable to marshal lastReplied in UpdateReview: ", err)
+    }
+
+    update := expression.Set(
+        expression.Name("lastUpdated"),
+        expression.Value(lastUpdatedAv),
+    ).Set(
+        expression.Name("lastReplied"),
+        expression.Value(lastRepliedAv),
+    ).Set(
+        expression.Name("reply"),
+        expression.Value(input.Reply),
+    )
+    expr, err := expression.NewBuilder().
+        WithUpdate(update).
+        Build()
+    if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateReview: %v", err)
+        return err
+    }
 
     // Create the key for the UpdateItem request
     key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
@@ -162,9 +184,9 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableReview.String()),
         Key:                       key,
-        UpdateExpression:          aws.String("SET #lu = :lu, #lr = :lr, #rep = :rep"),
-        ExpressionAttributeNames:  map[string]*string{"#lu": aws.String("lastUpdated"), "#lr": aws.String("lastReplied"), "#rep": aws.String("reply")},
-        ExpressionAttributeValues: av,
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
     }
     _, err = d.client.UpdateItem(ddbInput)
     if err != nil {
