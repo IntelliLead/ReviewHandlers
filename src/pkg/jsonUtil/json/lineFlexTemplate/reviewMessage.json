@@ -63,10 +63,10 @@
                             {
                                 "type": "text",
                                 "text": "reviewTime readable",
-                                "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
-                                "flex": 5
+                                "flex": 5,
+                                "wrap": true
                             }
                         ]
                     },
@@ -85,10 +85,10 @@
                             {
                                 "type": "text",
                                 "text": "reviewer",
-                                "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
-                                "flex": 5
+                                "flex": 5,
+                                "wrap": true
                             }
                         ]
                     }
@@ -121,7 +121,7 @@
                     "fillInText": "@{REVIEW_ID} {CANNED_REPLY}"
                 },
                 "adjustMode": "shrink-to-fit",
-                "color": "#152642"
+                "color": "#445783"
             },
             {
                 "type": "button",
@@ -135,7 +135,19 @@
                     "fillInText": "@{REVIEW_ID} {TEMPLATE_REPLY}"
                 },
                 "adjustMode": "shrink-to-fit",
-                "color": "#152642"
+                "color": "#445783"
+            },
+            {
+                "type": "button",
+                "style": "link",
+                "height": "sm",
+                "action": {
+                    "type": "postback",
+                    "label": "AI 回覆",
+                    "data": "/NewReview/GenerateAiReply/{REVIEW_ID}"
+                },
+                "adjustMode": "shrink-to-fit",
+                "color": "#445783"
             }
         ],
         "flex": 0,

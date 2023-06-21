@@ -6,14 +6,15 @@
         "contents": [
             {
                 "type": "text",
-                "text": "快速回復設定",
+                "text": "快速回覆設定",
                 "weight": "bold",
-                "size": "xxl",
-                "margin": "md"
+                "size": "xl",
+                "margin": "md",
+                "wrap": true
             },
             {
                 "type": "text",
-                "text": "\"快速回復\"是預先設定好的回復內容，幫助您一鍵回復評價",
+                "text": "\"快速回覆\"是預先設定好的回覆內容，幫助您一鍵回覆評價",
                 "size": "xs",
                 "color": "#aaaaaa",
                 "wrap": true
@@ -30,8 +31,8 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "已儲存回復",
-                                "size": "lg",
+                                "text": "已儲存回覆",
+                                "size": "md",
                                 "color": "#555555",
                                 "flex": 0,
                                 "weight": "bold",
@@ -48,7 +49,8 @@
                                 "type": "text",
                                 "text": "{CANNED_REPLY}",
                                 "size": "md",
-                                "color": "#555555"
+                                "color": "#555555",
+                                "wrap": true
                             }
                         ],
                         "borderWidth": "none",
@@ -70,19 +72,19 @@
                     {
                         "type": "text",
                         "text": "高階功能",
-                        "wrap": true,
-                        "size": "sm",
+                        "size": "xs",
                         "weight": "bold",
-                        "style": "italic"
+                        "style": "italic",
+                        "wrap": true
                     },
                     {
                         "type": "text",
-                        "text": "在回復內容中使用“{評價者}”即可替換評價者名字。\n例如：罐頭回復設定為“{評價者}，謝謝您的評價”，則來自“蔡康永”的評價，快速回復內容為“蔡康永，謝謝您的評價”",
-                        "size": "xs",
+                        "text": "在回覆內容中使用“{評價者}”即可替換評價者名字。\n例如：罐頭回覆設定為“{評價者}，謝謝您的評價”，則來自“蔡康永”的評價，快速回覆內容為“蔡康永，謝謝您的評價”",
+                        "size": "xxs",
                         "contents": [
                             {
                                 "type": "span",
-                                "text": "在回復內容中使用"
+                                "text": "在回覆內容中使用"
                             },
                             {
                                 "type": "span",
@@ -91,7 +93,7 @@
                             },
                             {
                                 "type": "span",
-                                "text": "即可替換評價者名字。\n例如：若快速回復設定為“"
+                                "text": "即可替換評價者名字。\n例如：若快速回覆設定為“"
                             },
                             {
                                 "type": "span",
@@ -100,7 +102,7 @@
                             },
                             {
                                 "type": "span",
-                                "text": "，謝謝您的鼓勵”，則來自“蔡康永”的評價快速回復內容為“蔡康永，謝謝您的鼓勵”"
+                                "text": "，謝謝您的鼓勵”，則來自“蔡康永”的評價快速回覆內容為“蔡康永，謝謝您的鼓勵”"
                             }
                         ],
                         "wrap": true
@@ -125,7 +127,8 @@
                     "inputOption": "openKeyboard",
                     "data": "/QuickReply/UpdateQuickReplyMessage",
                     "fillInText": "/QuickReply 感謝…"
-                }
+                },
+                "color": "#445783"
             },
             {
                 "type": "button",
@@ -133,7 +136,8 @@
                     "type": "postback",
                     "label": "刪除",
                     "data": "/QuickReply/DeleteQuickReplyMessage"
-                }
+                },
+                "color": "#445783"
             }
         ]
     },

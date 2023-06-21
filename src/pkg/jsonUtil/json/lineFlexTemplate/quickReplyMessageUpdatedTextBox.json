@@ -7,8 +7,8 @@
             "text": "成功更新回復訊息",
             "size": "md",
             "color": "#555555",
-            "flex": 0,
-            "style": "italic"
+            "style": "italic",
+            "wrap": true
         }
     ]
 }

@@ -1,0 +1,114 @@
+{
+  "type": "bubble",
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "AI 生成結果",
+        "weight": "bold",
+        "size": "xl",
+        "margin": "md"
+      },
+      {
+        "type": "text",
+        "text": "運用GPT-4最新科技，為您一鍵生成個性化的生動回覆",
+        "size": "xs",
+        "color": "#aaaaaa",
+        "wrap": true
+      },
+      {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "lg",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "回覆評價者：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REVIEWER_NAME}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "sm",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "box",
+            "layout": "horizontal",
+            "margin": "xl",
+            "contents": [
+              {
+                "type": "text",
+                "text": "{AI_REPLY}",
+                "size": "md",
+                "color": "#555555",
+                "wrap": true
+              }
+            ],
+            "borderWidth": "none",
+            "backgroundColor": "#FFFFFF",
+            "cornerRadius": "md",
+            "paddingAll": "lg"
+          }
+        ],
+        "paddingBottom": "lg"
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "使用回覆",
+          "inputOption": "openKeyboard",
+          "data": "/NewReview/Reply",
+          "fillInText": "@{REVIEW_ID} {AI_REPLY}"
+        },
+        "color": "#445783"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "換一個",
+          "data": "/AiReply/GenerateAiReply/{REVIEW_ID}"
+        },
+        "color": "#445783"
+      }
+    ]
+  },
+  "styles": {
+    "body": {
+      "backgroundColor": "#F5F5F5"
+    },
+    "footer": {
+      "separator": true,
+      "backgroundColor": "#8fa6cc"
+    }
+  }
+}
