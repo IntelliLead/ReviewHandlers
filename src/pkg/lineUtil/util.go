@@ -267,8 +267,8 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         }
     }
 
-    quickReplyMsg := user.GetFinalQuickReplyMessage(review)
     // update quick reply button
+    quickReplyMsg := user.GetFinalQuickReplyMessage(review)
     if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if util.IsEmptyString(quickReplyMsg) {
@@ -280,6 +280,16 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
                 (map[string]interface{})["action"].
                 (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMsg
             }
+        }
+    }
+
+    // update AI reply button
+    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            // TODO: enable when ready
+
+            // remove quick reply button
+            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[:len(contentsArr)-1])
         }
     }
 
