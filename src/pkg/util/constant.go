@@ -19,7 +19,7 @@ func HelpMessage() string {
 func MoreMessage() string {
     url := "https://line.me/R/ti/p/%40006xnyvp"
     text := fmt.Sprint("更多功能開發中，敬請期待。\n\n" +
-        "下一功能：AI 智能回復\n" +
+        "下一功能：Coming Soon...\n" +
         "智引力企劃的最新功能會在這邊不定期更新，歡迎查看！\n\n" +
         "Customer Obsession 是我們的 DNA。我們承諾持續聆聽用戶聲音，力圖為願意給我們機會的您提供最好的服務。\n\n" +
         "希望您不吝嗇提供寶貴建議，或若您有任何需要協助，都請隨時聯係我們：")
