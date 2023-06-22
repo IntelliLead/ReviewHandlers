@@ -50,10 +50,10 @@ func (ai *Ai) GenerateReply(review string) (string, error) {
             case 429:
                 // rate limiting or engine overload (wait and retry)
                 ai.log.Error("Error generating AI reply due to rate limit exceeded: ", err)
-                // TODO: retry
+                // TODO: [INT-62] add retry
             case 500:
-                ai.log.Error("Error generating AI reply due to OpenAI server error: ", err)
-                // TODO: retry
+                ai.log.Error("Error generating AI reply due to OpenAI internal server error: ", err)
+                // TODO: [INT-62] add retry
             default:
                 ai.log.Error("Error generating AI reply due to unknown error: ", err)
             }
@@ -62,12 +62,11 @@ func (ai *Ai) GenerateReply(review string) (string, error) {
         return "", err
     }
 
+    // response format: https://platform.openai.com/docs/guides/gpt/completions-response-format
     if response.Choices[0].FinishReason != openai.FinishReasonStop {
         ai.log.Error("Error generating AI reply due to failure finish reason: %s", jsonUtil.AnyToJson(response.Choices[0]))
         return response.Choices[0].Message.Content, errors.New(response.Choices[0].Message.Content)
     }
-
-    // response format: https://platform.openai.com/docs/guides/gpt/completions-response-format
 
     ai.log.Infof("AI reply used %d input tokens and %d output tokens", response.Usage.PromptTokens, response.Usage.CompletionTokens)
 

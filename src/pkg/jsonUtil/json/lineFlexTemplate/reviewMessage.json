@@ -6,7 +6,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "Google 地圖評價",
+                "text": "Google 地圖評論",
                 "weight": "bold",
                 "size": "xl"
             },
@@ -55,7 +55,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "評價時間",
+                                "text": "評論時間",
                                 "color": "#999999",
                                 "size": "sm",
                                 "flex": 0
@@ -77,7 +77,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "評價者",
+                                "text": "評論者",
                                 "color": "#999999",
                                 "size": "sm",
                                 "flex": 0

@@ -19,7 +19,7 @@ var TestUpdateQuickReplyEvent = []*linebot.Event{
         },
         Message: &linebot.TextMessage{
             ID:   "460358036163657844",
-            Text: "/QuickReply 感謝評價！",
+            Text: "/QuickReply 感謝評論！",
         },
         ReplyToken: "c9ea1fc15d9f498e9955897187869905",
         Mode:       linebot.EventModeActive,

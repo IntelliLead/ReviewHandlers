@@ -31,7 +31,7 @@
             "contents": [
               {
                 "type": "text",
-                "text": "回覆評價者：",
+                "text": "評論者：",
                 "size": "sm",
                 "flex": 0,
                 "color": "#666666"
