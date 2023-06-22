@@ -267,7 +267,13 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         }
     }
 
+    // update AI reply button
+    jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
+
     // update quick reply button
+    // must be done LAST because it will remove the quick reply button if the quick reply message is empty
     quickReplyMsg := user.GetFinalQuickReplyMessage(review)
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
@@ -282,11 +288,6 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
             }
         }
     }
-
-    // update AI reply button
-    jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
-    (map[string]interface{})["action"].
-    (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
 
     // Convert the map to LINE flex message
     return l.jsonMapToLineFlexContainer(jsonMap)
