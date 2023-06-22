@@ -111,8 +111,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
         case linebot.EventTypePostback:
             log.Info("Received Postback event")
-
-            return lineEventProcessor.ProcessPostbackEvent(event, userId, userDao, line, log)
+            return lineEventProcessor.ProcessPostbackEvent(event, userId, userDao, reviewDao, line, log)
 
         default:
             log.Info("Unhandled event type: ", event.Type)

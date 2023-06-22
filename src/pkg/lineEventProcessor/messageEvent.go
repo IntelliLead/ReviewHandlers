@@ -113,7 +113,7 @@ func ProcessMessageEvent(event *linebot.Event,
             }, err
         }
 
-        err = line.ShowQuickReplySettings(updatedUser, event.ReplyToken, true)
+        err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser, true)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{

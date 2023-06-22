@@ -2,9 +2,12 @@ package lineEventProcessor
 
 import (
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/aiUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
+    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
@@ -14,6 +17,7 @@ import (
 func ProcessPostbackEvent(event *linebot.Event,
     userId string,
     userDao *ddbDao.UserDao,
+    reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
@@ -26,6 +30,79 @@ func ProcessPostbackEvent(event *linebot.Event,
     dataSlice = dataSlice[1:]
 
     switch dataSlice[0] {
+    case "NewReview", "AiReply":
+        // /[NewReview|AiReply]/GenerateAiReply/{REVIEW_ID}
+        if len(dataSlice) < 3 || dataSlice[1] != "GenerateAiReply" || util.IsEmptyString(dataSlice[2]) {
+            return returnUnhandledPostback(log, *event), nil
+        }
+
+        // Notify user that AI is generating reply
+        _, err := line.NotifyUserAiReplyGenerationInProgress(event.ReplyToken)
+        if err != nil {
+            log.Errorf("Error notifying user '%s' that AI is generating reply. Porceeding: %v", userId, err)
+        }
+
+        // get review
+        reviewIdArg := dataSlice[2]
+        review, err := reviewDao.GetReview(userId, _type.NewReviewId(reviewIdArg))
+        if err != nil {
+            log.Errorf("Error getting review during handling %s: %v", event.Postback.Data, err)
+
+            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+            if err != nil {
+                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+                }, err
+            }
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error getting review during handling %s: %s"}`, event.Postback.Data, err),
+            }, err
+        }
+
+        // invoke gpt4
+        aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review)
+        if err != nil {
+            log.Errorf("Error generating AI reply: %v", err)
+
+            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+            if err != nil {
+                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+                }, err
+            }
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error generating AI reply: %s"}`, err),
+            }, err
+        }
+
+        // create AI generated result card
+        err = line.SendAiGeneratedReply(aiReply, review)
+        if err != nil {
+            log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
+
+            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+            if err != nil {
+                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+                }, err
+            }
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error sending AI generated reply: %s"}`, err),
+            }, err
+        }
+
     case "RichMenu":
         if len(dataSlice) < 2 {
             return returnUnhandledPostback(log, *event), nil
@@ -43,7 +120,7 @@ func ProcessPostbackEvent(event *linebot.Event,
                 }, err
             }
 
-            err = line.ShowQuickReplySettings(user, event.ReplyToken, false)
+            err = line.ShowQuickReplySettings(event.ReplyToken, user, false)
             if err != nil {
                 log.Errorf("Error sending quick reply settings to user '%s': %v", user.UserId, err)
                 return events.LambdaFunctionURLResponse{
@@ -105,7 +182,7 @@ func ProcessPostbackEvent(event *linebot.Event,
                 }, err
             }
 
-            err = line.ShowQuickReplySettings(updatedUser, event.ReplyToken, true)
+            err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser, true)
             if err != nil {
                 log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
                 return events.LambdaFunctionURLResponse{

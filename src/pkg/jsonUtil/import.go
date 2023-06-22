@@ -17,6 +17,10 @@ type QuickReplySettingsLineFlexTemplateJsons struct {
     QuickReplyMessageUpdatedTextBox []byte
 }
 
+type AiReplyResultLineFlexTemplateJsons struct {
+    AiReplyResult []byte
+}
+
 //go:embed json/lineFlexTemplate/*
 var embeddedFileSystem embed.FS
 
@@ -60,5 +64,16 @@ func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTem
         QuickReplySettings:              quickReplySettings,
         QuickReplySettingsNoQuickReply:  quickReplySettingsNoQuickReply,
         QuickReplyMessageUpdatedTextBox: quickReplyMessageUpdatedTextBox,
+    }
+}
+
+func LoadAiReplyResultLineFlexTemplateJsons() AiReplyResultLineFlexTemplateJsons {
+    aiReplyResult, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReplyResult.json")
+    if err != nil {
+        log.Fatal("Error reading aiReplyResult.json: ", err)
+    }
+
+    return AiReplyResultLineFlexTemplateJsons{
+        aiReplyResult,
     }
 }

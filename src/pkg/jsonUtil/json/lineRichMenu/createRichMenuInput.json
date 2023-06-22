@@ -2,10 +2,10 @@
     "size":
     {
         "width": 2500,
-        "height": 844
+        "height": 843
     },
     "selected": true,
-    "name": "v3",
+    "name": "v4",
     "chatBarText": "選單",
     "areas":
     [
@@ -15,7 +15,7 @@
                 "x": 0,
                 "y": 0,
                 "width": 833,
-                "height": 844
+                "height": 843
             },
             "action":
             {
@@ -31,7 +31,7 @@
                 "x": 834,
                 "y": 0,
                 "width": 843,
-                "height": 844
+                "height": 843
             },
             "action":
             {
@@ -47,7 +47,7 @@
                 "x": 1667,
                 "y": 0,
                 "width": 833,
-                "height": 844
+                "height": 843
             },
             "action":
             {

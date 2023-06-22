@@ -5,4 +5,5 @@ type Secrets struct {
     NewUserSlackBotChannelId string `json:"NewUserSlackBotChannelId"`
     LineChannelSecret        string `json:"LineChannelSecret"`
     LineChannelAccessToken   string `json:"LineChannelAccessToken"`
+    GptApiKey                string `json:"GptApiKey"`
 }

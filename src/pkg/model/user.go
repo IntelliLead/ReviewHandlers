@@ -72,5 +72,5 @@ func (u User) GetFinalQuickReplyMessage(review Review) string {
         return ""
     }
 
-    return strings.ReplaceAll(*u.QuickReplyMessage, "{評價者}", review.ReviewerName)
+    return strings.ReplaceAll(*u.QuickReplyMessage, "{評論者}", review.ReviewerName)
 }
