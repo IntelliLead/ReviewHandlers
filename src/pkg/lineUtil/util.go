@@ -268,9 +268,18 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     }
 
     // update AI reply button
-    jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
-    (map[string]interface{})["action"].
-    (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
+    // // remove AI reply button (3rd element in contents array) if review is empty
+    if isEmptyReview {
+        if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
+            if contentsArr, ok := contents.([]interface{}); ok {
+                jsonMap["footer"].(map[string]interface{})["contents"] = append(contentsArr[:2])
+            }
+        }
+    } else {
+        jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
+    }
 
     // update quick reply button
     // must be done LAST because it will remove the quick reply button if the quick reply message is empty
