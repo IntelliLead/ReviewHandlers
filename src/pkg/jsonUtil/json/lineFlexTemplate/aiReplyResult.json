@@ -86,7 +86,7 @@
           "type": "postback",
           "label": "使用回覆",
           "inputOption": "openKeyboard",
-          "data": "/NewReview/Reply",
+          "data": "/AiReply/Reply",
           "fillInText": "@{REVIEW_ID} {AI_REPLY}"
         },
         "color": "#445783"

@@ -191,7 +191,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
 
 func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
-    reviewMsgJson, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
+    jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
         l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
         return nil, err
@@ -206,7 +206,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         reviewMessage = review.Review
     }
 
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             contentsArr[3].(map[string]interface{})["text"] = reviewMessage
         }
@@ -219,7 +219,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
         return nil, err
     }
 
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
         }
@@ -233,7 +233,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     }
 
     // Modify reviewer and timestamp
-    if contents, ok := reviewMsgJson["body"].(map[string]interface{})["contents"]; ok {
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
                 if subContentsArr, ok := subContents.([]interface{}); ok {
@@ -259,7 +259,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     // update edit reply button
     ReplyMessagePrefix := fmt.Sprintf("@%s ", review.ReviewId.String())
     fillInText := ReplyMessagePrefix + "感謝…"
-    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
                 action.(map[string]interface{})["fillInText"] = fillInText
@@ -269,14 +269,14 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
 
     // update quick reply button
     quickReplyMsg := user.GetFinalQuickReplyMessage(review)
-    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
+    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if util.IsEmptyString(quickReplyMsg) {
                 // remove quick reply button
-                reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
+                jsonMap["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
             } else {
                 // update quick reply message in button
-                reviewMsgJson["footer"].(map[string]interface{})["contents"].([]interface{})[0].
+                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].
                 (map[string]interface{})["action"].
                 (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMsg
             }
@@ -284,27 +284,66 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     }
 
     // update AI reply button
-    if contents, ok := reviewMsgJson["footer"].(map[string]interface{})["contents"]; ok {
-        if contentsArr, ok := contents.([]interface{}); ok {
-            // TODO: enable when ready
-
-            // remove quick reply button
-            reviewMsgJson["footer"].(map[string]interface{})["contents"] = append(contentsArr[:len(contentsArr)-1])
-        }
-    }
+    jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
 
     // Convert the map to LINE flex message
-    // first convert back to json
-    reviewMsgJsonBytes, err := json.Marshal(reviewMsgJson)
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.aiReplyResultJsons.AiReplyResult)
     if err != nil {
-        l.log.Error("Error marshalling reviewMessage JSON: ", err)
+        l.log.Debug("Error unmarshalling AiReplyResult JSON: ", err)
         return nil, err
     }
-    reviewMsgFlexContainer, err := linebot.UnmarshalFlexMessageJSON(reviewMsgJsonBytes)
+
+    // update reviewer name
+    // body -> contents[2] -> contents[0] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = review.ReviewerName
+
+    // update ai reply
+    // body -> contents[3] -> contents[0] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = aiReply
+
+    // update buttons
+    // footer -> contents[0] -> action -> fillInText
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%s %s", review.ReviewId.String(), aiReply)
+
+    // footer -> contents[1] -> action -> data
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = "/AiReply/GenerateAiReply/" + review.ReviewId.String()
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (linebot.FlexContainer, error) {
+    // Convert the map to LINE flex message
+    // first convert back to json
+    jsonBytes, err := json.Marshal(jsonMap)
+    if err != nil {
+        l.log.Error("Error marshalling JSON: ", err)
+        return nil, err
+    }
+    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
     if err != nil {
         l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
         return nil, err
     }
 
-    return reviewMsgFlexContainer, nil
+    return flexContainer, nil
 }

@@ -19,6 +19,7 @@ type Line struct {
     log                *zap.SugaredLogger
     reviewMessageJsons jsonUtil.ReviewMessageLineFlexTemplateJsons
     quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
+    aiReplyResultJsons jsonUtil.AiReplyResultLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
@@ -27,6 +28,7 @@ func NewLine(logger *zap.SugaredLogger) *Line {
         log:                logger,
         reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
         quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
+        aiReplyResultJsons: jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
     }
 }
 
@@ -64,12 +66,12 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
 func (l *Line) SendNewReview(review model.Review, user model.User) error {
     flexMessage, err := l.buildReviewFlexMessage(review, user)
     if err != nil {
-        l.log.Error("Error building flex message: ", err)
+        l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有新評價!", flexMessage)).Do()
+    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
     if err != nil {
-        l.log.Error("Error sending lineTextMessage to line: ", err)
+        l.log.Error("Error sending lineTextMessage to line in SendNewReview: ", err)
         return err
     }
 
@@ -78,7 +80,7 @@ func (l *Line) SendNewReview(review model.Review, user model.User) error {
     return nil
 }
 
-func (l *Line) ShowQuickReplySettings(user model.User, replyToken string, isUpdated bool) error {
+func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, isUpdated bool) error {
     flexMessage, err := l.buildQuickReplySettingsFlexMessage(user, isUpdated)
 
     if err != nil {
@@ -92,6 +94,23 @@ func (l *Line) ShowQuickReplySettings(user model.User, replyToken string, isUpda
     }
 
     l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
+func (l *Line) SendAiGeneratedReply(replyToken string, aiReply string, review model.Review, userId string) error {
+    flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply)
+    if err != nil {
+        l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
+    }
+
+    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("AI 回復生成結果", flexMessage)).Do()
+    if err != nil {
+        l.log.Error("Error replying message in SendAiGeneratedReply: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in SendAiGeneratedReply to %s: %s", userId, jsonUtil.AnyToJson(resp))
 
     return nil
 }
