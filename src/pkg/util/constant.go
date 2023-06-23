@@ -5,9 +5,9 @@ import (
 )
 
 func HelpMessage() string {
-    text := fmt.Sprint("請查看我們的更多協助文檔：\n" +
+    text := fmt.Sprint("點擊連結了解相關功能說明：\n" +
         "https://tinyurl.com/intellilead-help \n\n" +
-        "如需更多幫助，請聯係我們：\n")
+        "「如需更多幫助請洽客服小幫手：\n")
     return text + "https://line.me/R/ti/p/%40006xnyvp"
 }
 
