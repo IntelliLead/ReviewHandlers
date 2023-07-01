@@ -71,7 +71,8 @@
                     "type": "datetimepicker",
                     "label": "設定結束時間",
                     "data": "/Closure/EndTime",
-                    "mode": "time"
+                    "mode": "time",
+                    "initial": "19:00"
                 },
                 "color": "#445783"
             }

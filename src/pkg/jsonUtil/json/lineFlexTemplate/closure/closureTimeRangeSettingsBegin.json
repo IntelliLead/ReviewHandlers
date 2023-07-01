@@ -46,7 +46,8 @@
                     "type": "datetimepicker",
                     "label": "設定開始時間",
                     "data": "/Closure/BeginTime",
-                    "mode": "time"
+                    "mode": "time",
+                    "initial": "09:00"
                 },
                 "color": "#445783"
             }

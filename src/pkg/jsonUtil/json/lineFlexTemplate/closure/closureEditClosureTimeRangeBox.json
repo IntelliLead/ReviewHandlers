@@ -14,5 +14,14 @@
     "borderWidth": "none",
     "backgroundColor": "#FFFFFF",
     "cornerRadius": "md",
-    "paddingAll": "lg"
+    "paddingAll": "lg",
+    "action": {
+        "type": "datetimepicker",
+        "label": "更改公休日期",
+        "data": "/Closure/Edit/UpdateDate",
+        "mode": "date",
+        "initial": "2023-07-01",
+        "max": "2023-09-01",
+        "min": "2023-07-01"
+    }
 }

@@ -42,7 +42,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "端午節連假",
+                        "text": "端午節公休",
                         "weight": "bold",
                         "size": "md",
                         "margin": "md",
@@ -136,7 +136,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "端午節連假",
+                        "text": "端午節公休",
                         "weight": "bold",
                         "size": "md",
                         "margin": "md",

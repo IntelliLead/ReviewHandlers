@@ -1,0 +1,184 @@
+{
+    "type": "bubble",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "公休日設定",
+                "weight": "bold",
+                "size": "xl",
+                "margin": "md",
+                "wrap": true
+            },
+            {
+                "type": "text",
+                "text": "讓您的顧客在 Google Map 上看到此日未營業",
+                "size": "xs",
+                "color": "#aaaaaa",
+                "wrap": true
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "lg",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "日期 *",
+                                "size": "sm",
+                                "color": "#666666",
+                                "weight": "bold",
+                                "style": "normal"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "md",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "2023-07-01",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "更改公休日期",
+                            "data": "/Closure/Edit/UpdateDate",
+                            "mode": "date",
+                            "initial": "2023-07-01",
+                            "max": "2023-09-01",
+                            "min": "2023-07-01"
+                        }
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "狀態 *",
+                                "size": "sm",
+                                "color": "#666666",
+                                "weight": "bold",
+                                "style": "normal"
+                            }
+                        ],
+                        "paddingEnd": "none"
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "全日公休",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true,
+                                "margin": "none"
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg"
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "公休原因（選填）",
+                                "size": "sm",
+                                "color": "#666666",
+                                "weight": "bold",
+                                "style": "normal"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "md",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "端午節",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改原因",
+                            "data": "/Closure/Edit/UpdateDescription"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "特殊營業時間",
+                    "data": "/Closure/Edit/UpdateToPartialDay"
+                },
+                "color": "#445783"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "保存",
+                    "data": "/Closure/Edit/Save"
+                },
+                "color": "#445783"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "取消",
+                    "data": "/Closure/Edit/Cancel"
+                },
+                "color": "#445783"
+            }
+        ]
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5"
+        },
+        "footer": {
+            "separator": true,
+            "backgroundColor": "#8fa6cc"
+        }
+    }
+}

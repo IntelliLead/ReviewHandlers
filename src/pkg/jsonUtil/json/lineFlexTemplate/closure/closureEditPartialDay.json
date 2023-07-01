@@ -55,7 +55,16 @@
                         "borderWidth": "none",
                         "backgroundColor": "#FFFFFF",
                         "cornerRadius": "md",
-                        "paddingAll": "lg"
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "更改公休日期",
+                            "data": "/Closure/Edit/UpdateDate",
+                            "mode": "date",
+                            "initial": "2023-07-01",
+                            "max": "2023-09-01",
+                            "min": "2023-07-01"
+                        }
                     },
                     {
                         "type": "box",
@@ -75,19 +84,25 @@
                     {
                         "type": "box",
                         "layout": "horizontal",
+                        "margin": "md",
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "全日公休",
+                                "text": "11:00-14:30 休",
                                 "size": "md",
                                 "color": "#555555",
-                                "wrap": true,
-                                "margin": "none"
+                                "wrap": true
                             }
                         ],
                         "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
                         "cornerRadius": "md",
-                        "paddingAll": "lg"
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改時間",
+                            "data": "/Closure/Edit/UpdateTime"
+                        }
                     },
                     {
                         "type": "box",
@@ -119,7 +134,12 @@
                         "borderWidth": "none",
                         "backgroundColor": "#FFFFFF",
                         "cornerRadius": "md",
-                        "paddingAll": "lg"
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改原因",
+                            "data": "/Closure/Edit/UpdateDescription"
+                        }
                     }
                 ]
             }
@@ -133,8 +153,8 @@
                 "type": "button",
                 "action": {
                     "type": "postback",
-                    "label": "改為時段公休",
-                    "data": "/Closure/Edit/UpdateToPartialDay"
+                    "label": "改為全日公休",
+                    "data": "/Closure/Edit/UpdateToFullDay"
                 },
                 "color": "#445783"
             },
