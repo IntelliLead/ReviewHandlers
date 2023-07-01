@@ -1,0 +1,64 @@
+{
+    "type": "bubble",
+    "size": "micro",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "公休時段設定",
+                "size": "lg",
+                "weight": "bold"
+            },
+            {
+                "type": "box",
+                "layout": "baseline",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "color": "#999999",
+                        "size": "md",
+                        "flex": 0,
+                        "text": "日期"
+                    },
+                    {
+                        "type": "text",
+                        "text": "2023-07-01",
+                        "color": "#666666",
+                        "size": "md",
+                        "flex": 5,
+                        "wrap": true
+                    }
+                ],
+                "margin": "lg"
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "button",
+                "action": {
+                    "type": "datetimepicker",
+                    "label": "設定開始時間",
+                    "data": "/Closure/BeginTime",
+                    "mode": "time"
+                },
+                "color": "#445783"
+            }
+        ]
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5"
+        },
+        "footer": {
+            "separator": true,
+            "backgroundColor": "#8fa6cc"
+        }
+    }
+}

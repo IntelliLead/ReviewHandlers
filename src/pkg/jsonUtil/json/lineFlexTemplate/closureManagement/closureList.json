@@ -13,7 +13,17 @@
                         "url": "https://i.imgur.com/mA3jZpC.png",
                         "size": "full",
                         "aspectMode": "fit",
-                        "aspectRatio": "1:1.5"
+                        "aspectRatio": "1:1.2"
+                    },
+                    {
+                        "type": "text",
+                        "text": "添加公休日",
+                        "align": "center",
+                        "color": "#445783",
+                        "style": "normal",
+                        "weight": "regular",
+                        "size": "sm",
+                        "margin": "xl"
                     }
                 ]
             },
@@ -32,7 +42,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "端午節",
+                        "text": "端午節連假",
                         "weight": "bold",
                         "size": "md",
                         "margin": "md",
@@ -126,7 +136,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "端午節（放假日）",
+                        "text": "端午節連假",
                         "weight": "bold",
                         "size": "md",
                         "margin": "md",
@@ -277,7 +287,7 @@
                                     },
                                     {
                                         "type": "text",
-                                        "text": "8:00-14:30 公休",
+                                        "text": "8:00-14:30 休",
                                         "color": "#666666",
                                         "size": "sm",
                                         "flex": 5,

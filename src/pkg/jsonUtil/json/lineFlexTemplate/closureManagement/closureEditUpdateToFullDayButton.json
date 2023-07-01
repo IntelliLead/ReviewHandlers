@@ -1,0 +1,9 @@
+{
+    "type": "button",
+    "action": {
+        "type": "postback",
+        "label": "改為全日公休",
+        "data": "/Closure/Edit/UpdateToFullDay"
+    },
+    "color": "#445783"
+}

@@ -1,0 +1,18 @@
+{
+    "type": "box",
+    "layout": "horizontal",
+    "margin": "md",
+    "contents": [
+        {
+            "type": "text",
+            "text": "11:00-14:30 休",
+            "size": "md",
+            "color": "#555555",
+            "wrap": true
+        }
+    ],
+    "borderWidth": "none",
+    "backgroundColor": "#FFFFFF",
+    "cornerRadius": "md",
+    "paddingAll": "lg"
+}
