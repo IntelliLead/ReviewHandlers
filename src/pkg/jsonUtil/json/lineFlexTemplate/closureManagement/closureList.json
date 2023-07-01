@@ -1,0 +1,327 @@
+{
+    "type": "carousel",
+    "contents": [
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "image",
+                        "url": "https://i.imgur.com/mA3jZpC.png",
+                        "size": "full",
+                        "aspectMode": "fit",
+                        "aspectRatio": "1:1.5"
+                    }
+                ]
+            },
+            "action": {
+                "type": "postback",
+                "label": "添加",
+                "data": "/Closure/Add"
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "端午節",
+                        "weight": "bold",
+                        "size": "md",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "日期",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "2023-06-22",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "狀態",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "照常營業",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改",
+                            "data": "/Closure/Update"
+                        },
+                        "color": "#445783"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "端午節（放假日）",
+                        "weight": "bold",
+                        "size": "md",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "日期",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "2023-06-23",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "狀態",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "全天公休",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改",
+                            "data": "/Closure/Update"
+                        },
+                        "color": "#445783"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "照常營業",
+                            "data": "/Closure/Delete"
+                        },
+                        "color": "#445783"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "特殊公休",
+                        "weight": "bold",
+                        "size": "md",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "日期",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "2023-06-27",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "baseline",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "狀態",
+                                        "color": "#999999",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "8:00-14:30 公休",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 5,
+                                        "wrap": true
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "更改",
+                            "data": "/Closure/Update"
+                        },
+                        "color": "#445783"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "照常營業",
+                            "data": "/Closure/Delete"
+                        },
+                        "color": "#445783"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        }
+    ]
+}
