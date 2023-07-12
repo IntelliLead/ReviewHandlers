@@ -70,7 +70,7 @@
                         "color": "#555555",
                         "wrap": true,
                         "margin": "none",
-                        "text": "無"
+                        "text": "11:00-14:30"
                     }
                 ],
                 "borderWidth": "none",
@@ -99,7 +99,29 @@
                 "type": "button",
                 "action": {
                     "type": "datetimepicker",
+                    "label": "重設",
+                    "data": "/Closure/BeginTime",
+                    "mode": "time",
+                    "initial": "09:00"
+                },
+                "color": "#445783"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "datetimepicker",
                     "label": "全日店休",
+                    "data": "/Closure/BeginTime",
+                    "mode": "time",
+                    "initial": "09:00"
+                },
+                "color": "#445783"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "datetimepicker",
+                    "label": "完成",
                     "data": "/Closure/BeginTime",
                     "mode": "time",
                     "initial": "09:00"

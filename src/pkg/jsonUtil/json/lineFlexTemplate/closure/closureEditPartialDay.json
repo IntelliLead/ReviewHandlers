@@ -6,7 +6,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "公休日設定",
+                "text": "店休設定",
                 "weight": "bold",
                 "size": "xl",
                 "margin": "md",
@@ -72,7 +72,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "狀態 *",
+                                "text": "營業時間 *",
                                 "size": "sm",
                                 "color": "#666666",
                                 "weight": "bold",
@@ -83,12 +83,19 @@
                     },
                     {
                         "type": "box",
-                        "layout": "horizontal",
+                        "layout": "vertical",
                         "margin": "md",
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "11:00-14:30 休",
+                                "text": "11:00-14:30",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            },
+                            {
+                                "type": "text",
+                                "text": "15:00-17:00",
                                 "size": "md",
                                 "color": "#555555",
                                 "wrap": true
@@ -110,7 +117,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "公休原因（選填）",
+                                "text": "店休原因",
                                 "size": "sm",
                                 "color": "#666666",
                                 "weight": "bold",
@@ -153,7 +160,7 @@
                 "type": "button",
                 "action": {
                     "type": "postback",
-                    "label": "改為全日公休",
+                    "label": "全日店休",
                     "data": "/Closure/Edit/UpdateToFullDay"
                 },
                 "color": "#445783"
