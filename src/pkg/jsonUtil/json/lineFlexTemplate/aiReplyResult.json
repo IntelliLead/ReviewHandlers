@@ -44,6 +44,27 @@
                 "flex": 5
               }
             ]
+          },
+          {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "評論內容：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REVIEW}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5
+              }
+            ]
           }
         ]
       },

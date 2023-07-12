@@ -317,6 +317,14 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["text"] = review.ReviewerName
 
+    // update review body
+    // body -> contents[2] -> contents[1] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = review.Review
+
     // update ai reply
     // body -> contents[3] -> contents[0] -> contents[0] -> text
     jsonMap["body"].
