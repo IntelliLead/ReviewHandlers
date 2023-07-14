@@ -1,0 +1,610 @@
+{
+    "type": "carousel",
+    "contents": [
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "07/10 - 07/16",
+                        "weight": "bold",
+                        "size": "lg",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "商家檔案互動次數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "60",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_equilateral_triangle_point_up.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "20",
+                                                "margin": "xs"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "50%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "評論數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "115",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_equilateral_triangle_point_up.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "10",
+                                                "margin": "xs"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "9.5%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "margin": "lg"
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "星評",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "margin": "md",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "4.8",
+                                                "size": "sm",
+                                                "margin": "md",
+                                                "flex": 0,
+                                                "color": "#999999"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_equilateral_triangle_point_up.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "0.8",
+                                                "margin": "xs",
+                                                "flex": 4
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "20%",
+                                                "flex": 7
+                                            }
+                                        ],
+                                        "margin": "none"
+                                    }
+                                ],
+                                "margin": "lg"
+                            }
+                        ],
+                        "paddingBottom": "md"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "07/03 - 07/09",
+                        "weight": "bold",
+                        "size": "lg",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "商家檔案互動次數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "40",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Red_triangle.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "10",
+                                                "margin": "xs"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "20%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "評論數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "105",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_equilateral_triangle_point_up.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "5",
+                                                "margin": "xs",
+                                                "flex": 1
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "5%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "margin": "lg"
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "星評",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "margin": "md",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "4.0",
+                                                "size": "sm",
+                                                "margin": "md",
+                                                "flex": 0,
+                                                "color": "#999999"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_equilateral_triangle_point_up.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "0.4",
+                                                "margin": "xs",
+                                                "flex": 4
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "11.1%",
+                                                "flex": 7
+                                            }
+                                        ],
+                                        "margin": "none"
+                                    }
+                                ],
+                                "margin": "lg"
+                            }
+                        ],
+                        "paddingBottom": "md"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "micro",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "06/26 - 07/02",
+                        "weight": "bold",
+                        "size": "lg",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "商家檔案互動次數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "50",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Red_triangle.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "5",
+                                                "margin": "xs"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "10%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0,
+                                        "text": "評論數"
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "100",
+                                                "size": "sm",
+                                                "wrap": true,
+                                                "flex": 3
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Red_triangle.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "5",
+                                                "margin": "xs",
+                                                "flex": 1
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "5%",
+                                                "flex": 2,
+                                                "align": "end"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "margin": "lg"
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "星評",
+                                        "color": "#666666",
+                                        "size": "sm",
+                                        "flex": 0
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "margin": "md",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
+                                            },
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "3.6",
+                                                "size": "sm",
+                                                "margin": "md",
+                                                "flex": 0,
+                                                "color": "#999999"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "baseline",
+                                        "contents": [
+                                            {
+                                                "type": "icon",
+                                                "size": "sm",
+                                                "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Red_triangle.svg"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "0.2",
+                                                "margin": "xs",
+                                                "flex": 4
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": "8%",
+                                                "flex": 7
+                                            }
+                                        ],
+                                        "margin": "none"
+                                    }
+                                ],
+                                "margin": "lg"
+                            }
+                        ],
+                        "paddingBottom": "md"
+                    }
+                ]
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        }
+    ]
+}
