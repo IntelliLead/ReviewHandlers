@@ -22,17 +22,27 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
     }
 }
 
-func (ai *Ai) GenerateReply(review string) (string, error) {
+func (ai *Ai) GenerateReply(review string, userId string) (string, error) {
+    var temp float32
+    var prompt string
+    if userId == util.NailSalonUserId || userId == util.AlphaUserId {
+        temp = 1.15
+        prompt = util.AiReplyPromptNailSalon
+    } else {
+        temp = 1.0
+        prompt = util.AiReplyPrompt
+    }
+
     response, err := ai.gptClient.CreateChatCompletion(
         context.Background(),
         openai.ChatCompletionRequest{
-            Temperature: 1.0,
+            Temperature: temp,
             MaxTokens:   256,
             Model:       openai.GPT4,
             Messages: []openai.ChatCompletionMessage{
                 {
                     Role:    openai.ChatMessageRoleSystem,
-                    Content: util.AiReplyPrompt,
+                    Content: prompt,
                 },
                 {
                     Role:    openai.ChatMessageRoleUser,

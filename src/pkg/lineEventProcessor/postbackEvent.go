@@ -64,7 +64,7 @@ func ProcessPostbackEvent(event *linebot.Event,
         }
 
         // invoke gpt4
-        aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review)
+        aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review, userId)
         if err != nil {
             log.Errorf("Error generating AI reply: %v", err)
 
