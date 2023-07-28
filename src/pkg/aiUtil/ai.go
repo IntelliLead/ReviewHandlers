@@ -26,7 +26,7 @@ func (ai *Ai) GenerateReply(review string, userId string) (string, error) {
     var temp float32
     var prompt string
     if userId == util.NailSalonUserId || userId == util.AlphaUserId {
-        temp = 1.15
+        temp = 1.12
         prompt = util.AiReplyPromptNailSalon
     } else {
         temp = 1.0
