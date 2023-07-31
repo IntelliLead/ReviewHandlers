@@ -1,7 +1,7 @@
 import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { StackCreationInfo, STAGE } from 'common-cdk';
-import { FunctionUrlAuthType, LambdaInsightsVersion } from 'aws-cdk-lib/aws-lambda';
+import { Code, FunctionUrlAuthType, LambdaInsightsVersion, LayerVersion, Runtime } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 import { DdbStack } from './ddb';
 import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
@@ -23,8 +23,19 @@ export class LambdaStack extends Stack {
         super(scope, id, props);
         this.props = props;
 
-        this.createWebhookHandler('lineEventsHandler');
+        const configLayer = this.createGCPConfigLayer();
+        this.createWebhookHandler('lineEventsHandler', configLayer);
         this.createWebhookHandler('newReviewEventHandler');
+    }
+
+    private createGCPConfigLayer(): LayerVersion {
+        // the Workload identity federation config file
+        // https://cloud.google.com/docs/authentication/application-default-credentials#GAC
+        // https://cloud.google.com/iam/docs/workload-identity-federation-with-other-clouds#use_the_credential_configuration_to_access
+        return new LayerVersion(this, 'GcpConfigLayer', {
+            description: 'workload identity federation config file used for Google APIs',
+            code: Code.fromAsset(path.join(__dirname, '../../../../config')),
+        });
     }
 
     /**
@@ -32,9 +43,10 @@ export class LambdaStack extends Stack {
      * handlerName must be src/cmd/{handlerName}/main.go
      *
      * @param handlerName
+     * @param layers - layers to be added to the function
      * @private
      */
-    private createWebhookHandler(handlerName: string) {
+    private createWebhookHandler(handlerName: string, ...layers: LayerVersion[]) {
         const { stage } = this.props.stackCreationInfo;
 
         const handlerRole = new Role(this, `${handlerName}Role`, {
@@ -58,6 +70,7 @@ export class LambdaStack extends Stack {
             bundling: {
                 goBuildFlags: ['-ldflags "-s -w"'],
             },
+            layers: [...layers],
             role: handlerRole,
             memorySize: 256,
             timeout: Duration.minutes(5),
