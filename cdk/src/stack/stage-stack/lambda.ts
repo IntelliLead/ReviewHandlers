@@ -16,16 +16,27 @@ export interface LambdaStackProps {
     readonly terminationProtection?: boolean;
 }
 
+type EnvObject = {
+    [key: string]: string | undefined;
+};
+
 export class LambdaStack extends Stack {
     private readonly props: LambdaStackProps;
 
     constructor(scope: Construct, id: string, props: LambdaStackProps) {
         super(scope, id, props);
         this.props = props;
+        const { stage } = this.props.stackCreationInfo;
 
         const configLayer = this.createGCPConfigLayer();
-        this.createWebhookHandler('lineEventsHandler', configLayer);
+
+        this.createWebhookHandler('lineEventsHandler', {}, configLayer);
         this.createWebhookHandler('newReviewEventHandler');
+        this.createWebhookHandler(
+            'tst',
+            { GOOGLE_APPLICATION_CREDENTIALS: `/opt/clientLibraryConfig-il-${stage}.json` },
+            configLayer
+        );
     }
 
     private createGCPConfigLayer(): LayerVersion {
@@ -43,10 +54,11 @@ export class LambdaStack extends Stack {
      * handlerName must be src/cmd/{handlerName}/main.go
      *
      * @param handlerName
+     * @param additionalEnv
      * @param layers - layers to be added to the function
      * @private
      */
-    private createWebhookHandler(handlerName: string, ...layers: LayerVersion[]) {
+    private createWebhookHandler(handlerName: string, additionalEnv: EnvObject = {}, ...layers: LayerVersion[]) {
         const { stage } = this.props.stackCreationInfo;
 
         const handlerRole = new Role(this, `${handlerName}Role`, {
@@ -63,9 +75,10 @@ export class LambdaStack extends Stack {
         handlerRole.addToPolicy(this.buildKmsDecryptPolicy());
 
         const handlerFunction = new GoFunction(this, handlerName, {
-            entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/main.go`),
+            entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/.go`),
             environment: {
                 STAGE: stage,
+                ...additionalEnv,
             },
             bundling: {
                 goBuildFlags: ['-ldflags "-s -w"'],
@@ -75,7 +88,6 @@ export class LambdaStack extends Stack {
             memorySize: 256,
             timeout: Duration.minutes(5),
             insightsVersion: LambdaInsightsVersion.VERSION_1_0_143_0,
-            deadLetterQueueEnabled: true,
             logRetention: RetentionDays.SIX_MONTHS,
             // TODO: INT-47 enable tracing
             // tracing: Tracing.ACTIVE,
