@@ -77,7 +77,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Fatal(err)
     }
 
-    accountId := "accounts/108579220773034215369" // IL onboarding service account
+    accountId := "accounts/107069853445303760285" // IL onboarding service account
     // mucurryAccountId := "accounts/107069853445303760285"
     // mucurryLocationId := "locations/14282334389737307772"
     //
