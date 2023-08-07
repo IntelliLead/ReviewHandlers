@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -94,11 +95,11 @@ func ProcessMessageEvent(event *linebot.Event,
         quickReplyMessage := args
 
         // update DDB
-        updatedUser, err := userDao.UpdateQuickReplyMessage(userId, quickReplyMessage)
+        updatedUser, err := userDao.UpdateAttribute(userId, "quickReplyMessage", quickReplyMessage)
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
 
-            _, err := line.NotifyUserUpdateQuickReplyMessageFailed(event.ReplyToken)
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
             if err != nil {
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
@@ -122,10 +123,100 @@ func ProcessMessageEvent(event *linebot.Event,
             }, err
         }
 
-        log.Infof("Successfully processed update quick reply message request to user '%s'", userId)
+        log.Infof("Successfully processed update quick reply message request for user '%s'", userId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
-            Body:       `{"message": "Successfully processed help request"}`,
+            Body:       `{"message": "Successfully processed update quick reply message request"}`,
+        }, nil
+
+    case "d", util.UpdateBusinessDescriptionMessageCmd, "主要業務":
+        // process update quick reply message request
+        businessDescription := args
+
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(businessDescription) {
+            updatedUser, err = userDao.DeleteAttribute(userId, "businessDescription")
+        } else {
+            updatedUser, err = userDao.UpdateAttribute(userId, "businessDescription", businessDescription)
+        }
+        if err != nil {
+            log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
+
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update business description failed: %s"}`, err),
+                }, err
+            }
+            log.Error("Successfully notified user of update business description failed")
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to update business description: %s"}`, err),
+            }, err
+        }
+
+        err = line.ShowSeoSettings(event.ReplyToken, updatedUser)
+        if err != nil {
+            log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
+            }, err
+        }
+
+        log.Infof("Successfully processed update business description request for user '%s'", userId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       `{"message": "Successfully processed update business description request"}`,
+        }, nil
+
+    case "k", util.UpdateKeywordsMessageCmd, "關鍵字":
+        // process update quick reply message request
+        keywords := args
+
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(keywords) {
+            updatedUser, err = userDao.DeleteAttribute(userId, "keywords")
+        } else {
+            updatedUser, err = userDao.UpdateAttribute(userId, "keywords", keywords)
+        }
+        if err != nil {
+            log.Errorf("Error updating keywords '%s' for user '%s': %v", keywords, userId, err)
+
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update keywords failed: %s"}`, err),
+                }, err
+            }
+            log.Error("Successfully notified user of update keywords failed")
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to update keywords: %s"}`, err),
+            }, err
+        }
+
+        err = line.ShowSeoSettings(event.ReplyToken, updatedUser)
+        if err != nil {
+            log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
+            }, err
+        }
+
+        log.Infof("Successfully processed update keywords request for user '%s'", userId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       `{"message": "Successfully processed update keywords request"}`,
         }, nil
 
     default:

@@ -1,0 +1,200 @@
+{
+    "type": "bubble",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "關鍵字回覆設定",
+                "weight": "bold",
+                "size": "xl",
+                "margin": "md",
+                "wrap": true
+            },
+            {
+                "type": "text",
+                "text": "通過提供給 AI 更多訊息，在回覆中佈置關鍵字，優化 SEO 相關性，提高搜索排行名次。\n",
+                "size": "xs",
+                "color": "#aaaaaa",
+                "wrap": true,
+                "contents": []
+            },
+            {
+                "type": "text",
+                "text": "了解更多",
+                "margin": "none",
+                "size": "xs",
+                "color": "#003366",
+                "wrap": true,
+                "contents": [],
+                "action": {
+                    "type": "uri",
+                    "label": "action",
+                    "uri": "https://tinyurl.com/app-seo"
+                }
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "主要業務（越詳細越好）",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 0,
+                                "weight": "bold",
+                                "style": "normal",
+                                "contents": [
+                                    {
+                                        "type": "span",
+                                        "text": "主要業務"
+                                    },
+                                    {
+                                        "type": "span",
+                                        "text": "（越詳細越好）",
+                                        "size": "sm"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "例：高端餐酒館提供融合亞洲特色的西餐美食",
+                        "size": "xxs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "xl",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "{BUSINESS_DESCRIPTION}",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "編輯業務描述",
+                            "data": "/Seo/EditBusinessDescription",
+                            "inputOption": "openKeyboard",
+                            "fillInText": "/description 高端餐酒館…"
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "關鍵字",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 0,
+                                "weight": "bold",
+                                "style": "normal"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
+                        "size": "xxs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "如何選擇？",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-choosing-keyword"
+                        }
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "{KEYWORDS}",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "編輯關鍵字",
+                            "data": "/Seo/EditKeywords",
+                            "inputOption": "openKeyboard",
+                            "fillInText": "/keywords 台北美食,…"
+                        }
+                    }
+                ]
+            }
+        ],
+        "paddingBottom": "xxl"
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "停用",
+                    "data": "/Seo/Toggle"
+                },
+                "color": "#445783"
+            }
+        ]
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5"
+        },
+        "footer": {
+            "separator": true,
+            "backgroundColor": "#8fa6cc"
+        }
+    }
+}

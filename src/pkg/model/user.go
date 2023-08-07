@@ -4,7 +4,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/service/dynamodb"
-    "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "strings"
     "time"
@@ -22,6 +21,9 @@ type User struct {
     ExpireAt              *time.Time            `dynamodbav:"expireAt,omitempty,unixtime"`
     LastUpdated           time.Time             `dynamodbav:"lastUpdated,unixtime"`
     QuickReplyMessage     *string               `dynamodbav:"quickReplyMessage,omitempty"`
+    BusinessDescription   *string               `dynamodbav:"businessDescription,omitempty"`
+    Keywords              *string               `dynamodbav:"keywords,omitempty"`
+    SeoEnabled            bool                  `dynamodbav:"seoEnabled"`
 }
 
 func NewUser(lineUserId string,
@@ -35,28 +37,13 @@ func NewUser(lineUserId string,
         Language:              &lineUserProfile.Language,
         CreatedAt:             createdAt,
         LastUpdated:           createdAt,
+        SeoEnabled:            false,
     }
 
     return user
 }
 
-func (u User) GetKey() map[string]dynamodb.AttributeValue {
-    userIdAttributeValue, err := dynamodbattribute.Marshal(u.UserId)
-    if err != nil {
-        panic(err)
-    }
-
-    uniqueId := util.DefaultUniqueId
-    return map[string]dynamodb.AttributeValue{
-        "userId": {
-            S: userIdAttributeValue.S,
-        },
-        "uniqueId": {
-            S: &uniqueId,
-        }}
-}
-
-func BuildUserDdbKey(userId string) map[string]*dynamodb.AttributeValue {
+func BuildDdbUserKey(userId string) map[string]*dynamodb.AttributeValue {
     uniqueId := util.DefaultUniqueId
     return map[string]*dynamodb.AttributeValue{
         "userId": {
@@ -67,6 +54,8 @@ func BuildUserDdbKey(userId string) map[string]*dynamodb.AttributeValue {
         }}
 }
 
+// GetFinalQuickReplyMessage returns the final quick reply message to be sent to the user.
+// It replaces the {評論者} placeholder with the reviewer's name.
 func (u User) GetFinalQuickReplyMessage(review Review) string {
     if util.IsEmptyStringPtr(u.QuickReplyMessage) {
         return ""

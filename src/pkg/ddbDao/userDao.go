@@ -84,7 +84,7 @@ func (d *UserDao) IsUserExist(userId string) (bool, model.User, error) {
 func (d *UserDao) GetUser(userId string) (model.User, error) {
     response, err := d.client.GetItem(&dynamodb.GetItemInput{
         TableName: aws.String(enum.TableUser.String()),
-        Key:       model.BuildUserDdbKey(userId),
+        Key:       model.BuildDdbUserKey(userId),
     })
     if err != nil {
         d.log.Errorf("Unable to get item with userId '%s' in GetUser: %v", userId, err)
@@ -109,39 +109,45 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
     return user, nil
 }
 
-func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage string) (model.User, error) {
+// UpdateAttribute updates a user's attribute with the given userId. For example:
+// user, err = userDao.UpdateAttribute(userId, "businessDescription", "New business description")
+// user, err = userDao.UpdateAttribute(userId, "arrayField", []string{"keyword1", "keyword2"})
+// user, err = userDao.UpdateAttribute(userId, "seoEnabled", true)
+func (d *UserDao) UpdateAttribute(userId string, attribute string, value interface{}) (model.User, error) {
     update := expression.Set(
-        expression.Name("quickReplyMessage"),
-        expression.Value(quickReplyMessage),
+        expression.Name(attribute),
+        expression.Value(value),
     )
     expr, err := expression.NewBuilder().
         WithUpdate(update).
         Build()
     if err != nil {
-        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
+        d.log.Errorf("Unable to build expression for DDB::UpdateItem in UpdateAttribute: %v", err)
         return model.User{}, err
     }
 
-    allNewStr := dynamodb.ReturnValueAllNew
+    returnValueAllNew := dynamodb.ReturnValueAllNew
     // Execute the UpdateItem operation
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableUser.String()),
-        Key:                       model.BuildUserDdbKey(userId),
+        Key:                       model.BuildDdbUserKey(userId),
         UpdateExpression:          expr.Update(),
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),
-        ReturnValues:              &allNewStr,
+        ReturnValues:              &returnValueAllNew,
     }
+    // DEBUG
+    d.log.Debugf("Executing UpdateItem operation in DDB with input '%s'", jsonUtil.AnyToJson(ddbInput))
     response, err := d.client.UpdateItem(ddbInput)
     if err != nil {
-        d.log.Errorf("DDB UpdateItem failed in UpdateQuickReplyMessage with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        d.log.Errorf("DDB UpdateItem failed in UpdateAttribute with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
         return model.User{}, err
     }
 
     var user model.User
     err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
     if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in UpdateAttribute: %v",
             jsonUtil.AnyToJson(response.Attributes), err)
         return model.User{}, err
     }
@@ -149,13 +155,18 @@ func (d *UserDao) UpdateQuickReplyMessage(userId string, quickReplyMessage strin
     return user, nil
 }
 
-func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
-    update := expression.Remove(expression.Name("quickReplyMessage"))
+// DeleteAttribute deletes a user's attribute with the given userId. Note that this function was designed for optional fields. It has not been tested on required fields.
+// For example:
+// user, err := userDao.DeleteAttribute(userId, "quickReplyMessage")
+// user, err = userDao.DeleteAttribute(userId, "businessDescription")
+// user, err = userDao.DeleteAttribute(userId, "keywords")
+func (d *UserDao) DeleteAttribute(userId string, attribute string) (model.User, error) {
+    update := expression.Remove(expression.Name(attribute))
     expr, err := expression.NewBuilder().
         WithUpdate(update).
         Build()
     if err != nil {
-        d.log.Errorf("Unable to build expression for UpdateItem in UpdateQuickReplyMessage: %v", err)
+        d.log.Errorf("Unable to build expression for UpdateItem in DeleteAttribute: %v", err)
         return model.User{}, err
     }
 
@@ -163,7 +174,7 @@ func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
     // Execute the UpdateItem operation
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableUser.String()),
-        Key:                       model.BuildUserDdbKey(userId),
+        Key:                       model.BuildDdbUserKey(userId),
         UpdateExpression:          expr.Update(),
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),
@@ -171,14 +182,14 @@ func (d *UserDao) DeleteQuickReplyMessage(userId string) (model.User, error) {
     }
     response, err := d.client.UpdateItem(ddbInput)
     if err != nil {
-        d.log.Errorf("DDB UpdateItem failed in UpdateQuickReplyMessage with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        d.log.Errorf("DDB UpdateItem failed in DeleteAttribute with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
         return model.User{}, err
     }
 
     var user model.User
     err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
     if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in DeleteAttribute: %v",
             jsonUtil.AnyToJson(response.Attributes), err)
         return model.User{}, err
     }

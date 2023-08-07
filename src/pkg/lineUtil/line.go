@@ -20,6 +20,7 @@ type Line struct {
     reviewMessageJsons jsonUtil.ReviewMessageLineFlexTemplateJsons
     quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
     aiReplyResultJsons jsonUtil.AiReplyResultLineFlexTemplateJsons
+    seoJsons           jsonUtil.SeoLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
@@ -29,6 +30,7 @@ func NewLine(logger *zap.SugaredLogger) *Line {
         reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
         quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
         aiReplyResultJsons: jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
+        seoJsons:           jsonUtil.LoadSeoLineFlexTemplateJsons(),
     }
 }
 
@@ -82,7 +84,6 @@ func (l *Line) SendNewReview(review model.Review, user model.User) error {
 
 func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, isUpdated bool) error {
     flexMessage, err := l.buildQuickReplySettingsFlexMessage(user, isUpdated)
-
     if err != nil {
         l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)
     }
@@ -94,6 +95,23 @@ func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, isUpda
     }
 
     l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
+func (l *Line) ShowSeoSettings(replyToken string, user model.User) error {
+    flexMessage, err := l.buildSeoSettingsFlexMessage(user)
+    if err != nil {
+        l.log.Error("Error building flex message in ShowSeoSettings: ", err)
+    }
+
+    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("關鍵字設定", flexMessage)).Do()
+    if err != nil {
+        l.log.Error("Error replying message in ShowSeoSettings: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in ShowSeoSettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
 
     return nil
 }
@@ -126,8 +144,11 @@ func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, revie
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }
 
-func (l *Line) NotifyUserUpdateQuickReplyMessageFailed(replyToken string) (*linebot.BasicResponse, error) {
-    text := fmt.Sprintf("快速回覆訊息更新失敗，請稍後再試。很抱歉為您造成不便。")
+// NotifyUserUpdateFailed let user know that the update failed
+// param updateType: is the Mandarin text of the update type in notification
+// Example:快速回覆訊息, 關鍵字, 主要業務
+func (l *Line) NotifyUserUpdateFailed(replyToken string, updateType string) (*linebot.BasicResponse, error) {
+    text := fmt.Sprintf("%s更新失敗，請稍後再試。很抱歉為您造成不便。", updateType)
 
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }
@@ -150,6 +171,10 @@ func (l *Line) ReplyHelpMessage(replyToken string) (*linebot.BasicResponse, erro
 
 func (l *Line) ReplyMoreMessage(replyToken string) (*linebot.BasicResponse, error) {
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(util.MoreMessage())).Do()
+}
+
+func (l *Line) ReplyUser(replyToken string, message string) (*linebot.BasicResponse, error) {
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(message)).Do()
 }
 
 func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {

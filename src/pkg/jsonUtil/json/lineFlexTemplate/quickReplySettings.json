@@ -125,7 +125,7 @@
                     "label": "更改",
                     "inputOption": "openKeyboard",
                     "data": "/QuickReply/UpdateQuickReplyMessage",
-                    "fillInText": "/QuickReply 感謝…"
+                    "fillInText": "/quickReply 感謝…"
                 },
                 "color": "#445783"
             },
