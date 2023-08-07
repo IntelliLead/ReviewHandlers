@@ -5,7 +5,7 @@
         "height": 843
     },
     "selected": true,
-    "name": "v5",
+    "name": "v6",
     "chatBarText": "選單",
     "areas":
     [
@@ -36,9 +36,9 @@
             "action":
             {
                 "type": "postback",
-                "label": "Help",
+                "label": "AiReplySettings",
                 "inputOption": "closeRichMenu",
-                "data": "/RichMenu/SeoSettings"
+                "data": "/RichMenu/AiReplySettings"
             }
         },
         {
@@ -52,7 +52,7 @@
             "action":
             {
                 "type": "postback",
-                "label": "SeoSettings",
+                "label": "Help",
                 "inputOption": "closeRichMenu",
                 "data": "/RichMenu/Help"
             }

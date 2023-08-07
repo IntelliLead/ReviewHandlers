@@ -6,7 +6,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "關鍵字回覆設定",
+                "text": "AI 回覆設定",
                 "weight": "bold",
                 "size": "xl",
                 "margin": "md",
@@ -14,25 +14,11 @@
             },
             {
                 "type": "text",
-                "text": "通過提供給 AI 更多訊息，在回覆中佈置關鍵字，優化 SEO 相關性，提高搜索排行名次。\n",
+                "text": "通過提供給 AI 更多訊息，優化 AI 生成結果。",
                 "size": "xs",
                 "color": "#aaaaaa",
                 "wrap": true,
                 "contents": []
-            },
-            {
-                "type": "text",
-                "text": "了解更多",
-                "margin": "none",
-                "size": "xs",
-                "color": "#003366",
-                "wrap": true,
-                "contents": [],
-                "action": {
-                    "type": "uri",
-                    "label": "action",
-                    "uri": "https://tinyurl.com/app-seo"
-                }
             },
             {
                 "type": "box",
@@ -94,7 +80,7 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯業務描述",
-                            "data": "/Seo/EditBusinessDescription",
+                            "data": "/AiReply/EditBusinessDescription",
                             "inputOption": "openKeyboard",
                             "fillInText": "/description 高端餐酒館…"
                         }
@@ -124,15 +110,16 @@
                     },
                     {
                         "type": "text",
-                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
-                        "size": "xxs",
+                        "text": "回覆中佈置關鍵字，優化 SEO 相關性，提高搜索排行名次。\n",
+                        "size": "xs",
                         "color": "#aaaaaa",
                         "wrap": true,
                         "contents": []
                     },
                     {
                         "type": "text",
-                        "text": "如何選擇？",
+                        "text": "了解更多",
+                        "margin": "none",
                         "size": "xs",
                         "color": "#003366",
                         "wrap": true,
@@ -140,7 +127,7 @@
                         "action": {
                             "type": "uri",
                             "label": "action",
-                            "uri": "https://tinyurl.com/app-choosing-keyword"
+                            "uri": "https://tinyurl.com/app-seo"
                         }
                     },
                     {
@@ -163,9 +150,30 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯關鍵字",
-                            "data": "/Seo/EditKeywords",
+                            "data": "/AiReply/EditKeywords",
                             "inputOption": "openKeyboard",
                             "fillInText": "/keywords 台北美食,…"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
+                        "size": "xxs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "如何選擇？",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-choosing-keyword"
                         }
                     }
                 ]
@@ -181,8 +189,8 @@
                 "type": "button",
                 "action": {
                     "type": "postback",
-                    "label": "停用",
-                    "data": "/Seo/Toggle"
+                    "label": "停用關鍵字",
+                    "data": "/AiReply/KeywordToggle"
                 },
                 "color": "#445783"
             }

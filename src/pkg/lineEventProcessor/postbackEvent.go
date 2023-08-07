@@ -33,95 +33,100 @@ func ProcessPostbackEvent(event *linebot.Event,
     switch dataSlice[0] {
     // /[NewReview|AiReply]/GenerateAiReply/{REVIEW_ID}
     case "NewReview", "AiReply":
-        if len(dataSlice) < 3 || dataSlice[1] != "GenerateAiReply" || util.IsEmptyString(dataSlice[2]) {
+        if len(dataSlice) == 3 && dataSlice[1] == "GenerateAiReply" && !util.IsEmptyString(dataSlice[2]) {
+            reviewId := _type.NewReviewId(dataSlice[2])
+            lambdaReturn, err := handleGenerateAiReply(event, userId, reviewId, userDao, reviewDao, line, log)
+            if err != nil {
+                return lambdaReturn, err
+            } // else continue
+        } else if dataSlice[0] == "AiReply" && len(dataSlice) >= 2 {
+            switch dataSlice[1] {
+            case "KeywordToggle":
+                // get user
+                user, err := userDao.GetUser(userId)
+                if err != nil {
+                    log.Error("Error getting user during handling /AiReply/KeywordToggle: ", err)
+                    return events.LambdaFunctionURLResponse{
+                        StatusCode: 500,
+                        Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
+                    }, err
+                }
+
+                var updatedUser model.User
+                if user.SeoEnabled {
+                    updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", false)
+                    if err != nil {
+                        log.Errorf("Error updating seo enabled to false for user '%s': %v", userId, err)
+
+                        // notify user of error
+                        _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
+                        if err != nil {
+                            return events.LambdaFunctionURLResponse{
+                                StatusCode: 500,
+                                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
+                            }, err
+                        }
+
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to false: %s"}`, err),
+                        }, err
+                    }
+                } else {
+                    if util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription) {
+                        _, err := line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
+                        if err != nil {
+                            log.Errorf("Error replying seo settings prompt message to user '%s': %v", userId, err)
+                            return events.LambdaFunctionURLResponse{
+                                StatusCode: 00,
+                                Body:       fmt.Sprintf(`{"error": "Error replying seo settings prompt message: %s"}`, err),
+                            }, err
+                        }
+
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 200,
+                            Body:       fmt.Sprintf(`{"Rejected enabling seo keyword feature": "Please fill in business description and keywords before enabling seo"}`),
+                        }, nil
+                    }
+
+                    updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", true)
+                    if err != nil {
+                        log.Errorf("Error updating seo enabled to true for user '%s': %v", userId, err)
+                        // notify user of error
+                        _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
+                        if err != nil {
+                            return events.LambdaFunctionURLResponse{
+                                StatusCode: 500,
+                                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
+                            }, err
+                        }
+
+                        return events.LambdaFunctionURLResponse{
+                            StatusCode: 500,
+                            Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to true: %s"}`, err),
+                        }, err
+                    }
+                }
+
+                // send updated seo settings
+                err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
+                if err != nil {
+                    log.Errorf("Error showing updated seo settings for user '%s': %v", userId, err)
+                    return events.LambdaFunctionURLResponse{
+                        StatusCode: 500,
+                        Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
+                    }, err
+                }
+
+            case "EditBusinessDescription":
+                log.Info("/AiReply/EditBusinessDescription postback event received. User is editing business description")
+
+            case "EditKeywords":
+                log.Info("/AiReply/EditKeywords postback event received. User is editing keywords")
+            }
+
+        } else {
             return returnUnhandledPostback(log, *event), nil
-        }
-
-        // get user
-        user, err := userDao.GetUser(userId)
-        if err != nil {
-            log.Errorf("Error getting user '%s' during handling %s: %v", userId, event.Postback.Data, err)
-
-            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
-            if err != nil {
-                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
-                }, err
-            }
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error getting user during handling %s: %s"}`, event.Postback.Data, err),
-            }, err
-        }
-
-        // Notify user that AI is generating reply
-        _, err = line.NotifyUserAiReplyGenerationInProgress(event.ReplyToken)
-        if err != nil {
-            log.Errorf("Error notifying user '%s' that AI is generating reply. Porceeding: %v", userId, err)
-        }
-
-        // get review
-        reviewIdArg := dataSlice[2]
-        review, err := reviewDao.GetReview(userId, _type.NewReviewId(reviewIdArg))
-        if err != nil {
-            log.Errorf("Error getting review during handling %s: %v", event.Postback.Data, err)
-
-            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
-            if err != nil {
-                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
-                }, err
-            }
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error getting review during handling %s: %s"}`, event.Postback.Data, err),
-            }, err
-        }
-
-        // invoke gpt4
-        aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review, user)
-        if err != nil {
-            log.Errorf("Error generating AI reply: %v", err)
-
-            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
-            if err != nil {
-                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
-                }, err
-            }
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error generating AI reply: %s"}`, err),
-            }, err
-        }
-
-        // create AI generated result card
-        err = line.SendAiGeneratedReply(aiReply, review)
-        if err != nil {
-            log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
-
-            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
-            if err != nil {
-                log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
-                }, err
-            }
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error sending AI generated reply: %s"}`, err),
-            }, err
         }
 
     case "RichMenu":
@@ -150,18 +155,18 @@ func ProcessPostbackEvent(event *linebot.Event,
                 }, err
             }
 
-        case "SeoSettings":
+        case "AiReplySettings":
             // get user
             user, err := userDao.GetUser(userId)
             if err != nil {
-                log.Error("Error getting user during handling /RichMenu/SeoSettings: ", err)
+                log.Error("Error getting user during handling /RichMenu/AiReplySettings: ", err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
                     Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
                 }, err
             }
 
-            err = line.ShowSeoSettings(event.ReplyToken, user)
+            err = line.ShowAiReplySettings(event.ReplyToken, user)
             if err != nil {
                 log.Errorf("Error sending seo settings to user '%s': %v", user.UserId, err)
                 return events.LambdaFunctionURLResponse{
@@ -234,97 +239,6 @@ func ProcessPostbackEvent(event *linebot.Event,
 
         }
 
-    case "Seo":
-        if len(dataSlice) < 2 {
-            return returnUnhandledPostback(log, *event), nil
-        }
-
-        switch dataSlice[1] {
-        case "Toggle":
-            // get user
-            user, err := userDao.GetUser(userId)
-            if err != nil {
-                log.Error("Error getting user during handling /Seo/Toggle: ", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
-                }, err
-            }
-
-            var updatedUser model.User
-            if user.SeoEnabled {
-                updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", false)
-                if err != nil {
-                    log.Errorf("Error updating seo enabled to false for user '%s': %v", userId, err)
-
-                    // notify user of error
-                    _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
-                    if err != nil {
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 500,
-                            Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
-                        }, err
-                    }
-
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to false: %s"}`, err),
-                    }, err
-                }
-            } else {
-                if util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription) {
-                    _, err := line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
-                    if err != nil {
-                        log.Errorf("Error replying seo settings prompt message to user '%s': %v", userId, err)
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 00,
-                            Body:       fmt.Sprintf(`{"error": "Error replying seo settings prompt message: %s"}`, err),
-                        }, err
-                    }
-
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 200,
-                        Body:       fmt.Sprintf(`{"Rejected enabling seo keyword feature": "Please fill in business description and keywords before enabling seo"}`),
-                    }, nil
-                }
-
-                updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", true)
-                if err != nil {
-                    log.Errorf("Error updating seo enabled to true for user '%s': %v", userId, err)
-                    // notify user of error
-                    _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
-                    if err != nil {
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 500,
-                            Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
-                        }, err
-                    }
-
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to true: %s"}`, err),
-                    }, err
-                }
-            }
-
-            // send updated seo settings
-            err = line.ShowSeoSettings(event.ReplyToken, updatedUser)
-            if err != nil {
-                log.Errorf("Error showing updated seo settings for user '%s': %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
-                }, err
-            }
-
-        case "EditBusinessDescription":
-            log.Info("/Seo/EditBusinessDescription postback event received. User is editing business description")
-
-        case "EditKeywords":
-            log.Info("/Seo/EditKeywords postback event received. User is editing keywords")
-
-        }
-
     default:
         log.Warn("Unknown QuickReply postback data: ", dataSlice)
         return events.LambdaFunctionURLResponse{
@@ -344,4 +258,101 @@ func returnUnhandledPostback(log *zap.SugaredLogger, event linebot.Event) events
         StatusCode: 200,
         Body:       `{"message": "Postback event data is not in expected format. No action taken."}`,
     }
+}
+
+func handleGenerateAiReply(event *linebot.Event,
+    userId string,
+    reviewId _type.ReviewId,
+    userDao *ddbDao.UserDao,
+    reviewDao *ddbDao.ReviewDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+    // get user
+    user, err := userDao.GetUser(userId)
+    if err != nil {
+        log.Errorf("Error getting user '%s' during handling %s: %v", userId, event.Postback.Data, err)
+
+        _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+        if err != nil {
+            log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error getting user during handling %s: %s"}`, event.Postback.Data, err),
+        }, err
+    }
+
+    // Notify user that AI is generating reply
+    _, err = line.NotifyUserAiReplyGenerationInProgress(event.ReplyToken)
+    if err != nil {
+        log.Errorf("Error notifying user '%s' that AI is generating reply. Porceeding: %v", userId, err)
+    }
+
+    // get review
+    review, err := reviewDao.GetReview(userId, reviewId)
+    if err != nil {
+        log.Errorf("Error getting review during handling %s: %v", event.Postback.Data, err)
+
+        _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+        if err != nil {
+            log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error getting review during handling %s: %s"}`, event.Postback.Data, err),
+        }, err
+    }
+
+    // invoke gpt4
+    aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review, user)
+    if err != nil {
+        log.Errorf("Error generating AI reply: %v", err)
+
+        _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+        if err != nil {
+            log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error generating AI reply: %s"}`, err),
+        }, err
+    }
+
+    // create AI generated result card
+    err = line.SendAiGeneratedReply(aiReply, review)
+    if err != nil {
+        log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
+
+        _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+        if err != nil {
+            log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error sending AI generated reply: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{}, nil
 }

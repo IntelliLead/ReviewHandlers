@@ -159,7 +159,7 @@ func ProcessMessageEvent(event *linebot.Event,
             }, err
         }
 
-        err = line.ShowSeoSettings(event.ReplyToken, updatedUser)
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -204,7 +204,7 @@ func ProcessMessageEvent(event *linebot.Event,
             }, err
         }
 
-        err = line.ShowSeoSettings(event.ReplyToken, updatedUser)
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{

@@ -15,22 +15,22 @@ import (
 )
 
 type Line struct {
-    lineClient         *linebot.Client
-    log                *zap.SugaredLogger
-    reviewMessageJsons jsonUtil.ReviewMessageLineFlexTemplateJsons
-    quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
-    aiReplyResultJsons jsonUtil.AiReplyResultLineFlexTemplateJsons
-    seoJsons           jsonUtil.SeoLineFlexTemplateJsons
+    lineClient           *linebot.Client
+    log                  *zap.SugaredLogger
+    reviewMessageJsons   jsonUtil.ReviewMessageLineFlexTemplateJsons
+    quickReplyJsons      jsonUtil.QuickReplySettingsLineFlexTemplateJsons
+    aiReplyResultJsons   jsonUtil.AiReplyResultLineFlexTemplateJsons
+    aiReplySettingsJsons jsonUtil.AiReplySettingsLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
     return &Line{
-        lineClient:         newLineClient(logger),
-        log:                logger,
-        reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
-        quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
-        aiReplyResultJsons: jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
-        seoJsons:           jsonUtil.LoadSeoLineFlexTemplateJsons(),
+        lineClient:           newLineClient(logger),
+        log:                  logger,
+        reviewMessageJsons:   jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
+        quickReplyJsons:      jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
+        aiReplyResultJsons:   jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
+        aiReplySettingsJsons: jsonUtil.LoadSeoLineFlexTemplateJsons(),
     }
 }
 
@@ -99,19 +99,19 @@ func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, isUpda
     return nil
 }
 
-func (l *Line) ShowSeoSettings(replyToken string, user model.User) error {
-    flexMessage, err := l.buildSeoSettingsFlexMessage(user)
+func (l *Line) ShowAiReplySettings(replyToken string, user model.User) error {
+    flexMessage, err := l.buildAiReplySettingsFlexMessage(user)
     if err != nil {
-        l.log.Error("Error building flex message in ShowSeoSettings: ", err)
+        l.log.Error("Error building flex message in ShowAiReplySettings: ", err)
     }
 
     resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("關鍵字設定", flexMessage)).Do()
     if err != nil {
-        l.log.Error("Error replying message in ShowSeoSettings: ", err)
+        l.log.Error("Error replying message in ShowAiReplySettings: ", err)
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in ShowSeoSettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in ShowAiReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
 
     return nil
 }

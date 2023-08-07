@@ -338,9 +338,9 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildSeoSettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
-    jsonMap, err := jsonUtil.JsonToMap(l.seoJsons.SeoSettings)
+    jsonMap, err := jsonUtil.JsonToMap(l.aiReplySettingsJsons.AiReplySettings)
     if err != nil {
         l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
     }
@@ -353,15 +353,17 @@ func (l *Line) buildSeoSettingsFlexMessage(user model.User) (linebot.FlexContain
     } else {
         businessDescription = *user.BusinessDescription
 
-        // body -> contents[3] -> contents[2] -> action -> fillInText
+        // update fillInText
+        // body -> contents[2] -> contents[2] -> action -> fillInText
         jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["contents"].([]interface{})[2].
         (map[string]interface{})["contents"].([]interface{})[2].
         (map[string]interface{})["action"].
         (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateBusinessDescriptionMessageCmd) + businessDescription
     }
+    // update display
     jsonMap["body"].
-    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = businessDescription
@@ -374,15 +376,16 @@ func (l *Line) buildSeoSettingsFlexMessage(user model.User) (linebot.FlexContain
     } else {
         keywords = *user.Keywords
 
-        // body -> contents[4] -> contents[3] -> action -> fillInText
+        // body -> contents[3] -> contents[3] -> action -> fillInText
         jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[4].
+        (map[string]interface{})["contents"].([]interface{})[3].
         (map[string]interface{})["contents"].([]interface{})[3].
         (map[string]interface{})["action"].
         (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateKeywordsMessageCmd) + keywords
     }
+    // body -> contents[3] -> contents[3] -> contents[0] -> text
     jsonMap["body"].
-    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = keywords
@@ -393,7 +396,7 @@ func (l *Line) buildSeoSettingsFlexMessage(user model.User) (linebot.FlexContain
         jsonMap["footer"].
         (map[string]interface{})["contents"].([]interface{})[0].
         (map[string]interface{})["action"].
-        (map[string]interface{})["label"] = "啟用"
+        (map[string]interface{})["label"] = "啟用關鍵字"
     } // default to 停用
 
     return l.jsonMapToLineFlexContainer(jsonMap)
