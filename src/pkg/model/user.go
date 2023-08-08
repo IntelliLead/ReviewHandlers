@@ -10,34 +10,43 @@ import (
 )
 
 type User struct {
-    UserId                string                `dynamodbav:"userId"` // partition key
-    CreatedAt             time.Time             `dynamodbav:"createdAt,unixtime"`
-    LineId                *string               `dynamodbav:"lineId,omitempty"`
-    LineUsername          string                `dynamodbav:"lineUsername"`
-    LineProfilePictureUrl *string               `dynamodbav:"lineProfilePicture,omitempty" validate:"url"`
-    Language              *string               `dynamodbav:"language,omitempty"`
-    ZapierReplyWebhook    *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
-    SubscriptionTier      enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
-    ExpireAt              *time.Time            `dynamodbav:"expireAt,omitempty,unixtime"`
-    LastUpdated           time.Time             `dynamodbav:"lastUpdated,unixtime"`
-    QuickReplyMessage     *string               `dynamodbav:"quickReplyMessage,omitempty"`
-    BusinessDescription   *string               `dynamodbav:"businessDescription,omitempty"`
-    Keywords              *string               `dynamodbav:"keywords,omitempty"`
-    KeywordEnabled        bool                  `dynamodbav:"keywordEnabled"` // FAC for keywords
+    UserId                       string                `dynamodbav:"userId"` // partition key
+    CreatedAt                    time.Time             `dynamodbav:"createdAt,unixtime"`
+    LineId                       *string               `dynamodbav:"lineId,omitempty"`
+    LineUsername                 string                `dynamodbav:"lineUsername"`
+    LineProfilePictureUrl        *string               `dynamodbav:"lineProfilePicture,omitempty" validate:"url"`
+    Language                     *string               `dynamodbav:"language,omitempty"`
+    ZapierReplyWebhook           *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
+    SubscriptionTier             enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
+    ExpireAt                     *time.Time            `dynamodbav:"expireAt,omitempty,unixtime"`
+    LastUpdated                  time.Time             `dynamodbav:"lastUpdated,unixtime"`
+    QuickReplyMessage            *string               `dynamodbav:"quickReplyMessage,omitempty"`
+    BusinessDescription          *string               `dynamodbav:"businessDescription,omitempty"`
+    EmojiEnabled                 bool                  `dynamodbav:"emojiEnabled"` // FAC for emoji
+    signature                    *string               `dynamodbav:"signature,omitempty"`
+    SignatureEnabled             bool                  `dynamodbav:"signatureEnabled"` // FAC for signature
+    Keywords                     *string               `dynamodbav:"keywords,omitempty"`
+    KeywordEnabled               bool                  `dynamodbav:"keywordEnabled"` // FAC for keywords
+    ServiceRecommendation        *string               `dynamodbav:"serviceRecommendation,omitempty"`
+    ServiceRecommendationEnabled bool                  `dynamodbav:"serviceRecommendationEnabled"` // FAC for serviceRecommendation
+
 }
 
 func NewUser(lineUserId string,
     lineUserProfile linebot.UserProfileResponse,
     createdAt time.Time) User {
     user := User{
-        UserId:                lineUserId,
-        SubscriptionTier:      enum.SubscriptionTierBeta,
-        LineUsername:          lineUserProfile.DisplayName,
-        LineProfilePictureUrl: &lineUserProfile.PictureURL,
-        Language:              &lineUserProfile.Language,
-        CreatedAt:             createdAt,
-        LastUpdated:           createdAt,
-        KeywordEnabled:        false,
+        UserId:                       lineUserId,
+        SubscriptionTier:             enum.SubscriptionTierBeta,
+        LineUsername:                 lineUserProfile.DisplayName,
+        LineProfilePictureUrl:        &lineUserProfile.PictureURL,
+        Language:                     &lineUserProfile.Language,
+        CreatedAt:                    createdAt,
+        LastUpdated:                  createdAt,
+        EmojiEnabled:                 false,
+        SignatureEnabled:             false,
+        KeywordEnabled:               false,
+        ServiceRecommendationEnabled: false,
     }
 
     return user

@@ -39,6 +39,7 @@ func ProcessPostbackEvent(event *linebot.Event,
             if err != nil {
                 return lambdaReturn, err
             } // else continue
+
         } else if dataSlice[0] == "AiReply" && len(dataSlice) >= 2 {
             switch dataSlice[1] {
             case "KeywordToggle":
