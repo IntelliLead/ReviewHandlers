@@ -99,111 +99,6 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "關鍵字",
-                                "size": "md",
-                                "color": "#555555",
-                                "flex": 4,
-                                "weight": "bold",
-                                "style": "normal",
-                                "gravity": "center"
-                            },
-                            {
-                                "type": "image",
-                                "url": "https://i.imgur.com/aiAnjYy.png",
-                                "size": "xxs",
-                                "align": "end",
-                                "gravity": "center",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Keyword"
-                                },
-                                "flex": 1
-                            }
-                        ]
-                    },
-                    {
-                        "type": "text",
-                        "text": "回覆中佈置關鍵字，優化 SEO 相關性，提高搜索排行名次。\n",
-                        "size": "xs",
-                        "color": "#aaaaaa",
-                        "wrap": true,
-                        "contents": []
-                    },
-                    {
-                        "type": "text",
-                        "text": "了解更多",
-                        "margin": "none",
-                        "size": "xs",
-                        "color": "#003366",
-                        "wrap": true,
-                        "contents": [],
-                        "action": {
-                            "type": "uri",
-                            "label": "action",
-                            "uri": "https://tinyurl.com/app-seo"
-                        }
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "margin": "lg",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "{KEYWORDS}",
-                                "size": "md",
-                                "color": "#555555",
-                                "wrap": true
-                            }
-                        ],
-                        "borderWidth": "none",
-                        "backgroundColor": "#FFFFFF",
-                        "cornerRadius": "md",
-                        "paddingAll": "lg",
-                        "action": {
-                            "type": "postback",
-                            "label": "編輯關鍵字",
-                            "data": "/AiReply/EditKeywords",
-                            "inputOption": "openKeyboard",
-                            "fillInText": "/keywords 台北美食,…"
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
-                        "size": "xxs",
-                        "color": "#aaaaaa",
-                        "wrap": true,
-                        "contents": []
-                    },
-                    {
-                        "type": "text",
-                        "text": "如何選擇？",
-                        "size": "xs",
-                        "color": "#003366",
-                        "wrap": true,
-                        "contents": [],
-                        "action": {
-                            "type": "uri",
-                            "label": "action",
-                            "uri": "https://tinyurl.com/app-choosing-keyword"
-                        }
-                    }
-                ]
-            },
-            {
-                "type": "box",
-                "layout": "vertical",
-                "margin": "xxl",
-                "spacing": "sm",
-                "contents": [
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
                                 "text": "😊 Emoji",
                                 "size": "md",
                                 "color": "#555555",
@@ -317,6 +212,111 @@
                             "data": "/AiReply/EditKeywords",
                             "inputOption": "openKeyboard",
                             "fillInText": "/keywords 台北美食,…"
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "關鍵字",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 4,
+                                "weight": "bold",
+                                "style": "normal",
+                                "gravity": "center"
+                            },
+                            {
+                                "type": "image",
+                                "url": "https://i.imgur.com/aiAnjYy.png",
+                                "size": "xxs",
+                                "align": "end",
+                                "gravity": "center",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "KeywordToggle",
+                                    "data": "/AiReply/Toggle/Keyword"
+                                },
+                                "flex": 1
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "回覆中佈置關鍵字，優化 SEO 相關性，提高搜索排行名次。\n",
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "了解更多",
+                        "margin": "none",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-seo"
+                        }
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "{KEYWORDS}",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "編輯關鍵字",
+                            "data": "/AiReply/EditKeywords",
+                            "inputOption": "openKeyboard",
+                            "fillInText": "/keywords 台北美食,…"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
+                        "size": "xxs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "如何選擇？",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-choosing-keyword"
                         }
                     }
                 ]
