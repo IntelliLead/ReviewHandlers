@@ -102,9 +102,23 @@
                                 "text": "關鍵字",
                                 "size": "md",
                                 "color": "#555555",
-                                "flex": 0,
+                                "flex": 4,
                                 "weight": "bold",
-                                "style": "normal"
+                                "style": "normal",
+                                "gravity": "center"
+                            },
+                            {
+                                "type": "image",
+                                "url": "https://i.imgur.com/aiAnjYy.png",
+                                "size": "xxs",
+                                "align": "end",
+                                "gravity": "center",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "KeywordToggle",
+                                    "data": "/AiReply/Toggle/Keyword"
+                                },
+                                "flex": 1
                             }
                         ]
                     },
@@ -177,24 +191,230 @@
                         }
                     }
                 ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "😊 Emoji",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 4,
+                                "weight": "bold",
+                                "style": "normal",
+                                "gravity": "center"
+                            },
+                            {
+                                "type": "image",
+                                "url": "https://i.imgur.com/kVS4YbE.png",
+                                "size": "xxs",
+                                "align": "end",
+                                "gravity": "center",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "KeywordToggle",
+                                    "data": "/AiReply/Toggle/Keyword"
+                                },
+                                "flex": 1
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "回覆中使用表情符號，增添一分活潑親切感。",
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "簽名",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 4,
+                                "weight": "bold",
+                                "style": "normal",
+                                "gravity": "center"
+                            },
+                            {
+                                "type": "image",
+                                "url": "https://i.imgur.com/aiAnjYy.png",
+                                "size": "xxs",
+                                "align": "end",
+                                "gravity": "center",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "KeywordToggle",
+                                    "data": "/AiReply/Toggle/Keyword"
+                                },
+                                "flex": 1
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "以您的簽名結束回覆，以示誠意。\n(Google 官方推薦回覆秘訣)",
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "了解更多",
+                        "margin": "none",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-signature"
+                        }
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "{SIGNATURE}",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "編輯關鍵字",
+                            "data": "/AiReply/EditKeywords",
+                            "inputOption": "openKeyboard",
+                            "fillInText": "/keywords 台北美食,…"
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "xxl",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "推薦其他業務",
+                                "size": "md",
+                                "color": "#555555",
+                                "flex": 4,
+                                "weight": "bold",
+                                "style": "normal",
+                                "gravity": "center"
+                            },
+                            {
+                                "type": "image",
+                                "url": "https://i.imgur.com/kVS4YbE.png",
+                                "size": "xxs",
+                                "align": "end",
+                                "gravity": "center",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "KeywordToggle",
+                                    "data": "/AiReply/Toggle/Keyword"
+                                },
+                                "flex": 1
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "邀請顧客下次來體驗不一樣的業務，也對 SEO 有幫助。\n(Google 官方推薦的回覆秘訣)",
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    },
+                    {
+                        "type": "text",
+                        "text": "了解更多",
+                        "margin": "none",
+                        "size": "xs",
+                        "color": "#003366",
+                        "wrap": true,
+                        "contents": [],
+                        "action": {
+                            "type": "uri",
+                            "label": "action",
+                            "uri": "https://tinyurl.com/app-recommend-other-service"
+                        }
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "{SERVICE_RECOMMENDATION}",
+                                "size": "md",
+                                "color": "#555555",
+                                "wrap": true
+                            }
+                        ],
+                        "borderWidth": "none",
+                        "backgroundColor": "#FFFFFF",
+                        "cornerRadius": "md",
+                        "paddingAll": "lg",
+                        "action": {
+                            "type": "postback",
+                            "label": "編輯關鍵字",
+                            "data": "/AiReply/EditKeywords",
+                            "inputOption": "openKeyboard",
+                            "fillInText": "/keywords 台北美食,…"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "若未填寫推薦業務，則從主要業務中隨機挑選",
+                        "size": "xxs",
+                        "color": "#aaaaaa",
+                        "wrap": true,
+                        "contents": []
+                    }
+                ]
             }
         ],
         "paddingBottom": "xxl"
-    },
-    "footer": {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [
-            {
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": "停用關鍵字",
-                    "data": "/AiReply/KeywordToggle"
-                },
-                "color": "#445783"
-            }
-        ]
     },
     "styles": {
         "body": {
