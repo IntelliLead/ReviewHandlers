@@ -112,7 +112,7 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
 // UpdateAttribute updates a user's attribute with the given userId. For example:
 // user, err = userDao.UpdateAttribute(userId, "businessDescription", "New business description")
 // user, err = userDao.UpdateAttribute(userId, "arrayField", []string{"keyword1", "keyword2"})
-// user, err = userDao.UpdateAttribute(userId, "seoEnabled", true)
+// user, err = userDao.UpdateAttribute(userId, "keywordEnabled", true)
 func (d *UserDao) UpdateAttribute(userId string, attribute string, value interface{}) (model.User, error) {
     update := expression.Set(
         expression.Name(attribute),

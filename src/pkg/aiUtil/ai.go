@@ -40,7 +40,7 @@ func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
     if !util.IsEmptyStringPtr(user.BusinessDescription) {
         businessPrompt = "Your business is" + *user.BusinessDescription + "."
     }
-    if user.SeoEnabled {
+    if user.KeywordEnabled {
         if util.IsEmptyStringPtr(user.Keywords) {
             ai.log.Errorf("Keywords is empty for user %s but SEO is enabled", user.UserId)
         } else {

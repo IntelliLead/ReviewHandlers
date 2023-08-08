@@ -53,8 +53,8 @@ func ProcessPostbackEvent(event *linebot.Event,
                 }
 
                 var updatedUser model.User
-                if user.SeoEnabled {
-                    updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", false)
+                if user.KeywordEnabled {
+                    updatedUser, err = userDao.UpdateAttribute(userId, "KeywordEnabled", false)
                     if err != nil {
                         log.Errorf("Error updating seo enabled to false for user '%s': %v", userId, err)
 
@@ -89,7 +89,7 @@ func ProcessPostbackEvent(event *linebot.Event,
                         }, nil
                     }
 
-                    updatedUser, err = userDao.UpdateAttribute(userId, "SeoEnabled", true)
+                    updatedUser, err = userDao.UpdateAttribute(userId, "KeywordEnabled", true)
                     if err != nil {
                         log.Errorf("Error updating seo enabled to true for user '%s': %v", userId, err)
                         // notify user of error

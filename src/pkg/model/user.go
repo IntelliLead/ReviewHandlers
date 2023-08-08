@@ -23,7 +23,7 @@ type User struct {
     QuickReplyMessage     *string               `dynamodbav:"quickReplyMessage,omitempty"`
     BusinessDescription   *string               `dynamodbav:"businessDescription,omitempty"`
     Keywords              *string               `dynamodbav:"keywords,omitempty"`
-    SeoEnabled            bool                  `dynamodbav:"seoEnabled"` // FAC for keywords
+    KeywordEnabled        bool                  `dynamodbav:"keywordEnabled"` // FAC for keywords
 }
 
 func NewUser(lineUserId string,
@@ -37,7 +37,7 @@ func NewUser(lineUserId string,
         Language:              &lineUserProfile.Language,
         CreatedAt:             createdAt,
         LastUpdated:           createdAt,
-        SeoEnabled:            false,
+        KeywordEnabled:        false,
     }
 
     return user
