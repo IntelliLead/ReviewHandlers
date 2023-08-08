@@ -82,7 +82,7 @@ func LoadAiReplyResultLineFlexTemplateJsons() AiReplyResultLineFlexTemplateJsons
     }
 }
 
-func LoadSeoLineFlexTemplateJsons() AiReplySettingsLineFlexTemplateJsons {
+func LoadAiReplySettingsLineFlexTemplateJsons() AiReplySettingsLineFlexTemplateJsons {
     file, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReplySettings.json")
     if err != nil {
         log.Fatal("Error reading aiReplySettings.json: ", err)

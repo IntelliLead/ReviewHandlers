@@ -390,9 +390,9 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = keywords
 
-    // substitute button text according to seoEnabled status
+    // substitute button text according to keywordEnabled status
     // footer -> contents[0] -> action -> label
-    if !user.SeoEnabled {
+    if !user.KeywordEnabled {
         jsonMap["footer"].
         (map[string]interface{})["contents"].([]interface{})[0].
         (map[string]interface{})["action"].

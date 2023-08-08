@@ -30,7 +30,7 @@ func NewLine(logger *zap.SugaredLogger) *Line {
         reviewMessageJsons:   jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
         quickReplyJsons:      jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
         aiReplyResultJsons:   jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
-        aiReplySettingsJsons: jsonUtil.LoadSeoLineFlexTemplateJsons(),
+        aiReplySettingsJsons: jsonUtil.LoadAiReplySettingsLineFlexTemplateJsons(),
     }
 }
 
