@@ -28,7 +28,9 @@ const StageEnvKey = "STAGE"
 // message commands
 const UpdateQuickReplyMessageCmd = "quickReply"
 const UpdateBusinessDescriptionMessageCmd = "description"
+const UpdateSignatureMessageCmd = "signature"
 const UpdateKeywordsMessageCmd = "keywords"
+const UpdateRecommendationMessageCmd = "recommendation"
 
 func BuildMessageCmdPrefix(cmd string) string {
     return "/" + cmd + " "

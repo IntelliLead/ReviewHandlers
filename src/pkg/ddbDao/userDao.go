@@ -1,6 +1,7 @@
 package ddbDao
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
@@ -12,6 +13,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
+    "strings"
 )
 
 type UserDao struct {
@@ -109,94 +111,6 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
     return user, nil
 }
 
-// UpdateAttribute updates a user's attribute with the given userId. For example:
-// user, err = userDao.UpdateAttribute(userId, "businessDescription", "New business description")
-// user, err = userDao.UpdateAttribute(userId, "arrayField", []string{"keyword1", "keyword2"})
-// user, err = userDao.UpdateAttribute(userId, "keywordEnabled", true)
-func (d *UserDao) UpdateAttribute(userId string, attribute string, value interface{}) (model.User, error) {
-    update := expression.Set(
-        expression.Name(attribute),
-        expression.Value(value),
-    )
-    expr, err := expression.NewBuilder().
-        WithUpdate(update).
-        Build()
-    if err != nil {
-        d.log.Errorf("Unable to build expression for DDB::UpdateItem in UpdateAttribute: %v", err)
-        return model.User{}, err
-    }
-
-    returnValueAllNew := dynamodb.ReturnValueAllNew
-    // Execute the UpdateItem operation
-    ddbInput := &dynamodb.UpdateItemInput{
-        TableName:                 aws.String(enum.TableUser.String()),
-        Key:                       model.BuildDdbUserKey(userId),
-        UpdateExpression:          expr.Update(),
-        ExpressionAttributeNames:  expr.Names(),
-        ExpressionAttributeValues: expr.Values(),
-        ReturnValues:              &returnValueAllNew,
-    }
-    // DEBUG
-    d.log.Debugf("Executing UpdateItem operation in DDB with input '%s'", jsonUtil.AnyToJson(ddbInput))
-    response, err := d.client.UpdateItem(ddbInput)
-    if err != nil {
-        d.log.Errorf("DDB UpdateItem failed in UpdateAttribute with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
-        return model.User{}, err
-    }
-
-    var user model.User
-    err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
-    if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in UpdateAttribute: %v",
-            jsonUtil.AnyToJson(response.Attributes), err)
-        return model.User{}, err
-    }
-
-    return user, nil
-}
-
-// DeleteAttribute deletes a user's attribute with the given userId. Note that this function was designed for optional fields. It has not been tested on required fields.
-// For example:
-// user, err := userDao.DeleteAttribute(userId, "quickReplyMessage")
-// user, err = userDao.DeleteAttribute(userId, "businessDescription")
-// user, err = userDao.DeleteAttribute(userId, "keywords")
-func (d *UserDao) DeleteAttribute(userId string, attribute string) (model.User, error) {
-    update := expression.Remove(expression.Name(attribute))
-    expr, err := expression.NewBuilder().
-        WithUpdate(update).
-        Build()
-    if err != nil {
-        d.log.Errorf("Unable to build expression for UpdateItem in DeleteAttribute: %v", err)
-        return model.User{}, err
-    }
-
-    allNewStr := dynamodb.ReturnValueAllNew
-    // Execute the UpdateItem operation
-    ddbInput := &dynamodb.UpdateItemInput{
-        TableName:                 aws.String(enum.TableUser.String()),
-        Key:                       model.BuildDdbUserKey(userId),
-        UpdateExpression:          expr.Update(),
-        ExpressionAttributeNames:  expr.Names(),
-        ExpressionAttributeValues: expr.Values(),
-        ReturnValues:              &allNewStr,
-    }
-    response, err := d.client.UpdateItem(ddbInput)
-    if err != nil {
-        d.log.Errorf("DDB UpdateItem failed in DeleteAttribute with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
-        return model.User{}, err
-    }
-
-    var user model.User
-    err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
-    if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in DeleteAttribute: %v",
-            jsonUtil.AnyToJson(response.Attributes), err)
-        return model.User{}, err
-    }
-
-    return user, nil
-}
-
 func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error) {
     // Marshal the user object into a DynamoDB attribute value map
     av, err := dynamodbattribute.MarshalMap(user)
@@ -214,4 +128,91 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
     // logger.NewLogger().Debug("userMarshalMap after uniqueId add: ", av)
 
     return av, nil
+}
+
+type AttributeAction struct {
+    Action enum.Action // "update" or "delete"
+    Name   string      // Name of the attribute
+    Value  interface{} // Value to set (for updates only)
+}
+
+// UpdateAttributes updates and deletes attributes of a user with the given userId.
+// Note that deleting required fields may break the data model.
+// For example:
+// user, err = userDao.UpdateAttributes(userId, []AttributeAction{
+//     {
+//         Action: enum.ActionDelete,
+//         Name:   "businessDescription",
+//     },
+//     {
+//         Action: enum.ActionUpdate,
+//         Name:   "arrayField",
+//         Value:  []string{"keyword1", "keyword2"},
+//     }
+// }    )
+func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (model.User, error) {
+    err := validateUniqueAttributeNames(actions)
+    if err != nil {
+        return model.User{}, err
+    }
+
+    var updateBuilder expression.UpdateBuilder
+    for _, action := range actions {
+        attribute := strings.ToLower(string(action.Name[0])) + action.Name[1:] // for safety in case of typo
+
+        switch action.Action {
+        case enum.ActionDelete:
+            updateBuilder.Remove(expression.Name(action.Name))
+
+        case enum.ActionUpdate:
+            updateBuilder.Set(expression.Name(attribute), expression.Value(action.Value))
+        }
+    }
+
+    expr, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
+    if err != nil {
+        d.log.Errorf("Unable to build expression for UpdateItem in UpdateAttributes: %v", err)
+        return model.User{}, err
+    }
+
+    allNewStr := dynamodb.ReturnValueAllNew
+    // Execute the UpdateItem operation
+    ddbInput := &dynamodb.UpdateItemInput{
+        TableName:                 aws.String(enum.TableUser.String()),
+        Key:                       model.BuildDdbUserKey(userId),
+        UpdateExpression:          expr.Update(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ReturnValues:              &allNewStr,
+    }
+    response, err := d.client.UpdateItem(ddbInput)
+    if err != nil {
+        d.log.Errorf("DDB UpdateItem failed in UpdateAttributes with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        return model.User{}, err
+    }
+
+    var user model.User
+    err = dynamodbattribute.UnmarshalMap(response.Attributes, &user)
+    if err != nil {
+        d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in UpdateAttributes: %v",
+            jsonUtil.AnyToJson(response.Attributes), err)
+        return model.User{}, err
+    }
+
+    return user, nil
+}
+
+func validateUniqueAttributeNames(actions []AttributeAction) error {
+    if len(actions) == 0 {
+        return errors.New(fmt.Sprintf("No actions provided to UpdateAttributes"))
+    }
+
+    uniqueNames := make(map[string]bool)
+    for _, action := range actions {
+        if _, ok := uniqueNames[action.Name]; ok {
+            return errors.New(fmt.Sprintf("Duplicate attribute name '%s' in UpdateAttributes", action.Name))
+        }
+        uniqueNames[action.Name] = true
+    }
+    return nil
 }

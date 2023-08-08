@@ -23,7 +23,7 @@ type User struct {
     QuickReplyMessage            *string               `dynamodbav:"quickReplyMessage,omitempty"`
     BusinessDescription          *string               `dynamodbav:"businessDescription,omitempty"`
     EmojiEnabled                 bool                  `dynamodbav:"emojiEnabled"` // FAC for emoji
-    signature                    *string               `dynamodbav:"signature,omitempty"`
+    Signature                    *string               `dynamodbav:"signature,omitempty"`
     SignatureEnabled             bool                  `dynamodbav:"signatureEnabled"` // FAC for signature
     Keywords                     *string               `dynamodbav:"keywords,omitempty"`
     KeywordEnabled               bool                  `dynamodbav:"keywordEnabled"` // FAC for keywords
