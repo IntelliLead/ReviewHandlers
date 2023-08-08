@@ -36,6 +36,9 @@ func BuildMessageCmdPrefix(cmd string) string {
     return "/" + cmd + " "
 }
 
+const ToggleOnFlexMessageImageUrl = "https://i.imgur.com/aiAnjYy.png"
+const ToggleOffFlexMessageImageUrl = "https://i.imgur.com/kVS4YbE.png"
+
 const AiReplyPromptFormat = "You are a humble business owner in Taiwan. " +
     "%s" + // business description
     "You will be provided a customer review of your business. You will reply in Taiwanese mandarin following best practices:\n" +

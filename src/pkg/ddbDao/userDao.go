@@ -124,9 +124,6 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
         S: aws.String("#"),
     }
 
-    // // DEBUG
-    // logger.NewLogger().Debug("userMarshalMap after uniqueId add: ", av)
-
     return av, nil
 }
 

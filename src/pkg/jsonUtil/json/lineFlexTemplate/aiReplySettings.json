@@ -116,7 +116,7 @@
                                 "action": {
                                     "type": "postback",
                                     "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Keyword"
+                                    "data": "/AiReply/Toggle/Emoji"
                                 },
                                 "flex": 1
                             }
@@ -160,8 +160,8 @@
                                 "gravity": "center",
                                 "action": {
                                     "type": "postback",
-                                    "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Keyword"
+                                    "label": "SignatureToggle",
+                                    "data": "/AiReply/Toggle/Signature"
                                 },
                                 "flex": 1
                             }
@@ -208,10 +208,10 @@
                         "paddingAll": "lg",
                         "action": {
                             "type": "postback",
-                            "label": "編輯關鍵字",
-                            "data": "/AiReply/EditKeywords",
+                            "label": "編輯簽名",
+                            "data": "/AiReply/EditSignature",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/keywords 台北美食,…"
+                            "fillInText": "/signature "
                         }
                     }
                 ]
@@ -350,7 +350,7 @@
                                 "action": {
                                     "type": "postback",
                                     "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Keyword"
+                                    "data": "/AiReply/Toggle/ServiceRecommendation"
                                 },
                                 "flex": 1
                             }
@@ -397,10 +397,10 @@
                         "paddingAll": "lg",
                         "action": {
                             "type": "postback",
-                            "label": "編輯關鍵字",
-                            "data": "/AiReply/EditKeywords",
+                            "label": "編輯推薦業務",
+                            "data": "/AiReply/EditServiceRecommendations",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/keywords 台北美食,…"
+                            "fillInText": "/recommendation "
                         }
                     },
                     {
