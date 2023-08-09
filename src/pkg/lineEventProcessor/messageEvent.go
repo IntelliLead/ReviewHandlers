@@ -140,7 +140,6 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(businessDescription) {
-            // disable depending features
             user, err := userDao.GetUser(userId)
             if err != nil {
                 return events.LambdaFunctionURLResponse{
@@ -151,9 +150,11 @@ func ProcessMessageEvent(event *linebot.Event,
 
             attributeActions := []ddbDao.AttributeAction{
                 {Action: enum.ActionDelete, Name: "businessDescription"},
+                // disable depending features
                 {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
             }
 
+            // disable depending features
             if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
                 attributeActions = append(attributeActions, ddbDao.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
             }
@@ -206,9 +207,9 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(signature) {
-            // disable depending features
             updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
                 {Action: enum.ActionDelete, Name: "signature"},
+                // disable depending features
                 {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: false},
             })
 
@@ -258,9 +259,9 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(keywords) {
-            // disable depending features
             updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
                 {Action: enum.ActionDelete, Name: "keywords"},
+                // disable depending features
                 {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
             })
         } else {
