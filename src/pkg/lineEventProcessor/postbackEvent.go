@@ -44,7 +44,7 @@ func ProcessPostbackEvent(event *linebot.Event,
         } else if dataSlice[0] == "AiReply" && len(dataSlice) >= 2 {
             switch dataSlice[1] {
             case "Toggle":
-                if len(dataSlice) != 3 || !util.IsEmptyString(dataSlice[2]) {
+                if len(dataSlice) != 3 || util.IsEmptyString(dataSlice[2]) {
                     return returnUnhandledPostback(log, *event), nil
                 }
 
@@ -470,7 +470,6 @@ func handleKeywordToggle(replyToken string,
     updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
         {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: !user.KeywordEnabled},
     })
-
     if err != nil {
         log.Errorf("Error updating keyword enabled to %v for user '%s': %v", !user.KeywordEnabled, user.UserId, err)
 
@@ -489,6 +488,8 @@ func handleKeywordToggle(replyToken string,
         }, err
     }
 
+    // DEBUG
+    log.Debugf("Updated user after keyword toggle: %+v", updatedUser)
     err = line.ShowAiReplySettings(replyToken, updatedUser)
     if err != nil {
         log.Errorf("Error showing updated keyword settings for user '%s': %v", user.UserId, err)
@@ -511,7 +512,7 @@ func handleServiceRecommendationToggle(replyToken string,
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
-    if !user.ServiceRecommendationEnabled && (util.IsEmptyStringPtr(user.ServiceRecommendation) || util.IsEmptyStringPtr(user.BusinessDescription)) {
+    if !user.ServiceRecommendationEnabled && util.IsEmptyStringPtr(user.ServiceRecommendation) && util.IsEmptyStringPtr(user.BusinessDescription) {
         _, err := line.ReplyUser(replyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
         if err != nil {
             log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", user.UserId, err)

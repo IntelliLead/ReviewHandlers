@@ -413,6 +413,14 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(user.KeywordEnabled)
 
+    // DEBUG
+    l.log.Debug("flex msg user.KeywordEnabled: ", user.KeywordEnabled)
+    l.log.Debug("flex msg url: ", jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"])
+
     // substitute keywords
     var keywords string
     if util.IsEmptyStringPtr(user.Keywords) {
@@ -442,9 +450,9 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(user.ServiceRecommendationEnabled)
 
-    // substitute keywords
+    // substitute service recommendation
     var serviceRecommendation string
-    if util.IsEmptyStringPtr(user.Keywords) {
+    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
         serviceRecommendation = " "
     } else {
         serviceRecommendation = *user.ServiceRecommendation

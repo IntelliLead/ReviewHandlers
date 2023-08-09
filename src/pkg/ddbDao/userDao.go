@@ -159,10 +159,10 @@ func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (mo
 
         switch action.Action {
         case enum.ActionDelete:
-            updateBuilder.Remove(expression.Name(action.Name))
+            updateBuilder = updateBuilder.Remove(expression.Name(action.Name))
 
         case enum.ActionUpdate:
-            updateBuilder.Set(expression.Name(attribute), expression.Value(action.Value))
+            updateBuilder = updateBuilder.Set(expression.Name(attribute), expression.Value(action.Value))
         }
     }
 
@@ -182,6 +182,7 @@ func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (mo
         ExpressionAttributeValues: expr.Values(),
         ReturnValues:              &allNewStr,
     }
+    d.log.Debugf("DDB UpdateItem input: %s", jsonUtil.AnyToJson(ddbInput))
     response, err := d.client.UpdateItem(ddbInput)
     if err != nil {
         d.log.Errorf("DDB UpdateItem failed in UpdateAttributes with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
