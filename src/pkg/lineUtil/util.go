@@ -346,7 +346,6 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     }
 
     // substitute business description
-    // body -> contents[3] -> contents[2] -> contents[0] -> text
     var businessDescription string
     if util.IsEmptyStringPtr(user.BusinessDescription) {
         businessDescription = " "
@@ -361,43 +360,116 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
         (map[string]interface{})["action"].
         (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateBusinessDescriptionMessageCmd) + businessDescription
     }
-    // update display
+    // body -> contents[2] -> contents[2] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = businessDescription
 
-    // substitute keywords
+    // substitute emoji toggle
+    // body -> contents[3] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.EmojiEnabled)
+
+    // substitute signature toggle
+    // body -> contents[4] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.SignatureEnabled)
+
+    // substitute signature
+    var signature string
+    if util.IsEmptyStringPtr(user.Signature) {
+        signature = " "
+    } else {
+        signature = *user.Signature
+
+        // update fillInText
+        // body -> contents[4] -> contents[3] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[4].
+        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateSignatureMessageCmd) + signature
+    }
     // body -> contents[4] -> contents[3] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = signature
+
+    // substitute keyword toggle
+    // body -> contents[5] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.KeywordEnabled)
+
+    // DEBUG
+    l.log.Debug("flex msg user.KeywordEnabled: ", user.KeywordEnabled)
+    l.log.Debug("flex msg url: ", jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"])
+
+    // substitute keywords
     var keywords string
     if util.IsEmptyStringPtr(user.Keywords) {
         keywords = " "
     } else {
         keywords = *user.Keywords
 
-        // body -> contents[3] -> contents[3] -> action -> fillInText
+        // body -> contents[5] -> contents[3] -> action -> fillInText
         jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["contents"].([]interface{})[5].
         (map[string]interface{})["contents"].([]interface{})[3].
         (map[string]interface{})["action"].
         (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateKeywordsMessageCmd) + keywords
     }
-    // body -> contents[3] -> contents[3] -> contents[0] -> text
+    // body -> contents[5] -> contents[3] -> contents[0] -> text
     jsonMap["body"].
-    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[5].
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = keywords
 
-    // substitute button text according to keywordEnabled status
-    // footer -> contents[0] -> action -> label
-    if !user.KeywordEnabled {
-        jsonMap["footer"].
-        (map[string]interface{})["contents"].([]interface{})[0].
+    // substitute service recommendation toggle
+    // body -> contents[6] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.ServiceRecommendationEnabled)
+
+    // substitute service recommendation
+    var serviceRecommendation string
+    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+        serviceRecommendation = " "
+    } else {
+        serviceRecommendation = *user.ServiceRecommendation
+
+        // body -> contents[6] -> contents[3] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[6].
+        (map[string]interface{})["contents"].([]interface{})[3].
         (map[string]interface{})["action"].
-        (map[string]interface{})["label"] = "啟用關鍵字"
-    } // default to 停用
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateRecommendationMessageCmd) + serviceRecommendation
+    }
+    // body -> contents[5] -> contents[3] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = serviceRecommendation
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }

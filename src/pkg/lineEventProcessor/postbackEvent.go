@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/aiUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -39,9 +40,14 @@ func ProcessPostbackEvent(event *linebot.Event,
             if err != nil {
                 return lambdaReturn, err
             } // else continue
+
         } else if dataSlice[0] == "AiReply" && len(dataSlice) >= 2 {
             switch dataSlice[1] {
-            case "KeywordToggle":
+            case "Toggle":
+                if len(dataSlice) != 3 || util.IsEmptyString(dataSlice[2]) {
+                    return returnUnhandledPostback(log, *event), nil
+                }
+
                 // get user
                 user, err := userDao.GetUser(userId)
                 if err != nil {
@@ -52,77 +58,44 @@ func ProcessPostbackEvent(event *linebot.Event,
                     }, err
                 }
 
-                var updatedUser model.User
-                if user.KeywordEnabled {
-                    updatedUser, err = userDao.UpdateAttribute(userId, "KeywordEnabled", false)
+                switch dataSlice[2] {
+                case "Emoji":
+                    lambdaReturn, err := handleEmojiToggle(event.ReplyToken, user, userDao, line, log)
                     if err != nil {
-                        log.Errorf("Error updating seo enabled to false for user '%s': %v", userId, err)
+                        return lambdaReturn, err
+                    } // else continue
 
-                        // notify user of error
-                        _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
-                        if err != nil {
-                            return events.LambdaFunctionURLResponse{
-                                StatusCode: 500,
-                                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
-                            }, err
-                        }
-
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 500,
-                            Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to false: %s"}`, err),
-                        }, err
-                    }
-                } else {
-                    if util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription) {
-                        _, err := line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
-                        if err != nil {
-                            log.Errorf("Error replying seo settings prompt message to user '%s': %v", userId, err)
-                            return events.LambdaFunctionURLResponse{
-                                StatusCode: 00,
-                                Body:       fmt.Sprintf(`{"error": "Error replying seo settings prompt message: %s"}`, err),
-                            }, err
-                        }
-
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 200,
-                            Body:       fmt.Sprintf(`{"Rejected enabling seo keyword feature": "Please fill in business description and keywords before enabling seo"}`),
-                        }, nil
-                    }
-
-                    updatedUser, err = userDao.UpdateAttribute(userId, "KeywordEnabled", true)
+                case "Signature":
+                    lambdaReturn, err := handleSignatureToggle(event.ReplyToken, user, userDao, line, log)
                     if err != nil {
-                        log.Errorf("Error updating seo enabled to true for user '%s': %v", userId, err)
-                        // notify user of error
-                        _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字回覆")
-                        if err != nil {
-                            return events.LambdaFunctionURLResponse{
-                                StatusCode: 500,
-                                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update seo enabled failed: %s"}`, err),
-                            }, err
-                        }
+                        return lambdaReturn, err
+                    } // else continue
 
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 500,
-                            Body:       fmt.Sprintf(`{"error": "Error updating seo enabled to true: %s"}`, err),
-                        }, err
-                    }
-                }
+                case "Keyword":
+                    lambdaReturn, err := handleKeywordToggle(event.ReplyToken, user, userDao, line, log)
+                    if err != nil {
+                        return lambdaReturn, err
+                    } // else continue
 
-                // send updated seo settings
-                err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
-                if err != nil {
-                    log.Errorf("Error showing updated seo settings for user '%s': %v", userId, err)
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
-                    }, err
+                case "ServiceRecommendation":
+                    lambdaReturn, err := handleServiceRecommendationToggle(event.ReplyToken, user, userDao, line, log)
+                    if err != nil {
+                        return lambdaReturn, err
+                    } // else continue
+
                 }
 
             case "EditBusinessDescription":
                 log.Info("/AiReply/EditBusinessDescription postback event received. User is editing business description")
 
+            case "EditSignature":
+                log.Info("/AiReply/EditSignature postback event received. User is editing signature")
+
             case "EditKeywords":
                 log.Info("/AiReply/EditKeywords postback event received. User is editing keywords")
+
+            case "EditServiceRecommendations":
+                log.Info("/AiReply/EditServiceRecommendations postback event received. User is editing service recommendations")
             }
 
         } else {
@@ -209,7 +182,10 @@ func ProcessPostbackEvent(event *linebot.Event,
         }
 
         if dataSlice[1] == "DeleteQuickReplyMessage" {
-            updatedUser, err := userDao.DeleteAttribute(userId, "QuickReplyMessage")
+            updatedUser, err := userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "quickReplyMessage"},
+            })
+
             if err != nil {
                 log.Errorf("Error deleting quick reply message for user '%s': %v", userId, err)
 
@@ -355,4 +331,240 @@ func handleGenerateAiReply(event *linebot.Event,
 
     // dummy return
     return events.LambdaFunctionURLResponse{}, nil
+}
+
+func handleEmojiToggle(replyToken string,
+    user model.User,
+    userDao *ddbDao.UserDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    var updatedUser model.User
+    var err error
+
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
+        {Action: enum.ActionUpdate, Name: "emojiEnabled", Value: !user.EmojiEnabled},
+    })
+
+    if err != nil {
+        log.Errorf("Error updating emoji enabled to %v for user '%s': %v", !user.EmojiEnabled, user.UserId, err)
+
+        // notify user of error
+        _, err := line.NotifyUserUpdateFailed(replyToken, "Emoji AI 回覆")
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update emoji enabled failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error updating emoji enabled: %s"}`, err),
+        }, err
+    }
+
+    err = line.ShowAiReplySettings(replyToken, updatedUser)
+    if err != nil {
+        log.Errorf("Error showing updated AI Reply settings for user '%s': %v", user.UserId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to show updated AI Reply settings: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       fmt.Sprintf(`{"Success": "Successfully updated emoji enabled to %v"}`, !user.EmojiEnabled),
+    }, nil
+}
+
+func handleSignatureToggle(replyToken string,
+    user model.User,
+    userDao *ddbDao.UserDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    if !user.SignatureEnabled && util.IsEmptyStringPtr(user.Signature) {
+        _, err := line.ReplyUser(replyToken, "請先填寫簽名，才能開啟簽名功能")
+        if err != nil {
+            log.Errorf("Error replying signature settings prompt message to user '%s': %v", user.UserId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error replying signature settings prompt message: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       fmt.Sprintf(`{"Rejected enabling keyword feature": "Please fill in business description and keywords before enabling keyword"}`),
+        }, nil
+    }
+
+    var updatedUser model.User
+    var err error
+
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
+        {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: !user.SignatureEnabled},
+    })
+
+    if err != nil {
+        log.Errorf("Error updating signature enabled to %v for user '%s': %v", !user.SignatureEnabled, user.UserId, err)
+
+        // notify user of error
+        _, err := line.NotifyUserUpdateFailed(replyToken, "簽名 AI 回覆")
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update signature enabled failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error updating signature enabled: %s"}`, err),
+        }, err
+    }
+
+    err = line.ShowAiReplySettings(replyToken, updatedUser)
+    if err != nil {
+        log.Errorf("Error showing updated AI Reply settings for user '%s': %v", user.UserId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to show updated AI Reply settings: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       fmt.Sprintf(`{"Success": "Successfully updated emoji enabled to %v"}`, !user.EmojiEnabled),
+    }, nil
+}
+
+func handleKeywordToggle(replyToken string,
+    user model.User,
+    userDao *ddbDao.UserDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    if !user.KeywordEnabled && (util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription)) {
+        _, err := line.ReplyUser(replyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
+        if err != nil {
+            log.Errorf("Error replying keyword settings prompt message to user '%s': %v", user.UserId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 00,
+                Body:       fmt.Sprintf(`{"error": "Error replying keyword settings prompt message: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       fmt.Sprintf(`{"Rejected enabling keyword feature": "Please fill in business description and keywords before enabling keyword"}`),
+        }, nil
+    }
+
+    var updatedUser model.User
+    var err error
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
+        {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: !user.KeywordEnabled},
+    })
+    if err != nil {
+        log.Errorf("Error updating keyword enabled to %v for user '%s': %v", !user.KeywordEnabled, user.UserId, err)
+
+        // notify user of error
+        _, err := line.NotifyUserUpdateFailed(replyToken, "關鍵字回覆")
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update keyword enabled failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error updating keyword enabled: %s"}`, err),
+        }, err
+    }
+
+    // DEBUG
+    log.Debugf("Updated user after keyword toggle: %+v", updatedUser)
+    err = line.ShowAiReplySettings(replyToken, updatedUser)
+    if err != nil {
+        log.Errorf("Error showing updated keyword settings for user '%s': %v", user.UserId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       fmt.Sprintf(`{"Success": "Successfully updated keyword enabled"}`),
+    }, nil
+}
+
+func handleServiceRecommendationToggle(replyToken string,
+    user model.User,
+    userDao *ddbDao.UserDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    if !user.ServiceRecommendationEnabled && util.IsEmptyStringPtr(user.ServiceRecommendation) && util.IsEmptyStringPtr(user.BusinessDescription) {
+        _, err := line.ReplyUser(replyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
+        if err != nil {
+            log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", user.UserId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Error replying service recommendation settings prompt message: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       fmt.Sprintf(`{"Rejected enabling service recommendation feature": "Please fill in recommended services or business description before enabling service recommendation"}`),
+        }, nil
+    }
+
+    var updatedUser model.User
+    var err error
+
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
+        {Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: !user.ServiceRecommendationEnabled},
+    })
+
+    if err != nil {
+        log.Errorf("Error updating service recommendation enabled to %v for user '%s': %v", !user.ServiceRecommendationEnabled, user.UserId, err)
+
+        // notify user of error
+        _, err := line.NotifyUserUpdateFailed(replyToken, "推薦其他業務 AI 回覆")
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify user of update service recommendation enabled failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error updating service recommendation enabled: %s"}`, err),
+        }, err
+    }
+
+    err = line.ShowAiReplySettings(replyToken, updatedUser)
+    if err != nil {
+        log.Errorf("Error showing updated AI Reply settings for user '%s': %v", user.UserId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to show updated AI Reply settings: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       fmt.Sprintf(`{"Success": "Successfully updated emoji enabled to %v"}`, !user.EmojiEnabled),
+    }, nil
 }

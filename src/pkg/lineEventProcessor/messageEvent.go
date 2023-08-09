@@ -3,6 +3,7 @@ package lineEventProcessor
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -95,7 +96,9 @@ func ProcessMessageEvent(event *linebot.Event,
         quickReplyMessage := args
 
         // update DDB
-        updatedUser, err := userDao.UpdateAttribute(userId, "quickReplyMessage", quickReplyMessage)
+        updatedUser, err := userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            {Action: enum.ActionUpdate, Name: "quickReplyMessage", Value: quickReplyMessage},
+        })
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
 
@@ -137,9 +140,31 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(businessDescription) {
-            updatedUser, err = userDao.DeleteAttribute(userId, "businessDescription")
+            user, err := userDao.GetUser(userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to get user: %s"}`, err),
+                }, err
+            }
+
+            attributeActions := []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "businessDescription"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
+            }
+
+            // disable depending features
+            if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
+                attributeActions = append(attributeActions, ddbDao.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
+            }
+
+            updatedUser, err = userDao.UpdateAttributes(userId, attributeActions)
+
         } else {
-            updatedUser, err = userDao.UpdateAttribute(userId, "businessDescription", businessDescription)
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "businessDescription", Value: businessDescription},
+            })
         }
         if err != nil {
             log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
@@ -174,6 +199,58 @@ func ProcessMessageEvent(event *linebot.Event,
             Body:       `{"message": "Successfully processed update business description request"}`,
         }, nil
 
+    case "s", util.UpdateSignatureMessageCmd, "簽名":
+        // process update quick reply message request
+        signature := args
+
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(signature) {
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "signature"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: false},
+            })
+
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "signature", Value: signature},
+            })
+        }
+        if err != nil {
+            log.Errorf("Error updating signature '%s' for user '%s': %v", signature, userId, err)
+
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "簽名")
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update signature failed: %s"}`, err),
+                }, err
+            }
+            log.Error("Successfully notified user of update signature failed")
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to update signature: %s"}`, err),
+            }, err
+        }
+
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
+        if err != nil {
+            log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
+            }, err
+        }
+
+        log.Infof("Successfully processed update signature request for user '%s'", userId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       `{"message": "Successfully processed update signature request"}`,
+        }, nil
+
     case "k", util.UpdateKeywordsMessageCmd, "關鍵字":
         // process update quick reply message request
         keywords := args
@@ -182,9 +259,15 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(keywords) {
-            updatedUser, err = userDao.DeleteAttribute(userId, "keywords")
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "keywords"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
+            })
         } else {
-            updatedUser, err = userDao.UpdateAttribute(userId, "keywords", keywords)
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "keywords", Value: keywords},
+            })
         }
         if err != nil {
             log.Errorf("Error updating keywords '%s' for user '%s': %v", keywords, userId, err)
@@ -206,10 +289,10 @@ func ProcessMessageEvent(event *linebot.Event,
 
         err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
-            log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
+            log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
+                Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings : %s"}`, err),
             }, err
         }
 
@@ -217,6 +300,71 @@ func ProcessMessageEvent(event *linebot.Event,
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Body:       `{"message": "Successfully processed update keywords request"}`,
+        }, nil
+
+    case "r", util.UpdateRecommendationMessageCmd, "推薦":
+        // process update quick reply message request
+        serviceRecommendation := args
+
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(serviceRecommendation) {
+            // disable depending features
+            user, err := userDao.GetUser(userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to get user: %s"}`, err),
+                }, err
+            }
+
+            actions := []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "serviceRecommendation"},
+            }
+
+            if util.IsEmptyStringPtr(user.BusinessDescription) {
+                actions = append(actions, ddbDao.AttributeAction{
+                    Action: enum.ActionUpdate, Name: "ServiceRecommendationEnabled", Value: false})
+            }
+
+            updatedUser, err = userDao.UpdateAttributes(userId, actions)
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "serviceRecommendation", Value: serviceRecommendation},
+            })
+        }
+        if err != nil {
+            log.Errorf("Error updating service recommendation '%s' for user '%s': %v", serviceRecommendation, userId, err)
+
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update service recommendation failed: %s"}`, err),
+                }, err
+            }
+            log.Error("Successfully notified user of update service recommendation failed")
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to update service recommendation: %s"}`, err),
+            }, err
+        }
+
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
+        if err != nil {
+            log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
+            }, err
+        }
+
+        log.Infof("Successfully processed update service recommendation request for user '%s'", userId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       `{"message": "Successfully processed update service recommendation request"}`,
         }, nil
 
     default:

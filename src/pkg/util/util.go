@@ -46,3 +46,10 @@ func IsEmptyString(s string) bool {
 func IsEmptyStringPtr(s *string) bool {
     return s == nil || len(strings.TrimSpace(*s)) == 0
 }
+
+func GetToggleUrl(state bool) string {
+    if state {
+        return ToggleOnFlexMessageImageUrl
+    }
+    return ToggleOffFlexMessageImageUrl
+}
