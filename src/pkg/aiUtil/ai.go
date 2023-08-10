@@ -3,7 +3,9 @@ package aiUtil
 import (
     "context"
     "errors"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/sashabaranov/go-openai"
@@ -22,21 +24,17 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
     }
 }
 
-func (ai *Ai) GenerateReply(review string, userId string) (string, error) {
-    var temp float32
-    var prompt string
-    if userId == util.NailSalonUserId || userId == util.AlphaUserId {
-        temp = 1.12
-        prompt = util.AiReplyPromptNailSalon
-    } else {
-        temp = 1.0
-        prompt = util.AiReplyPrompt
-    }
+func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
+    temp := 1.12
+
+    prompt := ai.buildPrompt(user)
+    // DEBUG
+    ai.log.Debug("AI Reply Prompt: ", prompt)
 
     response, err := ai.gptClient.CreateChatCompletion(
         context.Background(),
         openai.ChatCompletionRequest{
-            Temperature: temp,
+            Temperature: float32(temp),
             MaxTokens:   256,
             Model:       openai.GPT4,
             Messages: []openai.ChatCompletionMessage{
@@ -86,4 +84,48 @@ func (ai *Ai) GenerateReply(review string, userId string) (string, error) {
 func newGptClient() *openai.Client {
     secrets := secret.GetSecrets()
     return openai.NewClient(secrets.GptApiKey)
+}
+
+func (ai *Ai) buildPrompt(user model.User) string {
+    businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
+
+    // business prompt
+    if !util.IsEmptyStringPtr(user.BusinessDescription) {
+        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *user.BusinessDescription)
+    }
+
+    // emoji prompt
+    if user.EmojiEnabled {
+        emojiPrompt = util.EmojiPrompt
+    }
+
+    // service recommendation prompt
+    if user.ServiceRecommendationEnabled {
+        if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+            serviceRecommendationPrompt = fmt.Sprintf(util.ServiceRecommendationPromptFormat, "")
+        } else {
+            serviceRecommendationPrompt = fmt.Sprintf(
+                util.ServiceRecommendationPromptFormat, fmt.Sprintf(util.ServiceToRecommendPromptFormat, *user.ServiceRecommendation))
+        }
+    }
+
+    // keyword prompt
+    if user.KeywordEnabled {
+        if util.IsEmptyStringPtr(user.Keywords) {
+            ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
+        } else {
+            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *user.Keywords)
+        }
+    }
+
+    // signature prompt
+    if user.SignatureEnabled {
+        if util.IsEmptyStringPtr(user.Signature) {
+            ai.log.Errorf("Signature is empty for user %s but signature is enabled", user.UserId)
+        } else {
+            signaturePrompt = fmt.Sprintf(util.SignaturePrompt, *user.Signature)
+        }
+    }
+
+    return fmt.Sprintf(util.AiReplyPromptFormat, businessPrompt, emojiPrompt, serviceRecommendationPrompt, keywordsPrompt, signaturePrompt)
 }

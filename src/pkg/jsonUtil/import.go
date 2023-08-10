@@ -21,6 +21,10 @@ type AiReplyResultLineFlexTemplateJsons struct {
     AiReplyResult []byte
 }
 
+type AiReplySettingsLineFlexTemplateJsons struct {
+    AiReplySettings []byte
+}
+
 //go:embed json/lineFlexTemplate/*
 var embeddedFileSystem embed.FS
 
@@ -75,5 +79,16 @@ func LoadAiReplyResultLineFlexTemplateJsons() AiReplyResultLineFlexTemplateJsons
 
     return AiReplyResultLineFlexTemplateJsons{
         aiReplyResult,
+    }
+}
+
+func LoadAiReplySettingsLineFlexTemplateJsons() AiReplySettingsLineFlexTemplateJsons {
+    file, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReplySettings.json")
+    if err != nil {
+        log.Fatal("Error reading aiReplySettings.json: ", err)
+    }
+
+    return AiReplySettingsLineFlexTemplateJsons{
+        file,
     }
 }

@@ -23,6 +23,7 @@ type CommandMessage struct {
     Args    []string
 }
 
+// ParseCommandMessage parses a command message. Unless isMultiArgs is true, all the remaining text after the first command is treated as a single argument.
 func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
     if !strings.HasPrefix(str, "/") {
         return CommandMessage{}
@@ -31,18 +32,18 @@ func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
     // Find the first whitespace character after '/'
     index := strings.IndexFunc(str[1:], isWhitespace)
     if index == -1 {
-        return CommandMessage{Command: str[1:]}
+        return CommandMessage{Command: str[1:], Args: []string{""}} // Return the remaining text after '/' as command
     }
 
     cmd := str[1 : index+1]
-    afterCmd := strings.TrimSpace(str[index+2:])
+    trimmedCmd := strings.TrimSpace(str[index+2:])
 
     var args []string
     if isMultiArgs {
         // Only return the first argument
-        args = strings.Fields(afterCmd)
+        args = strings.Fields(trimmedCmd)
     } else {
-        args = []string{afterCmd}
+        args = []string{trimmedCmd}
     }
     return CommandMessage{Command: cmd, Args: args}
 }
@@ -149,7 +150,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         // substitute update button fill with current quick reply message
         if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
             if _, ok := contents.([]interface{}); ok {
-                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.UpdateQuickReplyMessageCmdPrefix + *user.QuickReplyMessage
+                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + *user.QuickReplyMessage
             }
         }
     }
@@ -174,19 +175,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         }
     }
 
-    outputJsonBytes, err := json.Marshal(jsonMap)
-    if err != nil {
-        l.log.Error("Error marshalling output JSON in buildQuickReplySettingsFlexMessage: ", err)
-        return nil, err
-    }
-
-    flexContainer, err := linebot.UnmarshalFlexMessageJSON(outputJsonBytes)
-    if err != nil {
-        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON in buildQuickReplySettingsFlexMessage: ", err)
-        return nil, err
-    }
-
-    return flexContainer, nil
+    return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (linebot.FlexContainer, error) {
@@ -345,6 +334,142 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["action"].
     (map[string]interface{})["data"] = "/AiReply/GenerateAiReply/" + review.ReviewId.String()
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+    // Convert the original JSON to a map[string]interface{}
+    jsonMap, err := jsonUtil.JsonToMap(l.aiReplySettingsJsons.AiReplySettings)
+    if err != nil {
+        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+    }
+
+    // substitute business description
+    var businessDescription string
+    if util.IsEmptyStringPtr(user.BusinessDescription) {
+        businessDescription = " "
+    } else {
+        businessDescription = *user.BusinessDescription
+
+        // update fillInText
+        // body -> contents[2] -> contents[2] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[2].
+        (map[string]interface{})["contents"].([]interface{})[2].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateBusinessDescriptionMessageCmd) + businessDescription
+    }
+    // body -> contents[2] -> contents[2] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = businessDescription
+
+    // substitute emoji toggle
+    // body -> contents[3] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.EmojiEnabled)
+
+    // substitute signature toggle
+    // body -> contents[4] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.SignatureEnabled)
+
+    // substitute signature
+    var signature string
+    if util.IsEmptyStringPtr(user.Signature) {
+        signature = " "
+    } else {
+        signature = *user.Signature
+
+        // update fillInText
+        // body -> contents[4] -> contents[3] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[4].
+        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateSignatureMessageCmd) + signature
+    }
+    // body -> contents[4] -> contents[3] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = signature
+
+    // substitute keyword toggle
+    // body -> contents[5] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.KeywordEnabled)
+
+    // DEBUG
+    l.log.Debug("flex msg user.KeywordEnabled: ", user.KeywordEnabled)
+    l.log.Debug("flex msg url: ", jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"])
+
+    // substitute keywords
+    var keywords string
+    if util.IsEmptyStringPtr(user.Keywords) {
+        keywords = " "
+    } else {
+        keywords = *user.Keywords
+
+        // body -> contents[5] -> contents[3] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[5].
+        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateKeywordsMessageCmd) + keywords
+    }
+    // body -> contents[5] -> contents[3] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = keywords
+
+    // substitute service recommendation toggle
+    // body -> contents[6] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.ServiceRecommendationEnabled)
+
+    // substitute service recommendation
+    var serviceRecommendation string
+    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+        serviceRecommendation = " "
+    } else {
+        serviceRecommendation = *user.ServiceRecommendation
+
+        // body -> contents[6] -> contents[3] -> action -> fillInText
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[6].
+        (map[string]interface{})["contents"].([]interface{})[3].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateRecommendationMessageCmd) + serviceRecommendation
+    }
+    // body -> contents[5] -> contents[3] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = serviceRecommendation
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
