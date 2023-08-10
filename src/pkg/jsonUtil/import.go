@@ -17,27 +17,28 @@ type QuickReplySettingsLineFlexTemplateJsons struct {
     QuickReplyMessageUpdatedTextBox []byte
 }
 
-type AiReplyResultLineFlexTemplateJsons struct {
-    AiReplyResult []byte
-}
-
-type AiReplySettingsLineFlexTemplateJsons struct {
+type AiReplyLineFlexTemplateJsons struct {
+    AiReplyResult   []byte
     AiReplySettings []byte
 }
 
+type AuthLineFlexTemplateJsons struct {
+    AuthRequest []byte
+}
+
 //go:embed json/lineFlexTemplate/*
-var embeddedFileSystem embed.FS
+var embeddedFileSystem embed.FS // import files at compile time
 
 func LoadReviewMessageLineFlexTemplateJsons() ReviewMessageLineFlexTemplateJsons {
-    goldStarIcon, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/goldStarIcon.json")
+    goldStarIcon, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/element/goldStarIcon.json")
     if err != nil {
         log.Fatal("Error reading goldStarIcon.json: ", err)
     }
-    grayStarIcon, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/grayStarIcon.json")
+    grayStarIcon, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/element/grayStarIcon.json")
     if err != nil {
         log.Fatal("Error reading grayStarIcon.json: ", err)
     }
-    reviewMessage, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/reviewMessage.json")
+    reviewMessage, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/review/reviewMessage.json")
     if err != nil {
         log.Fatal("Error reading reviewMessage.json: ", err)
     }
@@ -50,16 +51,15 @@ func LoadReviewMessageLineFlexTemplateJsons() ReviewMessageLineFlexTemplateJsons
 }
 
 func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTemplateJsons {
-    quickReplySettings, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplySettings.json")
+    quickReplySettings, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplySettings.json")
     if err != nil {
         log.Fatal("Error reading quickReplySettings.json: ", err)
     }
-    quickReplySettingsNoQuickReply, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplySettings_noQuickReply.json")
+    quickReplySettingsNoQuickReply, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplySettings_noQuickReply.json")
     if err != nil {
         log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
     }
-
-    quickReplyMessageUpdatedTextBox, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReplyMessageUpdatedTextBox.json")
+    quickReplyMessageUpdatedTextBox, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplyMessageUpdatedTextBox.json")
     if err != nil {
         log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
     }
@@ -71,24 +71,29 @@ func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTem
     }
 }
 
-func LoadAiReplyResultLineFlexTemplateJsons() AiReplyResultLineFlexTemplateJsons {
-    aiReplyResult, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReplyResult.json")
+func LoadAiReplyLineFlexTemplateJsons() AiReplyLineFlexTemplateJsons {
+    aiReplyResult, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReply/aiReplyResult.json")
     if err != nil {
         log.Fatal("Error reading aiReplyResult.json: ", err)
     }
-
-    return AiReplyResultLineFlexTemplateJsons{
-        aiReplyResult,
-    }
-}
-
-func LoadAiReplySettingsLineFlexTemplateJsons() AiReplySettingsLineFlexTemplateJsons {
-    file, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReplySettings.json")
+    aiReplySettings, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReply/aiReplySettings.json")
     if err != nil {
         log.Fatal("Error reading aiReplySettings.json: ", err)
     }
 
-    return AiReplySettingsLineFlexTemplateJsons{
-        file,
+    return AiReplyLineFlexTemplateJsons{
+        aiReplyResult,
+        aiReplySettings,
+    }
+}
+
+func LoadAuthLineFlexTemplateJsons() AuthLineFlexTemplateJsons {
+    authRequest, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/auth/authRequest.json")
+    if err != nil {
+        log.Fatal("Error reading authRequest.json: ", err)
+    }
+
+    return AuthLineFlexTemplateJsons{
+        authRequest,
     }
 }
