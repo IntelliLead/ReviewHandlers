@@ -150,11 +150,14 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMess
         // substitute update button fill with current quick reply message
         if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
             if _, ok := contents.([]interface{}); ok {
-                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + *user.QuickReplyMessage
+                jsonMap["footer"].(map[string]interface{})["contents"].
+                ([]interface{})[0].(map[string]interface{})["action"].
+                (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + *user.QuickReplyMessage
             }
         }
     }
 
+    // add quick reply updated message text box
     if addUpdateMessage {
         // Convert the original JSON to a map[string]interface{}
         quickReplyUpdatedMessageTextBox, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplyMessageUpdatedTextBox)

@@ -1,10 +1,9 @@
-package lineEventProcessor
+package messageEvent
 
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -69,7 +68,7 @@ func ProcessMessageEvent(event *linebot.Event,
     // process review reply request
     // --------------------------------
     if lineUtil.IsReviewReplyMessage(message) {
-        return messageEvent.ProcessReviewReplyMessage(userId, event, reviewDao, line, log)
+        return ProcessReviewReplyMessage(userId, event, reviewDao, line, log)
     }
 
     // process command requests
@@ -91,7 +90,7 @@ func ProcessMessageEvent(event *linebot.Event,
             Body:       `{"message": "Successfully processed help request"}`,
         }, nil
 
-    case "q", util.UpdateQuickReplyMessageCmd, "快速回復":
+    case "q", util.UpdateQuickReplyMessageCmd, "快速回覆":
         // process update quick reply message request
         quickReplyMessage := args
 
