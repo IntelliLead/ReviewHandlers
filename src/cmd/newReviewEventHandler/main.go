@@ -6,6 +6,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -126,7 +127,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
 
-    // --------------------
+    if user.AutoQuickReplyEnabled && util.IsEmptyString(review.Review) && review.NumberRating == 5 {
+        lambdaReturn, err := lineEventProcessor.ReplyReview(
+            user.UserId, nil, *user.QuickReplyMessage, review, reviewDao, line, log, true)
+        if err != nil {
+            return lambdaReturn, err
+        }
+
+        log.Infof("Successfully auto replied review for user ID '%s' for review ID '%s'",
+            user.UserId, review.ReviewId.String())
+
+        return lambdaReturn, nil
+    }
+
     log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))
 
     return events.LambdaFunctionURLResponse{Body: `{"message": "OK"}`, StatusCode: 200}, nil

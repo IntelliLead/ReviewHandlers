@@ -118,7 +118,7 @@
                     "label": "快速回覆",
                     "inputOption": "openKeyboard",
                     "data": "/NewReview/QuickReply",
-                    "fillInText": "@{REVIEW_ID} {CANNED_REPLY}"
+                    "fillInText": "@{REVIEW_ID} {QUICK_REPLY}"
                 },
                 "adjustMode": "shrink-to-fit",
                 "color": "#445783"

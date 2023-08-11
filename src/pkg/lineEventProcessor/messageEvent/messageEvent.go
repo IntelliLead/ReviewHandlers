@@ -92,12 +92,41 @@ func ProcessMessageEvent(event *linebot.Event,
 
     case "q", util.UpdateQuickReplyMessageCmd, "快速回覆":
         // process update quick reply message request
+
+        // validate message does not contain LINE emojis
+        // --------------------------------
+        if HasLineEmoji(textMessage) {
+            _, err := line.NotifyUserCannotUseLineEmoji(event.ReplyToken)
+            if err != nil {
+                log.Errorf("Error notifying user '%s' that LINE Emoji is not yet supported for quick reply: %v", userId, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of LINE Emoji not yet supported: %s"}`, err),
+                }, err
+            }
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 200,
+                Body:       `{"message": "Notified LINE Emoji not yet supported"}`,
+            }, nil
+        }
+
         quickReplyMessage := args
 
         // update DDB
-        updatedUser, err := userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
-            {Action: enum.ActionUpdate, Name: "quickReplyMessage", Value: quickReplyMessage},
-        })
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(quickReplyMessage) {
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionDelete, Name: "quickReplyMessage"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "autoQuickReplyEnabled", Value: false},
+            })
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "quickReplyMessage", Value: quickReplyMessage},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
 
@@ -116,7 +145,7 @@ func ProcessMessageEvent(event *linebot.Event,
             }, err
         }
 
-        err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser, true)
+        err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -383,5 +412,4 @@ func ProcessMessageEvent(event *linebot.Event,
         }, nil
 
     }
-
 }
