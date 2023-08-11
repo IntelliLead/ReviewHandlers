@@ -41,6 +41,14 @@ func ProcessPostbackEvent(event *linebot.Event,
                 return lambdaReturn, err
             } // else continue
 
+        } else if dataSlice[0] == "NewReview" {
+            if dataSlice[1] == "QuickReply" {
+                log.Info("/NewReview/QuickReply postback event received. User is editing quick reply message before replying")
+            }
+            if dataSlice[1] == "Reply" {
+                log.Info("/NewReview/Reply postback event received. User is editing hand-written reply message before replying")
+            }
+
         } else if dataSlice[0] == "AiReply" && len(dataSlice) >= 2 {
             switch dataSlice[1] {
             case "Toggle":
@@ -119,7 +127,7 @@ func ProcessPostbackEvent(event *linebot.Event,
                 }, err
             }
 
-            err = line.ShowQuickReplySettings(event.ReplyToken, user, false)
+            err = line.ShowQuickReplySettings(event.ReplyToken, user)
             if err != nil {
                 log.Errorf("Error sending quick reply settings to user '%s': %v", user.UserId, err)
                 return events.LambdaFunctionURLResponse{
@@ -181,38 +189,31 @@ func ProcessPostbackEvent(event *linebot.Event,
             return returnUnhandledPostback(log, *event), nil
         }
 
-        if dataSlice[1] == "DeleteQuickReplyMessage" {
-            updatedUser, err := userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "quickReplyMessage"},
-            })
+        switch dataSlice[1] {
+        case "Toggle":
+            // /QuickReply/Toggle/AutoReply
+            if len(dataSlice) != 3 || util.IsEmptyString(dataSlice[2]) || dataSlice[2] != "AutoReply" {
+                return returnUnhandledPostback(log, *event), nil
+            }
 
+            // get user
+            user, err := userDao.GetUser(userId)
             if err != nil {
-                log.Errorf("Error deleting quick reply message for user '%s': %v", userId, err)
-
-                _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
-                if err != nil {
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Failed to notify user of delete quick reply message failed: %s"}`, err),
-                    }, err
-                }
-                log.Error("Successfully notified user of update quick reply message failed")
-
+                log.Error("Error getting user during handling /QuickReply/Toggle/AutoReply: ", err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error deleting quick reply message: %s"}`, err),
+                    Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
                 }, err
             }
 
-            err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser, true)
+            lambdaReturn, err := handleAutoQuickReplyToggle(event.ReplyToken, user, userDao, line, log)
             if err != nil {
-                log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to show quick reply settings: %s"}`, err),
-                }, err
-            }
+                return lambdaReturn, err
+            } // else continue
 
+        case "EditQuickReplyMessage":
+            // /QuickReply/EditQuickReplyMessage
+            log.Info("/QuickReply/EditQuickReplyMessage postback event received. User is editing quick reply message")
         }
 
     default:
@@ -566,5 +567,66 @@ func handleServiceRecommendationToggle(replyToken string,
     return events.LambdaFunctionURLResponse{
         StatusCode: 200,
         Body:       fmt.Sprintf(`{"Success": "Successfully updated emoji enabled to %v"}`, !user.EmojiEnabled),
+    }, nil
+}
+
+func handleAutoQuickReplyToggle(replyToken string,
+    user model.User,
+    userDao *ddbDao.UserDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+
+    if !user.AutoQuickReplyEnabled && (util.IsEmptyStringPtr(user.QuickReplyMessage)) {
+        _, err := line.ReplyUser(replyToken, "請先填寫快速回覆訊息，才能開啟自動回覆功能")
+        if err != nil {
+            log.Errorf("Error replying cannot enable auto quick reply prompt to user '%s': %v", user.UserId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 00,
+                Body:       fmt.Sprintf(`{"error": "Error replying cannot enable auto quick reply prompt: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       fmt.Sprintf(`{"Rejected enabling auto quick reply feature": "Please fill in quick reply message before enabling auto quick reply"}`),
+        }, nil
+    }
+
+    var updatedUser model.User
+    var err error
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
+        {Action: enum.ActionUpdate, Name: "autoQuickReplyEnabled", Value: !user.AutoQuickReplyEnabled},
+    })
+    if err != nil {
+        log.Errorf("Error updating auto quick reply enabled to %v for user '%s': %v", !user.AutoQuickReplyEnabled, user.UserId, err)
+
+        // notify user of error
+        _, err := line.NotifyUserUpdateFailed(replyToken, "自動回覆")
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify user of updating auto quick reply enabled failed: %s"}`, err),
+            }, err
+        }
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error updating auto quick reply enabled: %s"}`, err),
+        }, err
+    }
+
+    err = line.ShowQuickReplySettings(replyToken, updatedUser)
+    if err != nil {
+        log.Errorf("Error showing quick reply settings for user '%s': %v", user.UserId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to show quick reply settings: %s"}`, err),
+        }, err
+    }
+
+    // dummy return
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       fmt.Sprintf(`{"Success": "Successfully updated quick reply enabled"}`),
     }, nil
 }
