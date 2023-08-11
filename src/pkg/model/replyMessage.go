@@ -5,28 +5,28 @@ import (
     "github.com/go-playground/validator/v10"
 )
 
-type ReplyMessage struct {
+type Reply struct {
     ReviewId _type.ReviewId `validate:"reviewIdValidation"`
     Message  string         `validate:"min=1"`
 }
 
-func NewReplyMessage(reviewId _type.ReviewId, message string) (ReplyMessage, error) {
+func NewReply(reviewId _type.ReviewId, message string) (Reply, error) {
     validate := validator.New()
     // even with omitEmpty and reviewId is indeed empty, validation registration is still needed
     err := validate.RegisterValidation("reviewIdValidation", _type.ReviewIdValidation)
     if err != nil {
-        return ReplyMessage{}, err
+        return Reply{}, err
     }
 
-    replyMessage := ReplyMessage{
+    reply := Reply{
         ReviewId: reviewId,
         Message:  message,
     }
 
-    err = validate.Struct(replyMessage)
+    err = validate.Struct(reply)
     if err != nil {
-        return ReplyMessage{}, err
+        return Reply{}, err
     }
 
-    return replyMessage, nil
+    return reply, nil
 }

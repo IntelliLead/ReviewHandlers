@@ -82,8 +82,8 @@ func (l *Line) SendNewReview(review model.Review, user model.User) error {
     return nil
 }
 
-func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, isUpdated bool) error {
-    flexMessage, err := l.buildQuickReplySettingsFlexMessage(user, isUpdated)
+func (l *Line) ShowQuickReplySettings(replyToken string, user model.User) error {
+    flexMessage, err := l.buildQuickReplySettingsFlexMessage(user)
     if err != nil {
         l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)
     }
@@ -150,15 +150,31 @@ func (l *Line) RequestAuth(userId string) error {
     return nil
 }
 
-func (l *Line) NotifyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string) (*linebot.BasicResponse, error) {
+func (l *Line) ReplyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(buildReplyProcessedMessage(succeeded, reviewerName, isAutoReply))).Do()
+}
+
+func (l *Line) NotifyUserReplyProcessed(userId string, succeeded bool, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
+    return l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyProcessedMessage(succeeded, reviewerName, isAutoReply))).Do()
+}
+
+func buildReplyProcessedMessage(succeeded bool, reviewerName string, isAutoReply bool) string {
     var text string
     if succeeded {
-        text = fmt.Sprintf("已回覆 %s 的評論。感謝您使用智引力。", reviewerName)
+        if isAutoReply {
+            text = fmt.Sprintf("已自動回覆 %s 的評論。感謝您使用智引力。", reviewerName)
+        } else {
+            text = fmt.Sprintf("已使用快速回覆內容自動回覆 %s 的評論。感謝您使用智引力。", reviewerName)
+        }
     } else {
-        text = fmt.Sprintf("回覆 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+        if isAutoReply {
+            text = fmt.Sprintf("自動回覆 %s 的評論失敗。很抱歉為您造成不便。", reviewerName)
+        } else {
+            text = fmt.Sprintf("回覆 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+        }
     }
 
-    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+    return text
 }
 
 // NotifyUserUpdateFailed let user know that the update failed
@@ -203,6 +219,10 @@ func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded b
     }
 
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+}
+
+func (l *Line) NotifyUserCannotUseLineEmoji(replyToken string) (*linebot.BasicResponse, error) {
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(CannotUseLineEmojiMessage)).Do()
 }
 
 func (l *Line) ParseRequest(request *events.LambdaFunctionURLRequest) ([]*linebot.Event, error) {

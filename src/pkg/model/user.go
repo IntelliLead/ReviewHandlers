@@ -29,7 +29,7 @@ type User struct {
     KeywordEnabled               bool                  `dynamodbav:"keywordEnabled"` // FAC for keywords
     ServiceRecommendation        *string               `dynamodbav:"serviceRecommendation,omitempty"`
     ServiceRecommendationEnabled bool                  `dynamodbav:"serviceRecommendationEnabled"` // FAC for serviceRecommendation
-
+    AutoQuickReplyEnabled        bool                  `dynamodbav:"autoQuickReplyEnabled"`        // FAC for auto quick reply
 }
 
 func NewUser(lineUserId string,
@@ -47,6 +47,7 @@ func NewUser(lineUserId string,
         SignatureEnabled:             false,
         KeywordEnabled:               false,
         ServiceRecommendationEnabled: false,
+        AutoQuickReplyEnabled:        false,
     }
 
     return user

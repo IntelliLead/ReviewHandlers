@@ -53,6 +53,17 @@ func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTem
     if err != nil {
         log.Fatal("Error reading quickReplySettings.json: ", err)
     }
+<<<<<<< HEAD
+    quickReplySettingsNoQuickReply, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplySettings_noQuickReply.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
+    quickReplyMessageUpdatedTextBox, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplyMessageUpdatedTextBox.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
+=======
+>>>>>>> main
 
     return QuickReplySettingsLineFlexTemplateJsons{
         QuickReplySettings: quickReplySettings,

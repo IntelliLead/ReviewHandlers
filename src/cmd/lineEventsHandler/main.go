@@ -6,6 +6,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
@@ -102,7 +103,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         switch event.Type {
         case linebot.EventTypeMessage:
             log.Info("Received Message event")
-            return lineEventProcessor.ProcessMessageEvent(event, userId, userDao, reviewDao, line, log)
+            return messageEvent.ProcessMessageEvent(event, userId, userDao, reviewDao, line, log)
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")

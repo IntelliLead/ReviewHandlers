@@ -12,6 +12,8 @@ import (
     "unicode"
 )
 
+const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。️很抱歉為您造成不便。"
+
 func IsReviewReplyMessage(message string) bool {
     return strings.HasPrefix(message, "@")
 }
@@ -48,21 +50,21 @@ func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
     return CommandMessage{Command: cmd, Args: args}
 }
 
-func ParseReplyMessage(str string) (model.ReplyMessage, error) {
+func ParseReplyMessage(str string) (model.Reply, error) {
     if !strings.HasPrefix(str, "@") {
-        return model.ReplyMessage{}, fmt.Errorf("message is not a reply message: %s", str)
+        return model.Reply{}, fmt.Errorf("message is not a reply message: %s", str)
     }
 
     // Find the first whitespace character after '@'
     index := strings.IndexFunc(str[1:], isWhitespace)
     if index == -1 {
-        return model.NewReplyMessage(_type.NewReviewId(str[1:]), "") // Return the remaining text after '@' as ReviewId
+        return model.NewReply(_type.NewReviewId(str[1:]), "") // Return the remaining text after '@' as ReviewId
     }
 
     reviewID := str[1 : index+1]
     replyMsg := strings.TrimSpace(str[index+2:])
 
-    return model.NewReplyMessage(_type.NewReviewId(reviewID), replyMsg)
+    return model.NewReply(_type.NewReviewId(reviewID), replyMsg)
 }
 
 func isWhitespace(r rune) bool {
@@ -119,61 +121,42 @@ type message struct {
     Type linebot.MessageType `json:"type"`
 }
 
-func (l *Line) buildQuickReplySettingsFlexMessage(user model.User, addUpdateMessage bool) (linebot.FlexContainer, error) {
-    var jsonBytes []byte
-    hasQuickReplyMessage := user.QuickReplyMessage != nil && strings.TrimSpace(*user.QuickReplyMessage) != ""
-    if hasQuickReplyMessage {
-        jsonBytes = l.quickReplyJsons.QuickReplySettings
-    } else {
-        jsonBytes = l.quickReplyJsons.QuickReplySettingsNoQuickReply
-    }
-
-    // Convert the original JSON to a map[string]interface{}
-    jsonMap, err := jsonUtil.JsonToMap(jsonBytes)
+func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
     if err != nil {
-        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+        l.log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
+        return nil, err
     }
 
-    if hasQuickReplyMessage {
-        // substitute current quick reply message
-        if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
-            if contentsArr, ok := contents.([]interface{}); ok {
-                if _, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                    jsonMap["body"].(map[string]interface{})["contents"].([]interface{})[2].
-                    (map[string]interface{})["contents"].([]interface{})[1].
-                    (map[string]interface{})["contents"].([]interface{})[0].
-                    (map[string]interface{})["text"] = *user.QuickReplyMessage
-                }
-            }
-        }
-
-        // substitute update button fill with current quick reply message
-        if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
-            if _, ok := contents.([]interface{}); ok {
-                jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["action"].(map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + *user.QuickReplyMessage
-            }
-        }
+    // update quick reply message text box
+    quickReplyMessage := " "
+    if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
+        quickReplyMessage = *user.QuickReplyMessage
     }
+    // body -> contents[2] -> contents[1] -> contents[0] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = quickReplyMessage
+    // body -> contents[2] -> contents[1] -> action -> fillInText
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessage
 
-    if addUpdateMessage {
-        // Convert the original JSON to a map[string]interface{}
-        quickReplyUpdatedMessageTextBox, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplyMessageUpdatedTextBox)
-        if err != nil {
-            l.log.Fatal("Error unmarshalling QuickReplyMessageUpdatedTextBox JSON: ", err)
-        }
+    // update auto quick reply toggle
+    // body -> contents[3] -> contents[0] -> contents[1] -> url
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.AutoQuickReplyEnabled)
 
-        // insert quick reply updated message in contents array
-        if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
-            if contentsArr, ok := contents.([]interface{}); ok {
-                if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
-                    if subContentsArr, ok := subContents.([]interface{}); ok {
-                        // we know there's only 2 elements prior to insertion
-                        contentsArr[2].(map[string]interface{})["contents"] = append(subContentsArr[:1], quickReplyUpdatedMessageTextBox, subContentsArr[1])
-                    }
-                }
-            }
-        }
-    }
+    // DEBUG
+    l.log.Debug("user.AutoQuickReplyEnabled: ", user.AutoQuickReplyEnabled)
+    l.log.Debug("end jsonMap in buildQuickReplySettingsFlexMessage: ", jsonUtil.AnyToJson(jsonMap))
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }

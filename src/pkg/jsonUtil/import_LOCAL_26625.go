@@ -12,7 +12,9 @@ type ReviewMessageLineFlexTemplateJsons struct {
 }
 
 type QuickReplySettingsLineFlexTemplateJsons struct {
-    QuickReplySettings []byte
+    QuickReplySettings              []byte
+    QuickReplySettingsNoQuickReply  []byte
+    QuickReplyMessageUpdatedTextBox []byte
 }
 
 type AiReplyLineFlexTemplateJsons struct {
@@ -53,9 +55,19 @@ func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTem
     if err != nil {
         log.Fatal("Error reading quickReplySettings.json: ", err)
     }
+    quickReplySettingsNoQuickReply, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplySettings_noQuickReply.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
+    quickReplyMessageUpdatedTextBox, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplyMessageUpdatedTextBox.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings_noQuickReply.json: ", err)
+    }
 
     return QuickReplySettingsLineFlexTemplateJsons{
-        QuickReplySettings: quickReplySettings,
+        QuickReplySettings:              quickReplySettings,
+        QuickReplySettingsNoQuickReply:  quickReplySettingsNoQuickReply,
+        QuickReplyMessageUpdatedTextBox: quickReplyMessageUpdatedTextBox,
     }
 }
 
