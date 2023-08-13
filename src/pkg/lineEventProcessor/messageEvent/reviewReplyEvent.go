@@ -65,7 +65,7 @@ func ProcessReviewReplyMessage(
         }, nil
     }
 
-    lambdaReturn, err := lineEventProcessor.ReplyReview(userId, &event.ReplyToken, message, review, reviewDao, line, log, false)
+    lambdaReturn, err := lineEventProcessor.ReplyReview(userId, &event.ReplyToken, reply.Message, review, reviewDao, line, log, false)
     if err != nil {
         return lambdaReturn, err
     }
