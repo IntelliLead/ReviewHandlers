@@ -105,7 +105,7 @@
         "type": "button",
         "action": {
           "type": "postback",
-          "label": "使用回覆",
+          "label": "送出回覆",
           "inputOption": "openKeyboard",
           "data": "/AiReply/Reply",
           "fillInText": "@{REVIEW_ID} {AI_REPLY}"
