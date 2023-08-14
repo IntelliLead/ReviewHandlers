@@ -24,6 +24,7 @@ func MoreMessage() string {
 const DefaultUniqueId = "#"
 
 const StageEnvKey = "STAGE"
+const AuthRedirectUrl = "AUTH_REDIRECT_URL"
 
 // message commands
 const UpdateQuickReplyMessageCmd = "quickReply"

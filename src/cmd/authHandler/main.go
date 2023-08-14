@@ -3,7 +3,6 @@ package main
 import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -19,26 +18,37 @@ func main() {
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
     stage := os.Getenv(util.StageEnvKey)
-    authRedirectUrl := os.Getenv(util.AuthRedirectUrl)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
-    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
-    const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
+    // const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
+    // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
 
-    // --------------------
-    // initialize resources
-    // --------------------
-    // LINE
-    line := lineUtil.NewLine(log)
-
-    // send auth request
-    err := line.RequestAuth(sendingUserId, authRedirectUrl)
-    if err != nil {
+    // parse the code url parameter
+    code := request.QueryStringParameters["code"]
+    if code == "" {
+        log.Errorf("Missing code parameter from Google OAUTH response")
         return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Failed to send auth request"}`,
-        }, err
+            StatusCode: 400,
+            Body:       `{"error": "Missing code parameter from Google OAUTH response"}`,
+        }, nil
     }
+
+    log.Infof("Received authorization code from Google OAUTH response: %s", code)
+
+    // // --------------------
+    // // initialize resources
+    // // --------------------
+    // // LINE
+    // line := lineUtil.NewLine(log)
+    //
+    // // send auth request
+    // err := line.RequestAuth(sendingUserId)
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //         Body:       `{"error": "Failed to send auth request"}`,
+    //     }, err
+    // }
 
     //
     // // --------------------

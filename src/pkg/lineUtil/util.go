@@ -8,6 +8,7 @@ import (
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
+    "net/url"
     "strings"
     "unicode"
 )
@@ -449,14 +450,47 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAuthRequestFlexMessage() (linebot.FlexContainer, error) {
+func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.authJsons.AuthRequest)
     if err != nil {
         l.log.Debug("Error unmarshalling AuthRequest JSON: ", err)
         return nil, err
     }
 
+    // substitute auth redirect url
+    // footer -> contents[0] -> action -> uri
+    // find the redirect_uri query parameter in the uri and replace it with the authRedirectUrl
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["uri"] = strings.Replace(jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["uri"].(string), "redirect_uri", authRedirectUrl, 1)
+
+    strings.Replace(jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["uri"].(string), "redirect_uri", url.QueryEscape(authRedirectUrl), 1)
+
     return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func replaceRedirectURI(uri string, authRedirectUrl string) (string, error) {
+    parsedURL, err := url.Parse(uri)
+    if err != nil {
+        return "", err
+    }
+
+    queryParams, err := url.ParseQuery(parsedURL.RawQuery)
+    if err != nil {
+        return "", err
+    }
+
+    queryParams.Set("redirect_uri", authRedirectUrl)
+    parsedURL.RawQuery = queryParams.Encode()
+
+    return parsedURL.String(), nil
 }
 
 func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (linebot.FlexContainer, error) {

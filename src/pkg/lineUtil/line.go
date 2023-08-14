@@ -133,8 +133,8 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review) error {
     return nil
 }
 
-func (l *Line) RequestAuth(userId string) error {
-    flexMessage, err := l.buildAuthRequestFlexMessage()
+func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
+    flexMessage, err := l.buildAuthRequestFlexMessage(authRedirectUrl)
     if err != nil {
         l.log.Error("Error building flex message in RequestAuth: ", err)
     }

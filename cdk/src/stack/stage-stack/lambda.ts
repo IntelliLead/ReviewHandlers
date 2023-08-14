@@ -8,6 +8,7 @@ import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-
 import { VpcStack } from './vpc';
 import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { FunctionUrl } from 'aws-cdk-lib/aws-lambda/lib/function-url';
 
 export interface LambdaStackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -19,6 +20,11 @@ export interface LambdaStackProps {
 type EnvObject = {
     [key: string]: string | undefined;
 };
+
+interface WebhookHandler {
+    readonly lambdaFn: GoFunction;
+    readonly functionUrl: FunctionUrl;
+}
 
 export class LambdaStack extends Stack {
     private readonly props: LambdaStackProps;
@@ -32,11 +38,8 @@ export class LambdaStack extends Stack {
 
         this.createWebhookHandler('lineEventsHandler', {}, configLayer);
         this.createWebhookHandler('newReviewEventHandler');
-        this.createWebhookHandler(
-            'tst',
-            { GOOGLE_APPLICATION_CREDENTIALS: `/opt/clientLibraryConfig-il-${stage}.json` },
-            configLayer
-        );
+        const authHandler = this.createWebhookHandler('AuthHandler');
+        this.createWebhookHandler('tst', { AUTH_REDIRECT_URL: authHandler.functionUrl.url }, configLayer);
     }
 
     private createGCPConfigLayer(): LayerVersion {
@@ -58,7 +61,11 @@ export class LambdaStack extends Stack {
      * @param layers - layers to be added to the function
      * @private
      */
-    private createWebhookHandler(handlerName: string, additionalEnv: EnvObject = {}, ...layers: LayerVersion[]) {
+    private createWebhookHandler(
+        handlerName: string,
+        additionalEnv: EnvObject = {},
+        ...layers: LayerVersion[]
+    ): WebhookHandler {
         const { stage } = this.props.stackCreationInfo;
 
         const handlerRole = new Role(this, `${handlerName}Role`, {
@@ -75,7 +82,7 @@ export class LambdaStack extends Stack {
         handlerRole.addToPolicy(this.buildKmsDecryptPolicy());
 
         const handlerFunction = new GoFunction(this, handlerName, {
-            entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/.go`),
+            entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/main.go`),
             environment: {
                 STAGE: stage,
                 ...additionalEnv,
@@ -101,7 +108,7 @@ export class LambdaStack extends Stack {
             // },
         });
 
-        handlerFunction.addFunctionUrl({
+        const functionUrl = handlerFunction.addFunctionUrl({
             authType: FunctionUrlAuthType.NONE,
             ...((stage == STAGE.PROD || stage == STAGE.GAMMA) && {
                 cors: {
@@ -124,6 +131,11 @@ export class LambdaStack extends Stack {
         //         alarmName: 'My Lambda Timeout',
         //     });
         // }
+
+        return {
+            lambdaFn: handlerFunction,
+            functionUrl: functionUrl,
+        };
     }
 
     private buildGetSecretPolicy(): PolicyStatement {
