@@ -162,9 +162,9 @@ func buildReplyProcessedMessage(succeeded bool, reviewerName string, isAutoReply
     var text string
     if succeeded {
         if isAutoReply {
-            text = fmt.Sprintf("已自動回覆 %s 的評論。感謝您使用智引力。", reviewerName)
-        } else {
             text = fmt.Sprintf("已使用快速回覆內容自動回覆 %s 的評論。感謝您使用智引力。", reviewerName)
+        } else {
+            text = fmt.Sprintf("已回覆 %s 的評論。感謝您使用智引力。", reviewerName)
         }
     } else {
         if isAutoReply {
