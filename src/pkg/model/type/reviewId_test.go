@@ -8,7 +8,7 @@ func TestNewReviewId(t *testing.T) {
     id := NewReviewId("az")
     expected := "097122"
 
-    if id.Numeric() != expected {
+    if id.NumericString() != expected {
         t.Errorf("Expected %s, but got %s", expected, id)
     }
 }
@@ -23,18 +23,43 @@ func TestReviewId_String(t *testing.T) {
     }
 }
 
+func TestReviewId_NumericString(t *testing.T) {
+    id := NewReviewId("az")
+    expected := "097122"
+    result := id.NumericString()
+
+    if result != expected {
+        t.Errorf("Expected %s, but got %s", expected, result)
+    }
+}
+
+func TestReviewId_Numeric(t *testing.T) {
+    id := NewReviewId("az")
+    expected := 97122
+    result, _ := id.Numeric()
+
+    if result != expected {
+        t.Errorf("Expected %v, but got %v", expected, result)
+    }
+}
+
 func TestReviewId_GetNext(t *testing.T) {
     testCases := []struct {
         input    string
         expected string
     }{
-        {"az", "az0"},
+        // single-char
         {"0", "1"},
         {"9", "A"},
         {"Z", "a"},
-        {"z", "z0"},
+        // multi-char
         {"abc", "abd"},
         {"xyz0", "xyz1"},
+        // carry
+        {"az", "b0"},
+        {"azz", "b00"},
+        {"z", "00"},
+        {"zzz", "0000"},
     }
 
     for _, tc := range testCases {
