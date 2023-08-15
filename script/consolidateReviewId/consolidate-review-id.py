@@ -3,9 +3,7 @@ import argparse
 import boto3
 from boto3.dynamodb.conditions import Key
 
-dynamodb = boto3.resource('dynamodb')
-review_table = dynamodb.Table('Review')  # Replace 'YourTableName' with your table name
-user_table = dynamodb.Table('User')  # Replace with your user table name
+dynamodb = boto3.client('dynamodb')
 
 
 def get_next_review_id(review_id):
@@ -42,38 +40,34 @@ def get_next_ascii_code(last_ascii_code):
 
 
 def get_all_review_objects_for_user(user_id):
-    reviews = []
+    response = dynamodb.query(
+        TableName='Review',
+        KeyConditionExpression='userId = :userId',
+        ExpressionAttributeValues={
+            ':userId': {'S': user_id}
+        }
+    )
 
-    # Start the query
-    response = review_table.query(KeyConditionExpression=Key('userId').eq(user_id))
-    reviews.extend([item for item in response['Items'] if not item.get('uniqueId', '').startswith('#UNIQUE_VENDOR_REVIEW_ID#')])
-
-    # Handle pagination
-    while 'LastEvaluatedKey' in response:
-        response = review_table.query(
-            KeyConditionExpression=Key('userId').eq(user_id),
-            ExclusiveStartKey=response['LastEvaluatedKey']
-        )
-        reviews.extend([item for item in response['Items'] if not item.get('uniqueId', '').startswith('#UNIQUE_VENDOR_REVIEW_ID#')])
+    reviews_dict = [item for item in response['Items'] if
+                    not item.get('uniqueId', '').get('S', '').startswith('#UNIQUE_VENDOR_REVIEW_ID#')]
 
     # debug
-    print("The reviews for user " + user_id + " are " + str(reviews) + "\n")
-    return reviews
+    print("There are a total of " + str(len(reviews_dict)) + " reviews for user " + user_id + ". The review IDs are:")
+    for review in reviews_dict:
+        for key, value in review.items():
+            if key == 'uniqueId':
+
+                print(value['S'])
+
+    return reviews_dict
 
 
 def get_all_user_ids():
-    user_ids = []
-    response = user_table.scan(ProjectionExpression='userId')
+    response = dynamodb.scan(
+        TableName='User',
+        ProjectionExpression='userId')
 
-    while True:
-        user_ids.extend([item['userId'] for item in response['Items']])
-        # If there are more items to be fetched, fetch them
-        if 'LastEvaluatedKey' in response:
-            response = user_table.scan(ProjectionExpression='userId',
-                                       ExclusiveStartKey=response['LastEvaluatedKey'])
-        else:
-            break
-    return user_ids
+    return [item['userId']['S'] for item in response['Items']]
 
 
 def main(dry_run=False):
@@ -83,22 +77,30 @@ def main(dry_run=False):
         reviews = get_all_review_objects_for_user(user_id)
 
         if len(reviews) <= 62:  # If only the special records and <= 62 normal records, skip processing for this user
+            print(f"Skipping user {user_id} because there are only {len(reviews)} reviews for this user. It's review "
+                  f"IDs are correct")
             continue
 
-        next_review_id = get_next_review_id(reviews[61]['uniqueId'])  # Start after the 62nd one
+        next_review_id = get_next_review_id(reviews[61]['uniqueId']['S'])  # Start after the 62nd one
 
         for old_review in reviews[62:]:
             # debug
             print("Processing review " + str(old_review) + "\n")
 
-            old_review_id = old_review['uniqueId']
-            old_review['uniqueId'] = next_review_id
+            old_review_id = old_review['uniqueId']['S']
+            old_review['uniqueId']['S'] = next_review_id
 
             if dry_run:
                 print(f"Would change review ID from {old_review_id} to {next_review_id} for user {user_id}")
+                print(f"Would invoke put_item with {old_review}")
+                print(f"Would invoke delete_item with key 'userId': {user_id}, 'reviewId': {old_review_id}")
             else:
-                review_table.put_item(Item=old_review)  # This writes the review with the new ID and overwrites if it already exists
-                review_table.delete_item(Key={'userId': user_id, 'reviewId': old_review_id})
+                dynamodb.put_item(
+                    TableName='Review',
+                    Item=old_review)  # This writes the review with the new ID and overwrites if it already exists
+                dynamodb.delete_item(
+                    TableName='Review',
+                    Key={'userId': user_id, 'reviewId': old_review_id})
                 print(f"Successfully change review ID from {old_review_id} to {next_review_id} for user {user_id}")
 
             next_review_id = get_next_review_id(next_review_id)  # Move to the next ID
@@ -111,4 +113,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(dry_run=args.dry_run)
-

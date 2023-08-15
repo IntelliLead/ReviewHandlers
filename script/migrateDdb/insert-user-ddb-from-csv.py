@@ -4,11 +4,18 @@ import boto3
 
 def convert_csv_row_to_user_ddb_item(row):
     item = {}
+
     for key, value in row.items():
-        if key == 'userId' or key == 'uniqueId':
+        if key == 'userId' or key == 'uniqueId' or key == 'language' or key == 'lineProfilePicture' or key == 'lineUsername' or key == 'quickReplyMessage':
             item[key] = {'S': value}
+        elif key == 'autoQuickReplyEnabled' or key == 'subscriptionTier':
+            # convert string to boolean
+            value = value.lower() == 'true'
+            item[key] = {'BOOL': value}
         else:
             item[key] = {'N': value}
+
+    print("Constructed item: " + str(item))
     return item
 
 
