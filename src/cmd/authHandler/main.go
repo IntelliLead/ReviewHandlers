@@ -2,12 +2,16 @@ package main
 
 import (
     "context"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "golang.org/x/oauth2"
+    "golang.org/x/oauth2/google"
     "os"
 )
 
@@ -22,6 +26,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
     // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
+    // TODO: handle GET favicon request
+    //             "method": "GET",
+    //            "path": "/favicon.ico",
+
+    error := request.QueryStringParameters["error"]
+    if error != "" {
+        log.Errorf("Error from Google OAUTH response: %s", error)
+    }
 
     // parse the code url parameter
     code := request.QueryStringParameters["code"]
@@ -33,7 +45,29 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, nil
     }
 
-    log.Infof("Received authorization code from Google OAUTH response: %s", code)
+    log.Debugf("Received authorization code from Google OAUTH response: %s", code)
+
+    // exchange code for token
+    secrets := secret.GetSecrets()
+    config := &oauth2.Config{
+        ClientID:     secrets.GoogleClientID,
+        ClientSecret: secrets.GoogleClientSecret,
+        RedirectURL:  "https://x2thxlcprli4pkmdvi276moc6u0xldqd.lambda-url.ap-northeast-1.on.aws/", // TODO: use env var
+        Scopes:       []string{"https://www.googleapis.com/auth/business.manage"},
+        Endpoint:     google.Endpoint,
+    }
+
+    token, err := config.Exchange(ctx, code)
+    if err != nil {
+        log.Errorf("Error exchanging code for token: %s", err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error exchanging code for token"}`,
+        }, nil
+    }
+
+    fmt.Printf("Access Token: %s\n", token.AccessToken)
+    fmt.Printf("Refresh Token: %s\n", token.RefreshToken)
 
     // // --------------------
     // // initialize resources
@@ -172,7 +206,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // // log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))
     // //
 
-    return events.LambdaFunctionURLResponse{Body: `{"message": "OK"}`, StatusCode: 200}, nil
+    return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。您可以關掉此頁面了！", StatusCode: 200}, nil
 }
 
 func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {

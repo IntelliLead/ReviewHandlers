@@ -34,23 +34,23 @@ export class LambdaStack extends Stack {
         this.props = props;
         const { stage } = this.props.stackCreationInfo;
 
-        const configLayer = this.createGCPConfigLayer();
+        // const configLayer = this.createGCPConfigLayer();
 
-        this.createWebhookHandler('lineEventsHandler', {}, configLayer);
+        this.createWebhookHandler('lineEventsHandler');
         this.createWebhookHandler('newReviewEventHandler');
         const authHandler = this.createWebhookHandler('AuthHandler');
-        this.createWebhookHandler('tst', { AUTH_REDIRECT_URL: authHandler.functionUrl.url }, configLayer);
+        this.createWebhookHandler('tst', { AUTH_REDIRECT_URL: authHandler.functionUrl.url });
     }
 
-    private createGCPConfigLayer(): LayerVersion {
-        // the Workload identity federation config file
-        // https://cloud.google.com/docs/authentication/application-default-credentials#GAC
-        // https://cloud.google.com/iam/docs/workload-identity-federation-with-other-clouds#use_the_credential_configuration_to_access
-        return new LayerVersion(this, 'GcpConfigLayer', {
-            description: 'workload identity federation config file used for Google APIs',
-            code: Code.fromAsset(path.join(__dirname, '../../../../config')),
-        });
-    }
+    // private createGCPConfigLayer(): LayerVersion {
+    //     // the Workload identity federation config file
+    //     // https://cloud.google.com/docs/authentication/application-default-credentials#GAC
+    //     // https://cloud.google.com/iam/docs/workload-identity-federation-with-other-clouds#use_the_credential_configuration_to_access
+    //     return new LayerVersion(this, 'GcpConfigLayer', {
+    //         description: 'workload identity federation config file used for Google APIs',
+    //         code: Code.fromAsset(path.join(__dirname, '../../../../config')),
+    //     });
+    // }
 
     /**
      * Create Go Lambda function with FunctionUrl

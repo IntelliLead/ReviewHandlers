@@ -459,7 +459,6 @@ func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.Flex
 
     // substitute auth redirect url
     // footer -> contents[0] -> action -> uri
-    // find the redirect_uri query parameter in the uri and replace it with the authRedirectUrl
     jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["action"].
@@ -468,10 +467,21 @@ func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.Flex
     (map[string]interface{})["action"].
     (map[string]interface{})["uri"].(string), "redirect_uri", authRedirectUrl, 1)
 
-    strings.Replace(jsonMap["footer"].
+    // replace the redirect_uri query parameter in the uri with authRedirectUrl
+    uri, err := replaceRedirectURI(jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["action"].
-    (map[string]interface{})["uri"].(string), "redirect_uri", url.QueryEscape(authRedirectUrl), 1)
+    (map[string]interface{})["uri"].(string), authRedirectUrl)
+    if err != nil {
+        return nil, err
+    }
+
+    l.log.Debug("AuthRequest URI: ", uri)
+
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["uri"] = uri
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
