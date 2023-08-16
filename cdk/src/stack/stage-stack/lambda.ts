@@ -64,6 +64,8 @@ export class LambdaStack extends Stack {
             insightsVersion: LambdaInsightsVersion.VERSION_1_0_143_0,
             deadLetterQueueEnabled: true,
             logRetention: RetentionDays.SIX_MONTHS,
+            // TODO: enable once getNextReviewId bug is fixed
+            reservedConcurrentExecutions: 0,
             // TODO: INT-47 enable tracing
             // tracing: Tracing.ACTIVE,
 
