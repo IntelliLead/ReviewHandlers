@@ -1,6 +1,2 @@
-"userId","uniqueId","createdAt","lastUpdated","subscriptionTier"
-"U731c1eda52ad77c9b9ef59eb5bd08ffb","#","1686203421172000000","1686203421172000000","0"
-"U72b143091325272248f1a457565c39ed","#","1686643908587000000","1686643908587000000","0"
-"Ucc29292b212e271132cee980c58e94eb","#","1685865399126000000","1685865399126000000","0"
-"U6f5464bb39cb4c36325d73c9ddc2e9a3","#","1685869620661000000","1685869620661000000","0"
-"U1de8edbae28c05ac8c7435bbd19485cb","#","1686712929960000000","1686712929960000000","0"
+"userId","uniqueId","autoQuickReplyEnabled","createdAt","language","lastUpdated","lineProfilePicture","lineUsername","quickReplyMessage","subscriptionTier"
+"U9867e20526022425367daadba94da916","#","true","1687341599","zh-Hant","1687341599","https://sprofile.line-scdn.net/0hSPlt_JjiDH9BDRlVbUtyADFdDxVifFVtOWtATHwEUU11OEMoPmgTSyQOVkZ7OE0sb29DTidYVE5NHnsZX1vwS0Y9Ukh7PUkoamJHmQ","💫Ryan","感謝您的正面評論！我們很高兴知道您喜歡我們的咖喱和舒適的環境。希望下次還能再為您服務。#桃園美食 #桃園咖哩 #桃園餐廳 #藝文美食 #藝文咖哩","0"

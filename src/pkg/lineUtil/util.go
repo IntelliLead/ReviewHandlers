@@ -174,7 +174,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     isEmptyReview := review.Review == ""
     var reviewMessage string
     if isEmptyReview {
-        reviewMessage = "（星評無內容）"
+        reviewMessage = "（無文字內容）"
     } else {
         reviewMessage = review.Review
     }

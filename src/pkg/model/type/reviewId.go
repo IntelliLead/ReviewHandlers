@@ -32,59 +32,54 @@ func (id ReviewId) String() string {
     return alphanumeric
 }
 
-// Numeric returns the numeric representation of a ReviewId in string type
-// e.g. NewReviewId("az") -> returned.Numeric() == "097122"
-func (id ReviewId) Numeric() string {
+// NumericString returns the numeric representation of a ReviewId in string type
+// e.g. NewReviewId("az") -> returned.NumericString() == "097122"
+func (id ReviewId) NumericString() string {
     return string(id)
 }
 
-func (id ReviewId) GetNext() ReviewId {
-    numeric := id.Numeric()
-
-    // get last ascii code
-    lastAsciiCode, _ := strconv.Atoi(numeric[len(numeric)-3:])
-    issueNewChar := false
-    var newLastAsciiCode int
-    switch lastAsciiCode {
-    case 57: // ASCII code for '9'
-        newLastAsciiCode = 65 // ASCII code for 'A'
-    case 90: // ASCII code for 'Z'
-        newLastAsciiCode = 97 // ASCII code for 'a'
-    case 122: // ASCII code for 'z'
-        issueNewChar = true
-    default:
-        newLastAsciiCode = lastAsciiCode + 1 // ASCII code for 'a'
-    }
-
-    if issueNewChar {
-        return ReviewId(numeric + "048") // ASCII code for '0'
-    }
-
-    return ReviewId(numeric[:len(numeric)-3] + fmt.Sprintf("%03s", strconv.Itoa(newLastAsciiCode)))
+// Numeric returns the numeric representation of a ReviewId in int type
+// e.g. NewReviewId("az") -> returned.Numeric() == 97122    // leading 0 is omitted
+func (id ReviewId) Numeric() (int, error) {
+    parseInt, err := strconv.ParseInt(id.NumericString(), 10, 0)
+    return int(parseInt), err
 }
 
-func (id ReviewId) GetPrevious() ReviewId {
-    println("Calling GetPrevious() on ", id.String())
+func (id ReviewId) GetNext() ReviewId {
+    numericStr := id.NumericString()                                         // e.g. "097122"
+    newNumericStr, _ := incrementAsciiCodes(numericStr, len(numericStr)/3-1) // "097122", 1
+    return ReviewId(newNumericStr)
+}
 
-    numeric := id.Numeric()
-
-    // get last ascii code
-    lastAsciiCode, _ := strconv.Atoi(numeric[len(numeric)-3:])
-    var newLastAsciiCode int
-    switch lastAsciiCode {
-    case 48: // ASCII code for '0'
-        // trim last 3 numbers (last ascii char)
-        return ReviewId(numeric[:len(numeric)-3])
-    case 65: // ASCII code for 'A'
-        newLastAsciiCode = 57 // ASCII code for '9'
-    case 97: // ASCII code for 'a'
-        newLastAsciiCode = 90 // ASCII code for 'Z'
-    default:
-        newLastAsciiCode = lastAsciiCode - 1
+func incrementAsciiCodes(numericStr string, idx int) (string, bool) {
+    if idx < 0 {
+        return fmt.Sprintf("%03s", strconv.Itoa(48)) + numericStr, true // ASCII code for '0'
     }
 
-    println("DEBUG: new ascii code str: ", numeric[:len(numeric)-3]+fmt.Sprintf("%03s", strconv.Itoa(newLastAsciiCode)))
-    return ReviewId(numeric[:len(numeric)-3] + fmt.Sprintf("%03s", strconv.Itoa(newLastAsciiCode)))
+    asciiCode, _ := strconv.Atoi(numericStr[idx*3 : idx*3+3]) // [3: 6]
+    newAsciiCode, carry := getNextAsciiCode(asciiCode)
+    if carry {
+        newNumericStr, _ := incrementAsciiCodes(numericStr[:idx*3], idx-1)
+        return newNumericStr + fmt.Sprintf("%03s", strconv.Itoa(newAsciiCode)), carry
+    }
+    return numericStr[:idx*3] + fmt.Sprintf("%03s", strconv.Itoa(newAsciiCode)) + numericStr[idx*3+3:], carry
+}
+
+// getNextAsciiCode returns the next ascii code and a bool indicating if a carry occurred (exhausted all ascii codes)
+func getNextAsciiCode(lastAsciiCode int) (int, bool) {
+    var nextAsciiCode int
+    switch lastAsciiCode {
+    case 57: // ASCII code for '9'
+        nextAsciiCode = 65 // ASCII code for 'A'
+    case 90: // ASCII code for 'Z'
+        nextAsciiCode = 97 // ASCII code for 'a'
+    case 122: // ASCII code for 'z'
+        return 48, true // ASCII code for '0'
+    default:
+        nextAsciiCode = lastAsciiCode + 1 // ASCII code for 'a'
+    }
+
+    return nextAsciiCode, false
 }
 
 func ReviewIdPtrValidation(fl validator.FieldLevel) bool {
