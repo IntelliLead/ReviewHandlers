@@ -63,6 +63,8 @@ export class LambdaStack extends Stack {
             timeout: Duration.minutes(5),
             insightsVersion: LambdaInsightsVersion.VERSION_1_0_143_0,
             logRetention: RetentionDays.SIX_MONTHS,
+            // TODO: enable once getNextReviewId bug is fixed
+            reservedConcurrentExecutions: 0,
             // TODO: INT-47 enable tracing
             // tracing: Tracing.ACTIVE,
 
