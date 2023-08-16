@@ -31,7 +31,8 @@ func NewReviewDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *ReviewD
 func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
     // Define the expression to retrieve the largest ReviewId for the given UserId
     expr, err := expression.NewBuilder().
-        WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).Build()
+        WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).
+        Build()
     if err != nil {
         d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
         return "", err
@@ -39,6 +40,7 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
 
     result, err := d.client.Query(&dynamodb.QueryInput{
         TableName:                 aws.String(enum.TableReview.String()),
+        IndexName:                 aws.String(ReviewIndexCreatedAtLsi.String()),
         KeyConditionExpression:    expr.KeyCondition(),
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),
@@ -55,7 +57,7 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
         return _type.NewReviewId("0"), nil
     }
 
-    // Extract the largest ReviewId
+    // Extract the current largest ReviewId
     var review model.Review
     err = dynamodbattribute.UnmarshalMap(result.Items[0], &review)
     if err != nil {
