@@ -52,15 +52,12 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
         return "", err
     }
 
-    // debug
-    d.log.Debug("GetNextReviewID query result: ", jsonUtil.AnyToJson(result))
-
     // If there are no existing reviews, start with ReviewId 1
     if len(result.Items) == 0 {
         return _type.NewReviewId("0"), nil
     }
 
-    // Extract the largest ReviewId
+    // Extract the current largest ReviewId
     var review model.Review
     err = dynamodbattribute.UnmarshalMap(result.Items[0], &review)
     if err != nil {
