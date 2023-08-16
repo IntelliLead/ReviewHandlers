@@ -3,31 +3,32 @@ package ddbDao
 type UserIndex int
 
 const (
-    UserIndexLineUserIdGsi UserIndex = iota
+    UserIndexCreatedAtLsi UserIndex = iota
     UserIndexLastUpdatedLsi
 )
 
 func (i UserIndex) String() string {
     return []string{
-        "lineUserId-userId-gsi",
-        "lastUpdatedLSI",
+        "createdAt-lsi",
+        "lastUpdated-lsi",
     }[i]
 }
 
 type ReviewIndex int
 
 const (
-    ReviewIndexLineUserIdReviewIdGsi ReviewIndex = iota
-    ReviewIndexCreatedAtLsi
+    ReviewIndexCreatedAtLsi ReviewIndex = iota
     ReviewIndexLastRepliedLsi
+    ReviewIndexLastUpdatedLsi
     ReviewIndexNumberRatingLsi
+    ReviewIndexReviewLastUpdatedLsi
 )
 
 func (i ReviewIndex) String() string {
     return []string{
-        "lineUserId-reviewId-gsi",
-        "createdAtLSI",
-        "lastRepliedLSI",
-        "numberRatingLSI",
+        "createdAt-lsi",
+        "lastReplied-lsi",
+        "numberRating-lsi",
+        "reviewLastUpdated-lsi",
     }[i]
 }

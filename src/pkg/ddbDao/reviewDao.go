@@ -32,7 +32,6 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
     // Define the expression to retrieve the largest ReviewId for the given UserId
     expr, err := expression.NewBuilder().
         WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).
-        WithFilter(expression.Name("uniqueId").BeginsWith("#")).
         Build()
     if err != nil {
         d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
@@ -52,6 +51,9 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
         d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
         return "", err
     }
+
+    // debug
+    d.log.Debug("GetNextReviewID query result: ", jsonUtil.AnyToJson(result))
 
     // If there are no existing reviews, start with ReviewId 1
     if len(result.Items) == 0 {

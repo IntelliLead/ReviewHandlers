@@ -62,7 +62,6 @@ export class LambdaStack extends Stack {
             memorySize: 256,
             timeout: Duration.minutes(5),
             insightsVersion: LambdaInsightsVersion.VERSION_1_0_143_0,
-            deadLetterQueueEnabled: true,
             logRetention: RetentionDays.SIX_MONTHS,
             // TODO: INT-47 enable tracing
             // tracing: Tracing.ACTIVE,
