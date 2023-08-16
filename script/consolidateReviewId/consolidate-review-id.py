@@ -51,12 +51,13 @@ def get_all_review_objects_for_user(user_id):
     reviews_dict = [item for item in response['Items'] if
                     not item.get('uniqueId', '').get('S', '').startswith('#UNIQUE_VENDOR_REVIEW_ID#')]
 
+    reviews_dict = sorted(reviews_dict, key=lambda x: int(x['uniqueId']['S']))
+
     # debug
     print("There are a total of " + str(len(reviews_dict)) + " reviews for user " + user_id + ". The review IDs are:")
     for review in reviews_dict:
         for key, value in review.items():
             if key == 'uniqueId':
-
                 print(value['S'])
 
     return reviews_dict
@@ -76,31 +77,37 @@ def main(dry_run=False):
     for user_id in user_ids:
         reviews = get_all_review_objects_for_user(user_id)
 
-        if len(reviews) <= 62:  # If only the special records and <= 62 normal records, skip processing for this user
-            print(f"Skipping user {user_id} because there are only {len(reviews)} reviews for this user. It's review "
-                  f"IDs are correct")
-            continue
+        # THIS ASSUMPTION IS INCORRECT. SOME USERS HAVE IT MESSED UP FROM SINGLE CHAR FOR SOME REASON
+        # if len(reviews) <= 62:  # If only the special records and <= 62 normal records, skip processing for this user
+        #     print(f"Skipping user {user_id} because there are only {len(reviews)} reviews for this user. It's review "
+        #           f"IDs are correct")
+        #     continue
 
-        next_review_id = get_next_review_id(reviews[61]['uniqueId']['S'])  # Start after the 62nd one
+        next_review_id = "048"
 
-        for old_review in reviews[62:]:
+        for old_review in reviews:
             # debug
             print("Processing review " + str(old_review) + "\n")
 
             old_review_id = old_review['uniqueId']['S']
-            old_review['uniqueId']['S'] = next_review_id
+
+            if old_review_id == next_review_id:
+                print(f"Skipping review ID {old_review_id} for user {user_id} because it is already correct")
+                next_review_id = get_next_review_id(next_review_id)  # Move to the next ID
+                continue
 
             if dry_run:
                 print(f"Would change review ID from {old_review_id} to {next_review_id} for user {user_id}")
                 print(f"Would invoke put_item with {old_review}")
                 print(f"Would invoke delete_item with key 'userId': {user_id}, 'reviewId': {old_review_id}")
             else:
+                old_review['uniqueId']['S'] = next_review_id
                 dynamodb.put_item(
                     TableName='Review',
                     Item=old_review)  # This writes the review with the new ID and overwrites if it already exists
                 dynamodb.delete_item(
                     TableName='Review',
-                    Key={'userId': user_id, 'reviewId': old_review_id})
+                    Key={'userId': {'S': user_id}, 'uniqueId': {'S': old_review_id}})
                 print(f"Successfully change review ID from {old_review_id} to {next_review_id} for user {user_id}")
 
             next_review_id = get_next_review_id(next_review_id)  # Move to the next ID
