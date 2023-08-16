@@ -45,7 +45,6 @@ func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
         ScanIndexForward:          aws.Bool(false), // get largest
         Limit:                     aws.Int64(1),
     })
-
     if err != nil {
         d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
         return "", err

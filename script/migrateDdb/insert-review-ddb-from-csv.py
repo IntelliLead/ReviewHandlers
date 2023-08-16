@@ -6,7 +6,7 @@ def convert_csv_row_to_review_ddb_item(row):
     item = {}
     for key, value in row.items():
         if value != '':
-            if key == 'userId' or key == 'uniqueId' or key == 'review' or key == 'reviewerName' or key == 'reviewerProfilePhoto' or key == 'vendorEventId' or key == 'vendorReviewId' or key == 'zapierReplyWebhook':
+            if key == 'userId' or key == 'uniqueId' or key == 'reply' or key == 'review' or key == 'reviewerName' or key == 'reviewerProfilePhoto' or key == 'vendorEventId' or key == 'vendorReviewId' or key == 'zapierReplyWebhook':
                 item[key] = {'S': value}
             else:
                 item[key] = {'N': value}
@@ -16,13 +16,11 @@ def convert_csv_row_to_review_ddb_item(row):
 def insert_ddb_item(table_name_, item):
     dynamodb = boto3.client('dynamodb')
 
-    # # debug
-    # print(item)
+    # debug
+    print("Inserting item: ", item)
 
     response = dynamodb.put_item(TableName=table_name_, Item=item)
     return response
-
-    # return "done"
 
 
 def process_csv_file(csv_file, table_name_):
