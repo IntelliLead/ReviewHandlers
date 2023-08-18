@@ -4,7 +4,6 @@ import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
@@ -13,9 +12,6 @@ import (
     "github.com/aws/aws-sdk-go/service/ssm"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
-    "google.golang.org/api/mybusinessaccountmanagement/v1"
-    "google.golang.org/api/mybusinessbusinessinformation/v1"
-    "google.golang.org/api/option"
     "os"
 )
 
@@ -108,47 +104,47 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // businessprofileperformanceService, err := businessprofileperformance.NewService(context.Background())
 
-    mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(ctx,
-        option.WithTokenSource(config.TokenSource(ctx, token)))
-    if err != nil {
-        log.Error("Error creating Google business account management service: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating Google business account management service"}`, StatusCode: 500}, nil
-    }
-
-    // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
-    googleReq := mybusinessaccountmanagementService.Accounts.List()
-    log.Debug("list accounts googleReq is ", jsonUtil.AnyToJson(googleReq))
-    resp, err := googleReq.Do()
-    if err != nil {
-        log.Error("Error listing Google business accounts: ", err)
-        log.Error("Error details: ", jsonUtil.AnyToJson(err))
-        log.Error("response is ", jsonUtil.AnyToJson(resp))
-
-        return events.LambdaFunctionURLResponse{
-            Body:       `{"message": "Error listing Google business accounts"}`,
-            StatusCode: 500,
-        }, nil
-    }
-    log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(resp.Accounts))
-
-    businessInfoClient, err := mybusinessbusinessinformation.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
-
-    locationRequestParam := resp.Accounts[0].Name
-    log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", locationRequestParam)
-    locationsGoogleReq := businessInfoClient.Accounts.Locations.List(locationRequestParam)
-    log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
-    locationsResp, err := locationsGoogleReq.Do()
-    if err != nil {
-        log.Error("Error listing Google business locations: ", err)
-        log.Error("Error details: ", jsonUtil.AnyToJson(err))
-        log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
-
-        return events.LambdaFunctionURLResponse{
-            Body:       `{"message": "Error listing Google business locations"}`,
-            StatusCode: 500,
-        }, nil
-    }
-    log.Info("Retrieved locations: ", jsonUtil.AnyToJson(locationsResp.Locations))
+    // mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(ctx,
+    //     option.WithTokenSource(config.TokenSource(ctx, token)))
+    // if err != nil {
+    //     log.Error("Error creating Google business account management service: ", err)
+    //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating Google business account management service"}`, StatusCode: 500}, nil
+    // }
+    //
+    // // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
+    // googleReq := mybusinessaccountmanagementService.Accounts.List()
+    // log.Debug("list accounts googleReq is ", jsonUtil.AnyToJson(googleReq))
+    // resp, err := googleReq.Do()
+    // if err != nil {
+    //     log.Error("Error listing Google business accounts: ", err)
+    //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
+    //     log.Error("response is ", jsonUtil.AnyToJson(resp))
+    //
+    //     return events.LambdaFunctionURLResponse{
+    //         Body:       `{"message": "Error listing Google business accounts"}`,
+    //         StatusCode: 500,
+    //     }, nil
+    // }
+    // log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(resp.Accounts))
+    //
+    // businessInfoClient, err := mybusinessbusinessinformation.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
+    //
+    // locationRequestParam := resp.Accounts[0].Name
+    // log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", locationRequestParam)
+    // locationsGoogleReq := businessInfoClient.Accounts.Locations.List(locationRequestParam)
+    // log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
+    // locationsResp, err := locationsGoogleReq.Do()
+    // if err != nil {
+    //     log.Error("Error listing Google business locations: ", err)
+    //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
+    //     log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
+    //
+    //     return events.LambdaFunctionURLResponse{
+    //         Body:       `{"message": "Error listing Google business locations"}`,
+    //         StatusCode: 500,
+    //     }, nil
+    // }
+    // log.Info("Retrieved locations: ", jsonUtil.AnyToJson(locationsResp.Locations))
 
     // // --------------------
     // // initialize resources
@@ -265,13 +261,4 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // //
 
     return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。可以關掉此頁面了！", StatusCode: 200}, nil
-}
-
-func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
-    text := event.Review
-
-    originalLine, translationFound := util.ExtractOriginalFromGoogleTranslate(text)
-    if translationFound {
-        event.Review = originalLine
-    }
 }

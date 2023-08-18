@@ -49,8 +49,6 @@ export class LambdaStack extends Stack {
         this.props = props;
         const { stage } = this.props.stackCreationInfo;
 
-        // const configLayer = this.createGCPConfigLayer();
-
         this.createWebhookHandler('lineEventsHandler');
         this.createWebhookHandler('newReviewEventHandler');
 
@@ -63,7 +61,7 @@ export class LambdaStack extends Stack {
         // authHandler.lambdaFn.addEnvironment('AUTH_REDIRECT_URL', authHandler.functionUrl.url);
         // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
         // TODO: [INT-84] use Lambda extension to cache the value
-        const authRedirectUrlParameterStore = new StringParameter(this, 'authRedirectUrl', {
+        new StringParameter(this, 'authRedirectUrl', {
             parameterName: authRedirectUrlParameterName,
             stringValue: authHandler.functionUrl.url,
             description: 'The auth handler lambda function url, used as Google OAuth2 redirect url',
@@ -74,21 +72,11 @@ export class LambdaStack extends Stack {
                 resources: ['*'],
             })
         );
-
-        this.createWebhookHandler('tst', {
-            AUTH_REDIRECT_URL: authHandler.functionUrl.url,
-        });
+        //
+        // this.createWebhookHandler('tst', {
+        //     AUTH_REDIRECT_URL: authHandler.functionUrl.url,
+        // });
     }
-
-    // private createGCPConfigLayer(): LayerVersion {
-    //     // the Workload identity federation config file
-    //     // https://cloud.google.com/docs/authentication/application-default-credentials#GAC
-    //     // https://cloud.google.com/iam/docs/workload-identity-federation-with-other-clouds#use_the_credential_configuration_to_access
-    //     return new LayerVersion(this, 'GcpConfigLayer', {
-    //         description: 'workload identity federation config file used for Google APIs',
-    //         code: Code.fromAsset(path.join(__dirname, '../../../../config')),
-    //     });
-    // }
 
     /**
      * Create Go Lambda function with FunctionUrl
