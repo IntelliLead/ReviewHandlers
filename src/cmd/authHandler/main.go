@@ -2,7 +2,6 @@ package main
 
 import (
     "context"
-    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -10,8 +9,13 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/ssm"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
+    "google.golang.org/api/mybusinessaccountmanagement/v1"
+    "google.golang.org/api/mybusinessbusinessinformation/v1"
+    "google.golang.org/api/option"
     "os"
 )
 
@@ -20,19 +24,28 @@ func main() {
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
+    ctx = context.Background()
+
     log := logger.NewLogger()
     stage := os.Getenv(util.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
     // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
-    // TODO: handle GET favicon request
+    // TODO: gracefully ignore GET favicon request
     //             "method": "GET",
     //            "path": "/favicon.ico",
 
-    error := request.QueryStringParameters["error"]
-    if error != "" {
-        log.Errorf("Error from Google OAUTH response: %s", error)
+    if request.RequestContext.HTTP.Method == "GET" && request.RequestContext.HTTP.Path == "/favicon.ico" {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 200,
+            Body:       "no favicon",
+        }, nil
+    }
+
+    errorQueryParam := request.QueryStringParameters["error"]
+    if errorQueryParam != "" {
+        log.Errorf("Error from Google OAUTH response: %s", errorQueryParam)
     }
 
     // parse the code url parameter
@@ -47,12 +60,27 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Debugf("Received authorization code from Google OAUTH response: %s", code)
 
+    // TODO: [INT-84] use Lambda extension to cache and fetch auth redirect URL
+    // retrieve from SSM parameter store
+    authRedirectUrlParameterName := os.Getenv(util.AuthRedirectUrlParameterNameEnvKey)
+    ssmClient := ssm.New(session.Must(session.NewSession()))
+    response, err := ssmClient.GetParameter(&ssm.GetParameterInput{
+        Name: &authRedirectUrlParameterName,
+    })
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error retrieving auth redirect URL from SSM parameter store"}`,
+        }, err
+    }
+    authRedirectUrl := *response.Parameter.Value
+
     // exchange code for token
     secrets := secret.GetSecrets()
     config := &oauth2.Config{
         ClientID:     secrets.GoogleClientID,
         ClientSecret: secrets.GoogleClientSecret,
-        RedirectURL:  "https://x2thxlcprli4pkmdvi276moc6u0xldqd.lambda-url.ap-northeast-1.on.aws/", // TODO: use env var
+        RedirectURL:  authRedirectUrl,
         Scopes:       []string{"https://www.googleapis.com/auth/business.manage"},
         Endpoint:     google.Endpoint,
     }
@@ -66,8 +94,61 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, nil
     }
 
-    fmt.Printf("Access Token: %s\n", token.AccessToken)
-    fmt.Printf("Refresh Token: %s\n", token.RefreshToken)
+    log.Debug("Access Token: ", token.AccessToken)
+    log.Debug("Refresh Token: ", token.RefreshToken)
+
+    log.Debug("Token: ", jsonUtil.AnyToJson(token))
+
+    // --------------------
+    // Store refresh token
+    // --------------------
+
+    // --------------------
+    // make request to Google My Business API
+    // --------------------
+    // businessprofileperformanceService, err := businessprofileperformance.NewService(context.Background())
+
+    mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(ctx,
+        option.WithTokenSource(config.TokenSource(ctx, token)))
+    if err != nil {
+        log.Error("Error creating Google business account management service: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating Google business account management service"}`, StatusCode: 500}, nil
+    }
+
+    // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
+    googleReq := mybusinessaccountmanagementService.Accounts.List()
+    log.Debug("list accounts googleReq is ", jsonUtil.AnyToJson(googleReq))
+    resp, err := googleReq.Do()
+    if err != nil {
+        log.Error("Error listing Google business accounts: ", err)
+        log.Error("Error details: ", jsonUtil.AnyToJson(err))
+        log.Error("response is ", jsonUtil.AnyToJson(resp))
+
+        return events.LambdaFunctionURLResponse{
+            Body:       `{"message": "Error listing Google business accounts"}`,
+            StatusCode: 500,
+        }, nil
+    }
+    log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(resp.Accounts))
+
+    businessInfoClient, err := mybusinessbusinessinformation.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
+
+    locationRequestParam := resp.Accounts[0].Name
+    log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", locationRequestParam)
+    locationsGoogleReq := businessInfoClient.Accounts.Locations.List(locationRequestParam)
+    log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
+    locationsResp, err := locationsGoogleReq.Do()
+    if err != nil {
+        log.Error("Error listing Google business locations: ", err)
+        log.Error("Error details: ", jsonUtil.AnyToJson(err))
+        log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
+
+        return events.LambdaFunctionURLResponse{
+            Body:       `{"message": "Error listing Google business locations"}`,
+            StatusCode: 500,
+        }, nil
+    }
+    log.Info("Retrieved locations: ", jsonUtil.AnyToJson(locationsResp.Locations))
 
     // // --------------------
     // // initialize resources
@@ -163,29 +244,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // // Print the response body
     // log.Debug("Response body: ", string(body))
     //
-    // // // businessprofileperformanceService, err := businessprofileperformance.NewService(context.Background())
-    // //
-    // // mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(context.Background())
-    // // if err != nil {
-    // //     log.Error("Error creating Google business account management service: ", err)
-    // //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating Google business account management service"}`, StatusCode: 500}, nil
-    // // }
-    // //
-    // // // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
-    // // googleReq := mybusinessaccountmanagementService.Accounts.List()
-    // // log.Debug("googleReq is ", jsonUtil.AnyToJson(googleReq))
-    // // resp, err := googleReq.Do()
-    // // if err != nil {
-    // //     log.Error("Error listing Google business accounts: ", err)
-    // //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
-    // //     log.Error("response is ", jsonUtil.AnyToJson(resp))
-    // //
-    // //     return events.LambdaFunctionURLResponse{
-    // //         Body:       `{"message": "Error listing Google business accounts"}`,
-    // //         StatusCode: 500,
-    // //     }, nil
-    // // }
-    //
     log.Info("Successfully finished lambda execution")
     //
     // // --------------------------------
@@ -206,7 +264,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // // log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))
     // //
 
-    return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。您可以關掉此頁面了！", StatusCode: 200}, nil
+    return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。可以關掉此頁面了！", StatusCode: 200}, nil
 }
 
 func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {

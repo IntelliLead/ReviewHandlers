@@ -19,7 +19,7 @@ func main() {
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
     stage := os.Getenv(util.StageEnvKey)
-    authRedirectUrl := os.Getenv(util.AuthRedirectUrl)
+    authRedirectUrl := os.Getenv(util.AuthRedirectUrlEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研

@@ -1,14 +1,29 @@
 import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { StackCreationInfo, STAGE } from 'common-cdk';
-import { Code, FunctionUrlAuthType, LambdaInsightsVersion, LayerVersion, Runtime } from 'aws-cdk-lib/aws-lambda';
+import { ORGANIZATION_ID, StackCreationInfo, STAGE } from 'common-cdk';
+import {
+    Code,
+    FunctionUrlAuthType,
+    LambdaInsightsVersion,
+    LayerVersion,
+    ParamsAndSecretsVersions,
+    Runtime,
+} from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 import { DdbStack } from './ddb';
-import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+    AccountRootPrincipal,
+    ManagedPolicy,
+    OrganizationPrincipal,
+    PolicyStatement,
+    Role,
+    ServicePrincipal,
+} from 'aws-cdk-lib/aws-iam';
 import { VpcStack } from './vpc';
 import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { FunctionUrl } from 'aws-cdk-lib/aws-lambda/lib/function-url';
+import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 
 export interface LambdaStackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -38,8 +53,31 @@ export class LambdaStack extends Stack {
 
         this.createWebhookHandler('lineEventsHandler');
         this.createWebhookHandler('newReviewEventHandler');
-        const authHandler = this.createWebhookHandler('AuthHandler');
-        this.createWebhookHandler('tst', { AUTH_REDIRECT_URL: authHandler.functionUrl.url });
+
+        const authRedirectUrlParameterName = '/auth/authRedirectUrl';
+        const authHandler = this.createWebhookHandler('AuthHandler', {
+            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+        });
+
+        // This unfortunately creates a circular dependency
+        // authHandler.lambdaFn.addEnvironment('AUTH_REDIRECT_URL', authHandler.functionUrl.url);
+        // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
+        // TODO: [INT-84] use Lambda extension to cache the value
+        const authRedirectUrlParameterStore = new StringParameter(this, 'authRedirectUrl', {
+            parameterName: authRedirectUrlParameterName,
+            stringValue: authHandler.functionUrl.url,
+            description: 'The auth handler lambda function url, used as Google OAuth2 redirect url',
+        });
+        authHandler.lambdaFn.role?.addToPrincipalPolicy(
+            new PolicyStatement({
+                actions: ['ssm:GetParameter'],
+                resources: ['*'],
+            })
+        );
+
+        this.createWebhookHandler('tst', {
+            AUTH_REDIRECT_URL: authHandler.functionUrl.url,
+        });
     }
 
     // private createGCPConfigLayer(): LayerVersion {
