@@ -6,4 +6,6 @@ type Secrets struct {
     LineChannelSecret        string `json:"LineChannelSecret"`
     LineChannelAccessToken   string `json:"LineChannelAccessToken"`
     GptApiKey                string `json:"GptApiKey"`
+    GoogleClientID           string `json:"GoogleClientID"`
+    GoogleClientSecret       string `json:"GoogleClientSecret"`
 }

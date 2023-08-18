@@ -15,22 +15,22 @@ import (
 )
 
 type Line struct {
-    lineClient           *linebot.Client
-    log                  *zap.SugaredLogger
-    reviewMessageJsons   jsonUtil.ReviewMessageLineFlexTemplateJsons
-    quickReplyJsons      jsonUtil.QuickReplySettingsLineFlexTemplateJsons
-    aiReplyResultJsons   jsonUtil.AiReplyResultLineFlexTemplateJsons
-    aiReplySettingsJsons jsonUtil.AiReplySettingsLineFlexTemplateJsons
+    lineClient         *linebot.Client
+    log                *zap.SugaredLogger
+    reviewMessageJsons jsonUtil.ReviewMessageLineFlexTemplateJsons
+    quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
+    aiReplyJsons       jsonUtil.AiReplyLineFlexTemplateJsons
+    authJsons          jsonUtil.AuthLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
     return &Line{
-        lineClient:           newLineClient(logger),
-        log:                  logger,
-        reviewMessageJsons:   jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
-        quickReplyJsons:      jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
-        aiReplyResultJsons:   jsonUtil.LoadAiReplyResultLineFlexTemplateJsons(),
-        aiReplySettingsJsons: jsonUtil.LoadAiReplySettingsLineFlexTemplateJsons(),
+        lineClient:         newLineClient(logger),
+        log:                logger,
+        reviewMessageJsons: jsonUtil.LoadReviewMessageLineFlexTemplateJsons(),
+        quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
+        aiReplyJsons:       jsonUtil.LoadAiReplyLineFlexTemplateJsons(),
+        authJsons:          jsonUtil.LoadAuthLineFlexTemplateJsons(),
     }
 }
 
@@ -128,7 +128,24 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review) error {
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in SendAiGeneratedReply to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed PushMessage in SendAiGeneratedReply to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
+func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
+    flexMessage, err := l.buildAuthRequestFlexMessage(authRedirectUrl)
+    if err != nil {
+        l.log.Error("Error building flex message in RequestAuth: ", err)
+    }
+
+    resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("智引力請求讀取 Google", flexMessage)).Do()
+    if err != nil {
+        l.log.Error("Error sending message in RequestAuth: ", err)
+        return err
+    }
+
+    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
 
     return nil
 }

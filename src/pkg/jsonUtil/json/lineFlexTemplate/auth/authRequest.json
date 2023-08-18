@@ -1,0 +1,55 @@
+{
+    "type": "bubble",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "讓智引力訪問 Google",
+                "weight": "bold",
+                "size": "xl",
+                "wrap": true
+            },
+            {
+                "type": "text",
+                "margin": "xl",
+                "size": "md",
+                "style": "normal",
+                "wrap": true,
+                "text": "智引力需要您允許我們從 Google 獲得您的商家訊息以提供服務"
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "sm",
+        "contents": [
+            {
+                "type": "button",
+                "style": "link",
+                "height": "sm",
+                "action": {
+                    "type": "uri",
+                    "label": "好的",
+                    "uri": "https://accounts.google.com/o/oauth2/v2/auth?openExternalBrowser=1&redirect_uri=https://developers.google.com/oauthplayground&client_id=285556284401-duuhainiju04kfn9bdrme18fvq9f2v8g.apps.googleusercontent.com&response_type=code&scope=https://www.googleapis.com/auth/business.manage&access_type=offline&include_granted_scopes=true&login_hint=onboard@tryintellilead.com&prompt=consent"
+                },
+                "adjustMode": "shrink-to-fit",
+                "color": "#445783"
+            }
+        ],
+        "flex": 0,
+        "cornerRadius": "none"
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5",
+            "separator": false
+        },
+        "footer": {
+            "backgroundColor": "#8fa6cc",
+            "separator": false
+        }
+    }
+}
