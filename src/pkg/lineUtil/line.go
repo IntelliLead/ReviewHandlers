@@ -99,7 +99,10 @@ func (l *Line) ShowQuickReplySettings(replyToken string, user model.User) error 
     return nil
 }
 
+// TODO: [INT-88] source some fields from business
+// func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business model.Business) error {
 func (l *Line) ShowAiReplySettings(replyToken string, user model.User) error {
+    // flexMessage, err := l.buildAiReplySettingsFlexMessage(user, business)
     flexMessage, err := l.buildAiReplySettingsFlexMessage(user)
     if err != nil {
         l.log.Error("Error building flex message in ShowAiReplySettings: ", err)
@@ -134,7 +137,7 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review) error {
 }
 
 func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
-    flexMessage, err := l.buildAuthRequestFlexMessage(authRedirectUrl)
+    flexMessage, err := l.buildAuthRequestFlexMessage(userId, authRedirectUrl)
     if err != nil {
         l.log.Error("Error building flex message in RequestAuth: ", err)
     }

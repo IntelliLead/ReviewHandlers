@@ -322,6 +322,8 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
+// TODO: [INT-88] source some fields from business
+// func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.Business) (linebot.FlexContainer, error) {
 func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
@@ -331,9 +333,11 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
 
     // substitute business description
     var businessDescription string
+    // TODO: [INT-88]
     if util.IsEmptyStringPtr(user.BusinessDescription) {
         businessDescription = " "
     } else {
+        // TODO: [INT-88]
         businessDescription = *user.BusinessDescription
 
         // update fillInText
@@ -395,13 +399,16 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     (map[string]interface{})["contents"].([]interface{})[5].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["url"] = util.GetToggleUrl(user.KeywordEnabled)
+        // TODO: [INT-88]
+    (map[string]interface{})["url"] = util.GetToggleUrl(*user.KeywordEnabled)
 
     // substitute keywords
     var keywords string
+    // TODO: [INT-88]
     if util.IsEmptyStringPtr(user.Keywords) {
         keywords = " "
     } else {
+        // TODO: [INT-88]
         keywords = *user.Keywords
 
         // body -> contents[5] -> contents[3] -> action -> fillInText
@@ -450,7 +457,7 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.FlexContainer, error) {
+func (l *Line) buildAuthRequestFlexMessage(userId string, authRedirectUrl string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.authJsons.AuthRequest)
     if err != nil {
         l.log.Debug("Error unmarshalling AuthRequest JSON: ", err)
@@ -459,19 +466,13 @@ func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.Flex
 
     // substitute auth redirect url
     // footer -> contents[0] -> action -> uri
-    jsonMap["footer"].
+    oldUri := jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["action"].
-    (map[string]interface{})["uri"] = strings.Replace(jsonMap["footer"].
-    (map[string]interface{})["contents"].([]interface{})[0].
-    (map[string]interface{})["action"].
-    (map[string]interface{})["uri"].(string), "redirect_uri", authRedirectUrl, 1)
+    (map[string]interface{})["uri"].(string)
 
     // replace the redirect_uri query parameter in the uri with authRedirectUrl
-    uri, err := replaceRedirectURI(jsonMap["footer"].
-    (map[string]interface{})["contents"].([]interface{})[0].
-    (map[string]interface{})["action"].
-    (map[string]interface{})["uri"].(string), authRedirectUrl)
+    uri, err := finalizeAuthUri(oldUri, userId, authRedirectUrl)
     if err != nil {
         return nil, err
     }
@@ -486,7 +487,7 @@ func (l *Line) buildAuthRequestFlexMessage(authRedirectUrl string) (linebot.Flex
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func replaceRedirectURI(uri string, authRedirectUrl string) (string, error) {
+func finalizeAuthUri(uri string, userId string, authRedirectUrl string) (string, error) {
     parsedURL, err := url.Parse(uri)
     if err != nil {
         return "", err
@@ -498,6 +499,7 @@ func replaceRedirectURI(uri string, authRedirectUrl string) (string, error) {
     }
 
     queryParams.Set("redirect_uri", authRedirectUrl)
+    queryParams.Set("state", userId)
     parsedURL.RawQuery = queryParams.Encode()
 
     return parsedURL.String(), nil

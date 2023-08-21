@@ -110,7 +110,7 @@ func (ai *Ai) buildPrompt(user model.User) string {
     }
 
     // keyword prompt
-    if user.KeywordEnabled {
+    if *user.KeywordEnabled {
         if util.IsEmptyStringPtr(user.Keywords) {
             ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
         } else {

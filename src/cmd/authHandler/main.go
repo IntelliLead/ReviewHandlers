@@ -2,16 +2,17 @@ package main
 
 import (
     "context"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/ssm"
-    "golang.org/x/oauth2"
-    "golang.org/x/oauth2/google"
+    "github.com/aws/aws-sdk-go/service/dynamodb"
     "os"
 )
 
@@ -28,10 +29,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
     // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
-    // TODO: gracefully ignore GET favicon request
-    //             "method": "GET",
-    //            "path": "/favicon.ico",
 
+    // gracefully ignore favicon request
     if request.RequestContext.HTTP.Method == "GET" && request.RequestContext.HTTP.Path == "/favicon.ico" {
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
@@ -44,7 +43,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Errorf("Error from Google OAUTH response: %s", errorQueryParam)
     }
 
-    // parse the code url parameter
+    // parse the code parameter
     code := request.QueryStringParameters["code"]
     if code == "" {
         log.Errorf("Missing code parameter from Google OAUTH response")
@@ -56,95 +55,103 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Debugf("Received authorization code from Google OAUTH response: %s", code)
 
-    // TODO: [INT-84] use Lambda extension to cache and fetch auth redirect URL
-    // retrieve from SSM parameter store
-    authRedirectUrlParameterName := os.Getenv(util.AuthRedirectUrlParameterNameEnvKey)
-    ssmClient := ssm.New(session.Must(session.NewSession()))
-    response, err := ssmClient.GetParameter(&ssm.GetParameterInput{
-        Name: &authRedirectUrlParameterName,
-    })
-    if err != nil {
+    // parse the state parameter
+    userId := request.QueryStringParameters["state"]
+    if code == "" {
+        log.Errorf("Missing state parameter from Google OAUTH response")
         return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Error retrieving auth redirect URL from SSM parameter store"}`,
-        }, err
-    }
-    authRedirectUrl := *response.Parameter.Value
-
-    // exchange code for token
-    secrets := secret.GetSecrets()
-    config := &oauth2.Config{
-        ClientID:     secrets.GoogleClientID,
-        ClientSecret: secrets.GoogleClientSecret,
-        RedirectURL:  authRedirectUrl,
-        Scopes:       []string{"https://www.googleapis.com/auth/business.manage"},
-        Endpoint:     google.Endpoint,
-    }
-
-    token, err := config.Exchange(ctx, code)
-    if err != nil {
-        log.Errorf("Error exchanging code for token: %s", err)
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Error exchanging code for token"}`,
+            StatusCode: 400,
+            Body:       `{"error": "Missing state parameter from Google OAUTH response"}`,
         }, nil
     }
 
-    log.Debug("Access Token: ", token.AccessToken)
-    log.Debug("Refresh Token: ", token.RefreshToken)
+    log.Info("Received OAUTH request from user: ", userId)
 
-    log.Debug("Token: ", jsonUtil.AnyToJson(token))
+    google, err := googleUtil.NewGoogle(log)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error creating Google OAUTH client"}`,
+        }, err
+    }
+
+    token, err := google.ExchangeToken(code)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error exchanging code for token"}`,
+        }, err
+    }
+
+    log.Debug("Google token: ", jsonUtil.AnyToJson(token))
+
+    // retrieve Google user info
+    userInfo, err := google.GetGoogleUserInfo()
+    if err != nil {
+        log.Errorf("Error retrieving Google user info: %s", err)
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error retrieving Google user info"}`,
+        }, err
+    }
+
+    log.Debug("Google user info: ", jsonUtil.AnyToJson(userInfo))
+
+    // find business object of user
+    mySession := session.Must(session.NewSession())
+    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    // businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+
+    user, err := userDao.GetUser(userId)
+    if err != nil {
+        if _, ok := err.(*exception.UserDoesNotExistException); ok {
+            log.Infof("User %s does not exist", userId)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 400,
+                Body:       `{"error": "User does not exist"}`,
+            }, nil
+        } else {
+            log.Errorf("Error retrieving user: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error retrieving user"}`,
+            }, err
+        }
+    }
 
     // --------------------
     // Store refresh token
     // --------------------
+    if len(user.BusinessIds) == 0 {
+        // if not found, create fields
+        log.Infof("User %s does not have any associated business yet. Creating.", userId)
+
+        // get business ID from Google
+        location, err := google.GetBusinessLocation()
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error retrieving Google business location"}`,
+            }, err
+        }
+
+        log.Debugf("Google business location: %s", jsonUtil.AnyToJson(location))
+
+        // create business object
+        // TODO
+        // model.NewBusiness()
+    } else {
+        // if found, update fields
+        log.Infof("User %s has associated business(es) %v. Updating.", userId, user.BusinessIds)
+
+    }
 
     // --------------------
-    // make request to Google My Business API
+    // make request to Google My GoogleBusiness API
     // --------------------
-    // businessprofileperformanceService, err := businessprofileperformance.NewService(context.Background())
 
-    // mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(ctx,
-    //     option.WithTokenSource(config.TokenSource(ctx, token)))
-    // if err != nil {
-    //     log.Error("Error creating Google business account management service: ", err)
-    //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating Google business account management service"}`, StatusCode: 500}, nil
-    // }
     //
-    // // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
-    // googleReq := mybusinessaccountmanagementService.Accounts.List()
-    // log.Debug("list accounts googleReq is ", jsonUtil.AnyToJson(googleReq))
-    // resp, err := googleReq.Do()
-    // if err != nil {
-    //     log.Error("Error listing Google business accounts: ", err)
-    //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
-    //     log.Error("response is ", jsonUtil.AnyToJson(resp))
-    //
-    //     return events.LambdaFunctionURLResponse{
-    //         Body:       `{"message": "Error listing Google business accounts"}`,
-    //         StatusCode: 500,
-    //     }, nil
-    // }
-    // log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(resp.Accounts))
-    //
-    // businessInfoClient, err := mybusinessbusinessinformation.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
-    //
-    // locationRequestParam := resp.Accounts[0].Name
-    // log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", locationRequestParam)
-    // locationsGoogleReq := businessInfoClient.Accounts.Locations.List(locationRequestParam)
-    // log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
-    // locationsResp, err := locationsGoogleReq.Do()
-    // if err != nil {
-    //     log.Error("Error listing Google business locations: ", err)
-    //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
-    //     log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
-    //
-    //     return events.LambdaFunctionURLResponse{
-    //         Body:       `{"message": "Error listing Google business locations"}`,
-    //         StatusCode: 500,
-    //     }, nil
-    // }
-    // log.Info("Retrieved locations: ", jsonUtil.AnyToJson(locationsResp.Locations))
 
     // // --------------------
     // // initialize resources

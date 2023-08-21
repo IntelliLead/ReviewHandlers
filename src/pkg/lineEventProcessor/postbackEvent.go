@@ -450,7 +450,7 @@ func handleKeywordToggle(replyToken string,
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
-    if !user.KeywordEnabled && (util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription)) {
+    if !*user.KeywordEnabled && (util.IsEmptyStringPtr(user.Keywords) || util.IsEmptyStringPtr(user.BusinessDescription)) {
         _, err := line.ReplyUser(replyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
         if err != nil {
             log.Errorf("Error replying keyword settings prompt message to user '%s': %v", user.UserId, err)
@@ -469,10 +469,10 @@ func handleKeywordToggle(replyToken string,
     var updatedUser model.User
     var err error
     updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: !user.KeywordEnabled},
+        {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: !*user.KeywordEnabled},
     })
     if err != nil {
-        log.Errorf("Error updating keyword enabled to %v for user '%s': %v", !user.KeywordEnabled, user.UserId, err)
+        log.Errorf("Error updating keyword enabled to %v for user '%s': %v", !*user.KeywordEnabled, user.UserId, err)
 
         // notify user of error
         _, err := line.NotifyUserUpdateFailed(replyToken, "關鍵字回覆")
