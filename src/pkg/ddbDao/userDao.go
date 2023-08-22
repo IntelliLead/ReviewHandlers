@@ -119,7 +119,7 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
     }
 
     // add sort key
-    // (sort key appears already added somehow, just mistakenly as 'N' type)
+    // (sort key appears already added somehow, just mistakenly as 'N' type. So we correct this)
     av["uniqueId"] = &dynamodb.AttributeValue{
         S: aws.String("#"),
     }

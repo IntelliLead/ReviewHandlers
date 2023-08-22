@@ -10,6 +10,7 @@ import (
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "net/url"
     "strings"
+    "time"
     "unicode"
 )
 
@@ -199,7 +200,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     }
 
     // update review time
-    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(time.Time(review.ReviewLastUpdated))
     if err != nil {
         l.log.Error("Error converting review timestamp to readable format: ", err)
         return nil, err

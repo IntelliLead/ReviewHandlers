@@ -15,13 +15,13 @@ type Review struct {
     VendorEventId        string             `dynamodbav:"vendorEventId"`
     NumberRating         _type.NumberRating `dynamodbav:"numberRating" validate:"min=1,max=5"`
     Review               string             `dynamodbav:"review"`
-    CreatedAt            time.Time          `dynamodbav:"createdAt,unixtime"`
-    ReviewLastUpdated    time.Time          `dynamodbav:"reviewLastUpdated,unixtime"`
+    CreatedAt            _type.EpochMs      `dynamodbav:"createdAt"`
+    ReviewLastUpdated    _type.EpochMs      `dynamodbav:"reviewLastUpdated"`
     ReviewerProfilePhoto string             `dynamodbav:"reviewerProfilePhoto" validate:"url"`
     ReviewerName         string             `dynamodbav:"reviewerName"`
-    Reply                *string            `dynamodbav:"reply,omitempty" validate:"required_with=LastReplied"`          // optional
-    LastReplied          *time.Time         `dynamodbav:"lastReplied,omitempty,unixtime" validate:"required_with=Reply"` // optional
-    LastUpdated          time.Time          `dynamodbav:"lastUpdated,unixtime"`
+    Reply                *string            `dynamodbav:"reply,omitempty" validate:"required_with=LastReplied"` // optional
+    LastReplied          *_type.EpochMs     `dynamodbav:"lastReplied,omitempty" validate:"required_with=Reply"` // optional
+    LastUpdated          _type.EpochMs      `dynamodbav:"lastUpdated"`
     Vendor               enum.Vendor        `dynamodbav:"vendor"`
 }
 
@@ -31,9 +31,9 @@ func NewReview(event ZapierNewReviewEvent) (*Review, error) {
         *replyCopy = *event.Reply
     }
 
-    var lastRepliedCopy *time.Time = nil
+    var lastRepliedCopy *_type.EpochMs = nil
     if event.LastReplied != nil {
-        *lastRepliedCopy = *event.LastReplied
+        *lastRepliedCopy = _type.EpochMs(*event.LastReplied)
     }
 
     review := Review{
@@ -42,13 +42,13 @@ func NewReview(event ZapierNewReviewEvent) (*Review, error) {
         VendorEventId:        event.VendorEventId,
         NumberRating:         event.NumberRating,
         Review:               event.Review,
-        CreatedAt:            event.CreatedAt,
-        ReviewLastUpdated:    event.ReviewLastUpdated,
+        CreatedAt:            _type.EpochMs(event.CreatedAt),
+        ReviewLastUpdated:    _type.EpochMs(event.ReviewLastUpdated),
         ReviewerProfilePhoto: event.ReviewerProfilePhoto,
         ReviewerName:         event.ReviewerName,
         Reply:                replyCopy,
         LastReplied:          lastRepliedCopy,
-        LastUpdated:          time.Now(),
+        LastUpdated:          _type.EpochMs(time.Now()),
         Vendor:               enum.VendorGoogle,
         ZapierReplyWebhook:   event.ZapierReplyWebhook, // TODO: retrieve from User DB https://linear.app/vest/issue/INT-23/each-zapier-webhook-url-is-unique-to-the-user
     }

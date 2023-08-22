@@ -2,10 +2,10 @@ package model
 
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
-    "time"
 )
 
 // TODO: WIP
@@ -18,8 +18,8 @@ type Business struct {
     Language                     *string               `dynamodbav:"language,omitempty"`
     ZapierReplyWebhook           *string               `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
     SubscriptionTier             enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
-    ExpireAt                     *time.Time            `dynamodbav:"expireAt,omitempty,unixtime"`
-    LastUpdated                  time.Time             `dynamodbav:"lastUpdated,unixtime"`
+    ExpireAt                     *_type.EpochMs        `dynamodbav:"expireAt,omitempty"`
+    LastUpdated                  _type.EpochMs         `dynamodbav:"lastUpdated"`
     QuickReplyMessage            *string               `dynamodbav:"quickReplyMessage,omitempty"`
     BusinessDescription          *string               `dynamodbav:"businessDescription,omitempty"`
     EmojiEnabled                 bool                  `dynamodbav:"emojiEnabled"` // FAC for emoji
@@ -34,7 +34,7 @@ type Business struct {
 
 func NewBusiness(lineUserId string,
     lineUserProfile linebot.UserProfileResponse,
-    createdAt time.Time) User {
+    createdAt _type.EpochMs) User {
     user := User{
         UserId:                       lineUserId,
         SubscriptionTier:             enum.SubscriptionTierBeta,

@@ -123,7 +123,8 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
                 return exception.NewVendorReviewIdAlreadyExistException(fmt.Sprintf("UniqueVendorReviewId with vendorReviewID %s already exists", review.VendorReviewId), err)
             }
 
-            return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons: ", err)
+            // return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons: ", )
+            return err
         default:
             d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
             return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
