@@ -22,7 +22,7 @@ export interface DynamoDbTableAttribute {
 export enum TableName {
     REVIEW = 'Review',
     USER = 'User',
-    BUSINESS = 'Business,
+    BUSINESS = 'Business',
 }
 
 const reviewTable: DynamoDbTableAttribute = {
