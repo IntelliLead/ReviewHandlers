@@ -1,8 +1,8 @@
 package ddbDao
 
 import (
-    "errors"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -127,18 +127,12 @@ func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error
     return av, nil
 }
 
-type AttributeAction struct {
-    Action enum.Action // "update" or "delete"
-    Name   string      // Name of the attribute
-    Value  interface{} // Value to set (for updates only)
-}
-
 // UpdateAttributes updates and deletes attributes of a user with the given userId.
 // Note that deleting required fields may break the data model.
 // For example:
 // user, err = userDao.UpdateAttributes(userId, []AttributeAction{
 //     {
-//         Action: enum.ActionDelete,
+//         Action: enum.ActionRemove,
 //         Name:   "businessDescription",
 //     },
 //     {
@@ -147,8 +141,8 @@ type AttributeAction struct {
 //         Value:  []string{"keyword1", "keyword2"},
 //     }
 // }    )
-func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (model.User, error) {
-    err := validateUniqueAttributeNames(actions)
+func (d *UserDao) UpdateAttributes(userId string, actions []dbModel.AttributeAction) (model.User, error) {
+    err := dbModel.ValidateUniqueAttributeNames(actions)
     if err != nil {
         return model.User{}, err
     }
@@ -158,7 +152,7 @@ func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (mo
         attribute := strings.ToLower(string(action.Name[0])) + action.Name[1:] // for safety in case of typo
 
         switch action.Action {
-        case enum.ActionDelete:
+        case enum.ActionRemove:
             updateBuilder = updateBuilder.Remove(expression.Name(action.Name))
 
         case enum.ActionUpdate:
@@ -198,19 +192,4 @@ func (d *UserDao) UpdateAttributes(userId string, actions []AttributeAction) (mo
     }
 
     return user, nil
-}
-
-func validateUniqueAttributeNames(actions []AttributeAction) error {
-    if len(actions) == 0 {
-        return errors.New(fmt.Sprintf("No actions provided to UpdateAttributes"))
-    }
-
-    uniqueNames := make(map[string]bool)
-    for _, action := range actions {
-        if _, ok := uniqueNames[action.Name]; ok {
-            return errors.New(fmt.Sprintf("Duplicate attribute name '%s' in UpdateAttributes", action.Name))
-        }
-        uniqueNames[action.Name] = true
-    }
-    return nil
 }

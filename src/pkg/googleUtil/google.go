@@ -76,8 +76,9 @@ func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
 
     g.log.Debug("Getting Google user info with token: ", jsonUtil.AnyToJson(g.token))
 
-    googleOauthClient, err := googleOauth.NewService(context.Background(),
-        option.WithTokenSource(g.config.TokenSource(context.Background(), g.token)))
+    ctx := context.Background()
+    googleOauthClient, err := googleOauth.NewService(ctx,
+        option.WithTokenSource(g.config.TokenSource(ctx, g.token)))
     if err != nil {
         g.log.Errorf("Error creating Google OAUTH client in GetGoogleUserInfo(): %s", err)
         return nil, err
@@ -98,16 +99,17 @@ func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
     return resp, nil
 }
 
-func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, error) {
+// GetBusinessLocation retrieves the business location for the user and account ID
+func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, string, error) {
     if g.token == nil {
-        return mybusinessbusinessinformation.Location{}, errors.New("token is not set. Call ExchangeToken first")
+        return mybusinessbusinessinformation.Location{}, "", errors.New("token is not set. Call ExchangeToken first")
     }
 
     mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(context.Background(),
         option.WithTokenSource(g.config.TokenSource(context.Background(), g.token)))
     if err != nil {
         g.log.Error("Error creating Google business account management service client: ", err)
-        return mybusinessbusinessinformation.Location{}, err
+        return mybusinessbusinessinformation.Location{}, "", err
     }
 
     // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
@@ -119,7 +121,7 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
         g.log.Error("Error details: ", jsonUtil.AnyToJson(err))
         g.log.Error("response is ", jsonUtil.AnyToJson(resp))
 
-        return mybusinessbusinessinformation.Location{}, err
+        return mybusinessbusinessinformation.Location{}, "", err
     }
     accounts := resp.Accounts
     g.log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(accounts))
@@ -130,21 +132,21 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
     }
     if len(accounts) == 0 {
         g.log.Warn("User has no Google business accounts")
-        return mybusinessbusinessinformation.Location{}, nil
+        return mybusinessbusinessinformation.Location{}, "", nil
     }
 
     businessInfoClient, err := mybusinessbusinessinformation.NewService(context.Background(), option.WithTokenSource(g.config.TokenSource(context.Background(), g.token)))
 
-    locationRequestParam := accounts[0].Name
-    g.log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", locationRequestParam)
-    locationsGoogleReq := businessInfoClient.Accounts.Locations.List(locationRequestParam)
+    accountId := accounts[0].Name
+    g.log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", accountId)
+    locationsGoogleReq := businessInfoClient.Accounts.Locations.List(accountId)
     g.log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
     locationsResp, err := locationsGoogleReq.Do(googleapi.QueryParameter("readMask", "name,title,storeCode,languageCode,categories,labels,openInfo,relationshipData,serviceItems"))
     if err != nil {
         g.log.Error("Error listing Google business locations: ", err)
         g.log.Error("Error details: ", jsonUtil.AnyToJson(err))
         g.log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
-        return mybusinessbusinessinformation.Location{}, err
+        return mybusinessbusinessinformation.Location{}, "", err
     }
 
     locations := locationsResp.Locations
@@ -155,5 +157,5 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
         g.log.Warnf("User has multiple Google business locations %s. Using the first one", jsonUtil.AnyToJson(locations))
     }
 
-    return *locationsResp.Locations[0], nil
+    return *locationsResp.Locations[0], accountId, nil
 }

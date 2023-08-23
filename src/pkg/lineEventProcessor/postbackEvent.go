@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/aiUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
@@ -340,13 +341,14 @@ func handleEmojiToggle(replyToken string,
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
-    var updatedUser model.User
-    var err error
-
-    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "emojiEnabled", Value: !user.EmojiEnabled},
-    })
-
+    action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "emojiEnabled", !user.EmojiEnabled)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error creating attribute action: %s"}`, err),
+        }, err
+    }
+    updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{action})
     if err != nil {
         log.Errorf("Error updating emoji enabled to %v for user '%s': %v", !user.EmojiEnabled, user.UserId, err)
 
@@ -403,13 +405,14 @@ func handleSignatureToggle(replyToken string,
         }, nil
     }
 
-    var updatedUser model.User
-    var err error
-
-    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: !user.SignatureEnabled},
-    })
-
+    action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "signatureEnabled", !user.SignatureEnabled)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error creating attribute action: %s"}`, err),
+        }, err
+    }
+    updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{action})
     if err != nil {
         log.Errorf("Error updating signature enabled to %v for user '%s': %v", !user.SignatureEnabled, user.UserId, err)
 
@@ -466,11 +469,14 @@ func handleKeywordToggle(replyToken string,
         }, nil
     }
 
-    var updatedUser model.User
-    var err error
-    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: !*user.KeywordEnabled},
-    })
+    action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "keywordEnabled", !*user.KeywordEnabled)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error creating attribute action: %s"}`, err),
+        }, err
+    }
+    updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{action})
     if err != nil {
         log.Errorf("Error updating keyword enabled to %v for user '%s': %v", !*user.KeywordEnabled, user.UserId, err)
 
@@ -532,10 +538,14 @@ func handleServiceRecommendationToggle(replyToken string,
     var updatedUser model.User
     var err error
 
-    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: !user.ServiceRecommendationEnabled},
-    })
-
+    action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "serviceRecommendationEnabled", !user.ServiceRecommendationEnabled)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error creating attribute action: %s"}`, err),
+        }, err
+    }
+    updatedUser, err = userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{action})
     if err != nil {
         log.Errorf("Error updating service recommendation enabled to %v for user '%s': %v", !user.ServiceRecommendationEnabled, user.UserId, err)
 
@@ -592,11 +602,14 @@ func handleAutoQuickReplyToggle(replyToken string,
         }, nil
     }
 
-    var updatedUser model.User
-    var err error
-    updatedUser, err = userDao.UpdateAttributes(user.UserId, []ddbDao.AttributeAction{
-        {Action: enum.ActionUpdate, Name: "autoQuickReplyEnabled", Value: !user.AutoQuickReplyEnabled},
-    })
+    attributeAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "autoQuickReplyEnabled", !user.AutoQuickReplyEnabled)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Error creating attribute action: %s"}`, err),
+        }, err
+    }
+    updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{attributeAction})
     if err != nil {
         log.Errorf("Error updating auto quick reply enabled to %v for user '%s': %v", !user.AutoQuickReplyEnabled, user.UserId, err)
 

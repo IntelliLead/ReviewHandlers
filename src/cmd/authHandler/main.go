@@ -3,16 +3,19 @@ package main
 import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
     "github.com/aws/aws-sdk-go/service/dynamodb"
+    "golang.org/x/oauth2"
     "os"
 )
 
@@ -32,15 +35,22 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // gracefully ignore favicon request
     if request.RequestContext.HTTP.Method == "GET" && request.RequestContext.HTTP.Path == "/favicon.ico" {
+        log.Infof("Received favicon request. Ignoring.")
+
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Body:       "no favicon",
         }, nil
     }
 
+    // check for error from Google OAUTH response
     errorQueryParam := request.QueryStringParameters["error"]
     if errorQueryParam != "" {
         log.Errorf("Error from Google OAUTH response: %s", errorQueryParam)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 400,
+            Body:       `{"error": "Error from Google OAUTH response"}`,
+        }, nil
     }
 
     // parse the code parameter
@@ -67,6 +77,23 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Info("Received OAUTH request from user: ", userId)
 
+    // ----
+    // 0. Check if user exists
+    // ----
+    mySession := session.Must(session.NewSession())
+    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+
+    isUserExist, user, err := userDao.IsUserExist(userId)
+    if err != nil {
+        log.Error("Error checking if user exists: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
+    }
+    if !isUserExist {
+        log.Error("User does not exist: ", userId)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
+    }
+
     google, err := googleUtil.NewGoogle(log)
     if err != nil {
         return events.LambdaFunctionURLResponse{
@@ -75,6 +102,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, err
     }
 
+    // ----
+    // 1. exchange code for token
+    // ----
     token, err := google.ExchangeToken(code)
     if err != nil {
         return events.LambdaFunctionURLResponse{
@@ -85,187 +115,197 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Debug("Google token: ", jsonUtil.AnyToJson(token))
 
-    // retrieve Google user info
-    userInfo, err := google.GetGoogleUserInfo()
+    // ----
+    // 2. Check if business exists
+    // ----
+    // retrieve business location (businessId)
+    location, accountId, err := google.GetBusinessLocation()
     if err != nil {
-        log.Errorf("Error retrieving Google user info: %s", err)
-
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,
-            Body:       `{"error": "Error retrieving Google user info"}`,
+            Body:       `{"error": "Error retrieving Google business location"}`,
         }, err
     }
+    log.Debugf("Google business location: %s", jsonUtil.AnyToJson(location))
+    businessId := accountId + "/" + location.Name
 
-    log.Debug("Google user info: ", jsonUtil.AnyToJson(userInfo))
-
-    // find business object of user
-    mySession := session.Must(session.NewSession())
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    // businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-
-    user, err := userDao.GetUser(userId)
+    business, err := businessDao.GetBusiness(businessId)
     if err != nil {
-        if _, ok := err.(*exception.UserDoesNotExistException); ok {
-            log.Infof("User %s does not exist", userId)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 400,
-                Body:       `{"error": "User does not exist"}`,
-            }, nil
-        } else {
-            log.Errorf("Error retrieving user: %s", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error retrieving user"}`,
-            }, err
-        }
+        log.Errorf("Error retrieving business %s: %s", businessId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error retrieving business"}`,
+        }, err
+    }
+    if business == nil {
+        log.Infof("Business %s does not exist. Creating.", businessId)
     }
 
-    // --------------------
-    // Store refresh token
-    // --------------------
-    if len(user.BusinessIds) == 0 {
-        // if not found, create fields
-        log.Infof("User %s does not have any associated business yet. Creating.", userId)
+    /*
+       scenarios:
+        1. user have this business and business exists: update business Google token
+        2. user does not have this business and business exists: add user to business (secondary user or not first time login)
+        3. user does not have this business and business does not exist: create new business for user (primary user)
 
-        // get business ID from Google
-        location, err := google.GetBusinessLocation()
+        Other scenarios are error state
+    */
+
+    if business != nil && util.StringInSlice(userId, business.UserIds) && util.StringInSlice(businessId, user.BusinessIds) {
+        log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
+
+        actions, err := buildUpdateTokenAttributeActions(token)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       `{"error": "Error retrieving Google business location"}`,
+                Body:       `{"error": "Error building update token attribute actions"}`,
             }, err
         }
 
-        log.Debugf("Google business location: %s", jsonUtil.AnyToJson(location))
+        _, err = businessDao.UpdateAttributes(businessId, actions)
+        if err != nil {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error updating business attributes"}`,
+            }, err
+        }
 
-        // create business object
-        // TODO
-        // model.NewBusiness()
+    } else if business != nil && !util.StringInSlice(businessId, user.BusinessIds) {
+        log.Infof("User %s does not have association with business %s yet. Adding user to business.", userId, businessId)
+
+        // add user to business and update business Google token
+        userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "userIds", []string{userId})
+        if err != nil {
+            log.Errorf("Error building user id append action: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error building user id append action"}`,
+            }, err
+        }
+        tokenActions, err := buildUpdateTokenAttributeActions(token)
+        if err != nil {
+            log.Errorf("Error building update token attribute actions: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error building update token attribute actions"}`,
+            }, err
+        }
+
+        _, err = businessDao.UpdateAttributes(businessId, append(tokenActions, userIdAppendAction))
+        if err != nil {
+            log.Errorf("Error updating business %s attributes %v: %s", businessId, append(tokenActions, userIdAppendAction), err)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error updating business attributes"}`,
+            }, err
+        }
+
+        // add business to user
+        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "businessIds", []string{businessId})
+        if err != nil {
+            log.Errorf("Error building business id append action: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error building business id append action"}`,
+            }, err
+        }
+        _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdAppendAction})
+        if err != nil {
+            log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdAppendAction, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error updating user attributes"}`,
+            }, err
+        }
+
+    } else if business == nil && !util.StringInSlice(businessId, user.BusinessIds) {
+        log.Infof("Business %s does not exist. Creating and associating with user %s.", businessId, userId)
+
+        // get user info from Google and create business
+        userInfo, err := google.GetGoogleUserInfo()
+        if err != nil {
+            log.Errorf("Error retrieving Google user info: %s", err)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error retrieving Google user info"}`,
+            }, err
+        }
+
+        log.Debug("Google user info: ", jsonUtil.AnyToJson(userInfo))
+
+        // create business
+        business := model.NewBusiness(
+            accountId+"/"+location.Name,
+            location.Title,
+            model.Google{
+                Id:                  userInfo.Id,
+                AccessToken:         token.AccessToken,
+                AccessTokenExpireAt: token.Expiry,
+                RefreshToken:        token.RefreshToken,
+                ProfileFullName:     userInfo.Name,
+                Email:               userInfo.Email,
+                ImageUrl:            userInfo.Picture,
+                Locale:              userInfo.Locale,
+            },
+            userId,
+        )
+        err = businessDao.CreateBusiness(business)
+        if err != nil {
+            log.Errorf("Error creating business object %v: %v", business, err)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error creating business object"}`,
+            }, err
+        }
+
+        // associate business with user
+        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "businessIds", []string{businessId})
+        if err != nil {
+            log.Errorf("Error building business id append action: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error building business id append action"}`,
+            }, err
+        }
+        _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdAppendAction})
+        if err != nil {
+            log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdAppendAction, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error updating user attributes"}`,
+            }, err
+        }
+
     } else {
-        // if found, update fields
-        log.Infof("User %s has associated business(es) %v. Updating.", userId, user.BusinessIds)
-
+        // error states
+        log.Errorf("Error associating user %s with business %s", userId, businessId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error associating user with business"}`,
+        }, err
     }
 
-    // --------------------
-    // make request to Google My GoogleBusiness API
-    // --------------------
-
-    //
-
-    // // --------------------
-    // // initialize resources
-    // // --------------------
-    // // LINE
-    // line := lineUtil.NewLine(log)
-    //
-    // // send auth request
-    // err := line.RequestAuth(sendingUserId)
-    // if err != nil {
-    //     return events.LambdaFunctionURLResponse{
-    //         StatusCode: 500,
-    //         Body:       `{"error": "Failed to send auth request"}`,
-    //     }, err
-    // }
-
-    //
-    // // --------------------
-    // // initialize resources
-    // // --------------------
-    // // DDB
-    // mySession := session.Must(session.NewSession())
-    // userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    //
-    // // --------------------
-    // // validate user exists
-    // // --------------------
-    // isUserExist, _, err := userDao.IsUserExist(srcUserId)
-    // if err != nil {
-    //     log.Error("Error checking if user exists: ", err)
-    //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
-    // }
-    // if !isUserExist {
-    //     log.Error("User does not exist: ", srcUserId)
-    //     return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
-    // }
-    //
-    // log.Debugf("User %s exists, proceeding", srcUserId)
-    //
-    // // --------------------
-    // // Get metrics from Google
-    // // --------------------
-    // // TODO: how to get google user from user ID? Can populate manually, but how to get user to self-serve during onboarding?
-    // //
-    // client, err := google.DefaultClient(context.TODO(),
-    //     "https://www.googleapis.com/auth/business.manage")
-    // if err != nil {
-    //     log.Fatal(err)
-    // }
-    //
-    // accountId := "accounts/107069853445303760285" // IL onboarding service account
-    // // mucurryAccountId := "accounts/107069853445303760285"
-    // // mucurryLocationId := "locations/14282334389737307772"
-    // //
-    // // jinYuLiangyanAccountId := "accounts/107069853445303760285"
-    // // jinYuLiangyanLocationId := "locations/10774539939231103915"
-    //
-    // // listAccountsUrl := "https://mybusinessaccountmanagement.googleapis.com/v1/accounts"
-    // listStoresUrl := fmt.Sprintf("https://mybusinessbusinessinformation.googleapis.com/v1/%s/locations", accountId)
-    // readMask := "name"
-    //
-    // // Encode the parameters
-    // params := url.Values{}
-    // params.Set("readMask", readMask)
-    //
-    // // Create the final URL
-    // finalURL := listStoresUrl + "?" + params.Encode()
-    // // _ = listStoresUrl + "?" + params.Encode()
-    //
-    // resp, err := client.Get(finalURL)
-    // // resp, err := client.Get(listAccountsUrl)
-    // if err != nil {
-    //     log.Error("Error getting Google business accounts: ", err)
-    //     log.Error("Error details: ", jsonUtil.AnyToJson(err))
-    //
-    //     return events.LambdaFunctionURLResponse{
-    //         Body:       `{"message": "Error getting Google business accounts"}`,
-    //         StatusCode: 500,
-    //     }, nil
-    // }
-    //
-    // // Read the response body
-    // body, err := io.ReadAll(resp.Body)
-    // if err != nil {
-    //     log.Error("Failed to read response body: %s\n", err)
-    //
-    //     return events.LambdaFunctionURLResponse{
-    //         Body:       `{"message": "Failed to read response body"}`,
-    //         StatusCode: 500,
-    //     }, nil
-    // }
-    //
-    // // Print the response body
-    // log.Debug("Response body: ", string(body))
-    //
     log.Info("Successfully finished lambda execution")
-    //
-    // // --------------------------------
-    // // forward to LINE by calling LINE messaging API
-    // // --------------------------------
-    //
-    // // line := lineUtil.NewLine(log)
-    // //
-    // // err = line.SendNewReview(review, user)
-    // // if err != nil {
-    // //     log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
-    // //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
-    // // }
-    // //
-    // // log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
-    // //
-    // // // --------------------
-    // // log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))
-    // //
 
     return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。可以關掉此頁面了！", StatusCode: 200}, nil
+}
+
+func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAction, error) {
+    accessTokenAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google.accessToken", token.AccessToken)
+    if err != nil {
+        return []dbModel.AttributeAction{}, err
+    }
+    accessTokenExpireAtAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google.accessTokenExpireAt", token.Expiry)
+    if err != nil {
+        return []dbModel.AttributeAction{}, err
+    }
+
+    refreshTokenAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google.refreshToken", token.RefreshToken)
+    if err != nil {
+        return []dbModel.AttributeAction{}, err
+    }
+
+    return []dbModel.AttributeAction{accessTokenAction, accessTokenExpireAtAction, refreshTokenAction}, nil
 }
