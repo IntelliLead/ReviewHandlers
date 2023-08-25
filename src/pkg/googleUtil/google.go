@@ -30,7 +30,7 @@ func NewGoogleWithAuthCode(logger *zap.SugaredLogger, authCode string) (*Google,
         return &Google{}, err
     }
 
-    token, err := googleClient.ExchangeToken(authCode)
+    token, err := googleClient.exchangeToken(authCode)
     if err != nil {
         logger.Error("Unable to retrieve token from web: ", err)
         return &Google{}, err
@@ -81,23 +81,18 @@ func newGoogle(logger *zap.SugaredLogger) (*Google, error) {
     }, nil
 }
 
-// ExchangeToken exchanges the code for a token
-// side effect: sets the token on the Google struct
-func (g *Google) ExchangeToken(code string) (oauth2.Token, error) {
+// exchangeToken exchanges the authorization code for a token
+func (g *Google) exchangeToken(code string) (oauth2.Token, error) {
     token, err := g.config.Exchange(context.Background(), code)
     if err != nil {
         g.log.Errorf("Error exchanging code for token: %s", err)
         return oauth2.Token{}, err
     }
 
-    g.Token = *token
-
     return *token, nil
 }
 
 func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
-    g.log.Debug("Getting Google user info with token: ", jsonUtil.AnyToJson(g.Token))
-
     ctx := context.Background()
     googleOauthClient, err := googleOauth.NewService(ctx,
         option.WithTokenSource(g.config.TokenSource(ctx, &g.Token)))
@@ -106,22 +101,17 @@ func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
         return nil, err
     }
 
-    g.log.Debug("googleOauthClient is ", jsonUtil.AnyToJson(googleOauthClient))
-
     req := googleOauthClient.Userinfo.Get()
-    g.log.Debug("googleOauthClient.Userinfo.Get() request is ", jsonUtil.AnyToJson(req))
-
     resp, err := req.Do()
-    // resp, err := googleOauthClient.Userinfo.Get().Do()
     if err != nil {
-        g.log.Errorf("Error getting Google user info in GetGoogleUserInfo(): %s", err)
+        g.log.Errorf("Error getting Google user info in GetGoogleUserInfo() with request %s: %s", jsonUtil.AnyToJson(req), err)
         return nil, err
     }
 
     return resp, nil
 }
 
-// GetBusinessLocation retrieves the business location for the user and account ID
+// GetBusinessLocation retrieves the business location for the user and business account ID
 func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, string, error) {
     mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(context.Background(),
         option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
@@ -130,50 +120,47 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
         return mybusinessbusinessinformation.Location{}, "", err
     }
 
-    // resp, err := mybusinessaccountmanagementService.Accounts.List().Do()
-    googleReq := mybusinessaccountmanagementService.Accounts.List()
-    g.log.Debug("list accounts googleReq is ", jsonUtil.AnyToJson(googleReq))
-    resp, err := googleReq.Do()
+    listAccountsReq := mybusinessaccountmanagementService.Accounts.List()
+    resp, err := listAccountsReq.Do()
     if err != nil {
-        g.log.Error("Error listing Google business accounts: ", err)
-        g.log.Error("Error details: ", jsonUtil.AnyToJson(err))
-        g.log.Error("response is ", jsonUtil.AnyToJson(resp))
-
+        g.log.Errorf("Error listing Google business accounts in GetBusinessLocation() with request %s: %s", jsonUtil.AnyToJson(listAccountsReq), err)
         return mybusinessbusinessinformation.Location{}, "", err
     }
     accounts := resp.Accounts
-    g.log.Info("Retrieved accounts: ", jsonUtil.AnyToJson(accounts))
+    g.log.Debug("Retrieved accounts: ", jsonUtil.AnyToJson(accounts))
 
-    // TODO: [INT-89] add metrics to track frequency of multiple accounts and locations
-    if len(accounts) > 1 {
-        g.log.Warn("User has multiple Google business accounts. Using the first one")
-    }
     if len(accounts) == 0 {
         g.log.Warn("User has no Google business accounts")
         return mybusinessbusinessinformation.Location{}, "", nil
     }
 
+    // TODO: [INT-89] add metrics to track frequency of multiple accounts and locations
+    if len(accounts) > 1 {
+        g.log.Warn("User has multiple Google business accounts. Using the first one")
+    }
+
     businessInfoClient, err := mybusinessbusinessinformation.NewService(context.Background(), option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
 
     accountId := accounts[0].Name
-    g.log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", accountId)
     locationsGoogleReq := businessInfoClient.Accounts.Locations.List(accountId)
-    g.log.Debug("list locations googleReq is ", jsonUtil.AnyToJson(locationsGoogleReq))
-    locationsResp, err := locationsGoogleReq.Do(googleapi.QueryParameter("readMask", "name,title,storeCode,languageCode,categories,labels,openInfo,relationshipData,serviceItems"))
+    locationsResp, err := locationsGoogleReq.Do(googleapi.QueryParameter("readMask", "name,title,storeCode,languageCode,categories,labels,openInfo,relationshipData"))
     if err != nil {
-        g.log.Error("Error listing Google business locations: ", err)
-        g.log.Error("Error details: ", jsonUtil.AnyToJson(err))
-        g.log.Error("response is ", jsonUtil.AnyToJson(locationsResp))
+        g.log.Errorf("Error listing Google business locations in GetBusinessLocation() with request %s: %s", jsonUtil.AnyToJson(locationsGoogleReq), err)
         return mybusinessbusinessinformation.Location{}, "", err
     }
 
     locations := locationsResp.Locations
     g.log.Debug("Retrieved locations: ", jsonUtil.AnyToJson(locations))
 
-    // TODO: [INT-89] add metrics to track frequency of multiple accounts and locations
-    if len(locations) > 1 {
-        g.log.Warnf("User has multiple Google business locations %s. Using the first one", jsonUtil.AnyToJson(locations))
+    if len(locations) == 0 {
+        g.log.Warn("User has no Google business locations under account ", accountId)
+        return mybusinessbusinessinformation.Location{}, accountId, nil
     }
 
-    return *locationsResp.Locations[0], accountId, nil
+    // TODO: [INT-89] add metrics to track frequency of multiple accounts and locations
+    if len(locations) > 1 {
+        g.log.Warnf("User has multiple Google business locations. Using the first one %s", jsonUtil.AnyToJson(locations[0]))
+    }
+
+    return *locations[0], accountId, nil
 }

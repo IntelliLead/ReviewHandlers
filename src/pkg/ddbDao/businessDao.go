@@ -33,23 +33,19 @@ func NewBusinessDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *Busin
 // 1. Business already exist BusinessAlreadyExistException
 // 2. aws error
 func (b *BusinessDao) CreateBusiness(Business model.Business) error {
-    b.log.Debug("Putting Business in DDB if not exist: ", Business)
-
-    av, err := b.businessMarshalMap(Business)
+    av, err := b.marshalMap(Business)
     if err != nil {
         return err
     }
 
-    // Execute the PutItem operation
-    b.log.Debug("Executing PutItem operation in DDB")
-
-    _, err = b.client.PutItem(&dynamodb.PutItemInput{
+    putItemInput := dynamodb.PutItemInput{
         TableName:           aws.String(enum.TableBusiness.String()),
         Item:                av,
         ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-    })
+    }
+    _, err = b.client.PutItem(&putItemInput)
     if err != nil {
-        b.log.Debug("Error putting Business in DDB: ", err)
+        b.log.Debugf("Error putting Business %s in DDB: %v", jsonUtil.AnyToJson(putItemInput), err)
 
         if awsErr, ok := err.(awserr.Error); ok {
             if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
@@ -60,8 +56,6 @@ func (b *BusinessDao) CreateBusiness(Business model.Business) error {
         }
         return err
     }
-
-    b.log.Debug("Successfully put new business in DDB: ", jsonUtil.AnyToJson(Business))
 
     return nil
 }
@@ -93,7 +87,7 @@ func (b *BusinessDao) GetBusiness(BusinessId string) (*model.Business, error) {
     return &business, nil
 }
 
-func (b *BusinessDao) businessMarshalMap(Business model.Business) (map[string]*dynamodb.AttributeValue, error) {
+func (b *BusinessDao) marshalMap(Business model.Business) (map[string]*dynamodb.AttributeValue, error) {
     // Marshal the Business object into a DynamoDB attribute value map
     av, err := dynamodbattribute.MarshalMap(Business)
     if err != nil {
