@@ -4,6 +4,7 @@ import (
     "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
+    "reflect"
     "strings"
 )
 
@@ -14,6 +15,7 @@ type AttributeAction struct {
 }
 
 // NewAttributeAction creates a new AttributeAction with data validation and normalization
+// if ActionAppendStringSet, value must be a slice
 func NewAttributeAction(action enum.Action, name string, value interface{}) (AttributeAction, error) {
     aa := AttributeAction{
         Action: action,
@@ -44,9 +46,8 @@ func NewAttributeAction(action enum.Action, name string, value interface{}) (Att
 }
 
 func (a *AttributeAction) validate() error {
-    if a.Action == enum.ActionAppend {
-        // assert value is slice
-        if _, ok := a.Value.([]interface{}); !ok {
+    if a.Action == enum.ActionAppendStringSet {
+        if reflect.TypeOf(a.Value).Kind() != reflect.Slice {
             return errors.New(fmt.Sprintf("Value for append action must be a slice, got %T", a.Value))
         }
     }

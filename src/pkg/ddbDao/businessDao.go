@@ -1,6 +1,7 @@
 package ddbDao
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
@@ -31,24 +32,24 @@ func NewBusinessDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *Busin
 // error handling
 // 1. Business already exist BusinessAlreadyExistException
 // 2. aws error
-func (d *BusinessDao) CreateBusiness(Business model.Business) error {
-    d.log.Debug("Putting Business in DDB if not exist: ", Business)
+func (b *BusinessDao) CreateBusiness(Business model.Business) error {
+    b.log.Debug("Putting Business in DDB if not exist: ", Business)
 
-    av, err := BusinessMarshalMap(Business)
+    av, err := b.businessMarshalMap(Business)
     if err != nil {
         return err
     }
 
     // Execute the PutItem operation
-    d.log.Debug("Executing PutItem operation in DDB")
+    b.log.Debug("Executing PutItem operation in DDB")
 
-    _, err = d.client.PutItem(&dynamodb.PutItemInput{
+    _, err = b.client.PutItem(&dynamodb.PutItemInput{
         TableName:           aws.String(enum.TableBusiness.String()),
         Item:                av,
         ConditionExpression: aws.String(KeyNotExistsConditionExpression),
     })
     if err != nil {
-        d.log.Debug("Error putting Business in DDB: ", err)
+        b.log.Debug("Error putting Business in DDB: ", err)
 
         if awsErr, ok := err.(awserr.Error); ok {
             if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
@@ -60,42 +61,39 @@ func (d *BusinessDao) CreateBusiness(Business model.Business) error {
         return err
     }
 
-    d.log.Debug("Successfully put new business in DDB: ", Business)
+    b.log.Debug("Successfully put new business in DDB: ", jsonUtil.AnyToJson(Business))
 
     return nil
 }
 
 // GetBusiness gets a Business with the given BusinessId from the Business table
 // If the Business does not exist, returns nil, nil
-func (d *BusinessDao) GetBusiness(BusinessId string) (*model.Business, error) {
-    response, err := d.client.GetItem(&dynamodb.GetItemInput{
+func (b *BusinessDao) GetBusiness(BusinessId string) (*model.Business, error) {
+    response, err := b.client.GetItem(&dynamodb.GetItemInput{
         TableName: aws.String(enum.TableBusiness.String()),
         Key:       model.BuildDdbBusinessKey(BusinessId),
     })
     if err != nil {
-        d.log.Errorf("Unable to get item with BusinessId '%s' in GetBusiness: %v", BusinessId, err)
-
-        switch err.(type) {
-        case *dynamodb.ResourceNotFoundException:
-            return nil, nil
-        }
-
-        d.log.Error("Unknown error in GetBusiness: ", err)
+        b.log.Errorf("Unable to get item with BusinessId '%s' in GetBusiness: %v", BusinessId, err)
         return nil, exception.NewUnknownDDBException(fmt.Sprintf("GetBusiness failed for BusinessId '%s' with unknown error: ", BusinessId), err)
     }
 
-    var business *model.Business
-    err = dynamodbattribute.UnmarshalMap(response.Item, business)
+    if response.Item == nil {
+        return nil, nil
+    }
+
+    var business model.Business
+    err = dynamodbattribute.UnmarshalMap(response.Item, &business)
     if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to Business object in GetBusiness: %v",
+        b.log.Errorf("Unable to unmarshal from DDB response '%s' to Business object in GetBusiness: %v",
             jsonUtil.AnyToJson(response.Item), err)
         return nil, err
     }
 
-    return business, nil
+    return &business, nil
 }
 
-func BusinessMarshalMap(Business model.Business) (map[string]*dynamodb.AttributeValue, error) {
+func (b *BusinessDao) businessMarshalMap(Business model.Business) (map[string]*dynamodb.AttributeValue, error) {
     // Marshal the Business object into a DynamoDB attribute value map
     av, err := dynamodbattribute.MarshalMap(Business)
     if err != nil {
@@ -125,7 +123,7 @@ func BusinessMarshalMap(Business model.Business) (map[string]*dynamodb.Attribute
 //         Value:  []string{"keyword1", "keyword2"},
 //     }
 // }    )
-func (d *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.AttributeAction) (model.Business, error) {
+func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.AttributeAction) (model.Business, error) {
     err := dbModel.ValidateUniqueAttributeNames(actions)
     if err != nil {
         return model.Business{}, err
@@ -140,19 +138,23 @@ func (d *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.Attr
         case enum.ActionUpdate:
             updateBuilder = updateBuilder.Set(expression.Name(action.Name), expression.Value(action.Value))
 
-        case enum.ActionAppend:
-            updateBuilder = updateBuilder.Set(expression.Name(action.Name), expression.ListAppend(expression.Name(action.Name), expression.Value(action.Value)))
+        case enum.ActionAppendStringSet:
+            addSet := (&dynamodb.AttributeValue{}).SetSS(aws.StringSlice(action.Value.([]string)))
+            updateBuilder = updateBuilder.Add(expression.Name(action.Name), expression.Value(addSet))
+
+        default:
+            b.log.Errorf("Unsupported action '%s' in businessDao.UpdateAttributes", action.Action)
+            return model.Business{}, errors.New(fmt.Sprintf("Unsupported action '%s' in userDao.UpdateAttributes", action.Action))
         }
     }
 
     expr, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
     if err != nil {
-        d.log.Errorf("Unable to build expression for UpdateItem in UpdateAttributes: %v", err)
+        b.log.Errorf("Unable to build expression for UpdateItem in UpdateAttributes: %v", err)
         return model.Business{}, err
     }
 
     allNewStr := dynamodb.ReturnValueAllNew
-    // Execute the UpdateItem operation
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableBusiness.String()),
         Key:                       model.BuildDdbBusinessKey(BusinessId),
@@ -161,17 +163,16 @@ func (d *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.Attr
         ExpressionAttributeValues: expr.Values(),
         ReturnValues:              &allNewStr,
     }
-    d.log.Debugf("DDB UpdateItem input: %s", jsonUtil.AnyToJson(ddbInput))
-    response, err := d.client.UpdateItem(ddbInput)
+    response, err := b.client.UpdateItem(ddbInput)
     if err != nil {
-        d.log.Errorf("DDB UpdateItem failed in UpdateAttributes with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
+        b.log.Errorf("DDB UpdateItem failed in UpdateAttributes with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
         return model.Business{}, err
     }
 
     var Business model.Business
     err = dynamodbattribute.UnmarshalMap(response.Attributes, &Business)
     if err != nil {
-        d.log.Errorf("Unable to unmarshal from DDB response '%s' to Business object in UpdateAttributes: %v",
+        b.log.Errorf("Unable to unmarshal from DDB response '%s' to Business object in UpdateAttributes: %v",
             jsonUtil.AnyToJson(response.Attributes), err)
         return model.Business{}, err
     }

@@ -2,7 +2,6 @@ package googleUtil
 
 import (
     "context"
-    "errors"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -21,11 +20,38 @@ import (
 
 type Google struct {
     config oauth2.Config
-    token  *oauth2.Token
+    Token  oauth2.Token
     log    *zap.SugaredLogger
 }
 
-func NewGoogle(logger *zap.SugaredLogger) (*Google, error) {
+func NewGoogleWithAuthCode(logger *zap.SugaredLogger, authCode string) (*Google, error) {
+    googleClient, err := newGoogle(logger)
+    if err != nil {
+        return &Google{}, err
+    }
+
+    token, err := googleClient.ExchangeToken(authCode)
+    if err != nil {
+        logger.Error("Unable to retrieve token from web: ", err)
+        return &Google{}, err
+    }
+
+    googleClient.Token = token
+
+    return googleClient, nil
+}
+
+func NewGoogleWithToken(logger *zap.SugaredLogger, token oauth2.Token) (*Google, error) {
+    googleClient, err := newGoogle(logger)
+    if err != nil {
+        return &Google{}, err
+    }
+
+    googleClient.Token = token
+    return googleClient, nil
+}
+
+func newGoogle(logger *zap.SugaredLogger) (*Google, error) {
     // TODO: [INT-84] use Lambda extension to cache and fetch auth redirect URL
     // retrieve from SSM parameter store
     authRedirectUrlParameterName := os.Getenv(util.AuthRedirectUrlParameterNameEnvKey)
@@ -64,21 +90,17 @@ func (g *Google) ExchangeToken(code string) (oauth2.Token, error) {
         return oauth2.Token{}, err
     }
 
-    g.token = token
+    g.Token = *token
 
     return *token, nil
 }
 
 func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
-    if g.token == nil {
-        return nil, errors.New("token is not set. Call ExchangeToken first")
-    }
-
-    g.log.Debug("Getting Google user info with token: ", jsonUtil.AnyToJson(g.token))
+    g.log.Debug("Getting Google user info with token: ", jsonUtil.AnyToJson(g.Token))
 
     ctx := context.Background()
     googleOauthClient, err := googleOauth.NewService(ctx,
-        option.WithTokenSource(g.config.TokenSource(ctx, g.token)))
+        option.WithTokenSource(g.config.TokenSource(ctx, &g.Token)))
     if err != nil {
         g.log.Errorf("Error creating Google OAUTH client in GetGoogleUserInfo(): %s", err)
         return nil, err
@@ -101,12 +123,8 @@ func (g *Google) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
 
 // GetBusinessLocation retrieves the business location for the user and account ID
 func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, string, error) {
-    if g.token == nil {
-        return mybusinessbusinessinformation.Location{}, "", errors.New("token is not set. Call ExchangeToken first")
-    }
-
     mybusinessaccountmanagementService, err := mybusinessaccountmanagement.NewService(context.Background(),
-        option.WithTokenSource(g.config.TokenSource(context.Background(), g.token)))
+        option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
     if err != nil {
         g.log.Error("Error creating Google business account management service client: ", err)
         return mybusinessbusinessinformation.Location{}, "", err
@@ -135,7 +153,7 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
         return mybusinessbusinessinformation.Location{}, "", nil
     }
 
-    businessInfoClient, err := mybusinessbusinessinformation.NewService(context.Background(), option.WithTokenSource(g.config.TokenSource(context.Background(), g.token)))
+    businessInfoClient, err := mybusinessbusinessinformation.NewService(context.Background(), option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
 
     accountId := accounts[0].Name
     g.log.Debug("Using resp.Accounts[0].Name for list locations request, it is ", accountId)

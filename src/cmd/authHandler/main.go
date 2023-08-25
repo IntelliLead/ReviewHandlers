@@ -78,7 +78,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     log.Info("Received OAUTH request from user: ", userId)
 
     // ----
-    // 0. Check if user exists
+    // 1. Check if user exists
     // ----
     mySession := session.Must(session.NewSession())
     userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
@@ -94,7 +94,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
     }
 
-    google, err := googleUtil.NewGoogle(log)
+    google, err := googleUtil.NewGoogleWithAuthCode(log, code)
     if err != nil {
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,
@@ -102,18 +102,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, err
     }
 
-    // ----
-    // 1. exchange code for token
-    // ----
-    token, err := google.ExchangeToken(code)
-    if err != nil {
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Error exchanging code for token"}`,
-        }, err
-    }
-
-    log.Debug("Google token: ", jsonUtil.AnyToJson(token))
+    log.Debug("Google token: ", jsonUtil.AnyToJson(google.Token))
 
     // ----
     // 2. Check if business exists
@@ -137,23 +126,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             Body:       `{"error": "Error retrieving business"}`,
         }, err
     }
-    if business == nil {
-        log.Infof("Business %s does not exist. Creating.", businessId)
-    }
 
     /*
        scenarios:
-        1. user have this business and business exists: update business Google token
+        1. user have this business and business exists: update Google token for business
         2. user does not have this business and business exists: add user to business (secondary user or not first time login)
         3. user does not have this business and business does not exist: create new business for user (primary user)
 
         Other scenarios are error state
     */
-
     if business != nil && util.StringInSlice(userId, business.UserIds) && util.StringInSlice(businessId, user.BusinessIds) {
         log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
 
-        actions, err := buildUpdateTokenAttributeActions(token)
+        actions, err := buildUpdateTokenAttributeActions(google.Token)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
@@ -173,7 +158,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Infof("User %s does not have association with business %s yet. Adding user to business.", userId, businessId)
 
         // add user to business and update business Google token
-        userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "userIds", []string{userId})
+        userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})
         if err != nil {
             log.Errorf("Error building user id append action: %s", err)
             return events.LambdaFunctionURLResponse{
@@ -181,7 +166,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
                 Body:       `{"error": "Error building user id append action"}`,
             }, err
         }
-        tokenActions, err := buildUpdateTokenAttributeActions(token)
+        tokenActions, err := buildUpdateTokenAttributeActions(google.Token)
         if err != nil {
             log.Errorf("Error building update token attribute actions: %s", err)
             return events.LambdaFunctionURLResponse{
@@ -201,7 +186,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
 
         // add business to user
-        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "businessIds", []string{businessId})
+        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId})
         if err != nil {
             log.Errorf("Error building business id append action: %s", err)
             return events.LambdaFunctionURLResponse{
@@ -240,9 +225,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             location.Title,
             model.Google{
                 Id:                  userInfo.Id,
-                AccessToken:         token.AccessToken,
-                AccessTokenExpireAt: token.Expiry,
-                RefreshToken:        token.RefreshToken,
+                AccessToken:         google.Token.AccessToken,
+                AccessTokenExpireAt: google.Token.Expiry,
+                RefreshToken:        google.Token.RefreshToken,
                 ProfileFullName:     userInfo.Name,
                 Email:               userInfo.Email,
                 ImageUrl:            userInfo.Picture,
@@ -261,7 +246,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
 
         // associate business with user
-        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppend, "businessIds", []string{businessId})
+        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId})
         if err != nil {
             log.Errorf("Error building business id append action: %s", err)
             return events.LambdaFunctionURLResponse{

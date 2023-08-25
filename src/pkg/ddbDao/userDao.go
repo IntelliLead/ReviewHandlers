@@ -1,6 +1,7 @@
 package ddbDao
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
@@ -157,6 +158,14 @@ func (d *UserDao) UpdateAttributes(userId string, actions []dbModel.AttributeAct
 
         case enum.ActionUpdate:
             updateBuilder = updateBuilder.Set(expression.Name(attribute), expression.Value(action.Value))
+
+        case enum.ActionAppendStringSet:
+            addSet := (&dynamodb.AttributeValue{}).SetSS(aws.StringSlice(action.Value.([]string)))
+            updateBuilder = updateBuilder.Add(expression.Name(action.Name), expression.Value(addSet))
+
+        default:
+            d.log.Errorf("Unsupported action '%s' in userDao.UpdateAttributes", action.Action)
+            return model.User{}, errors.New(fmt.Sprintf("Unsupported action '%s' in userDao.UpdateAttributes", action.Action))
         }
     }
 
