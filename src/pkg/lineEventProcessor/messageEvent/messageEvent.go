@@ -3,6 +3,7 @@ package messageEvent
 import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -117,13 +118,13 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(quickReplyMessage) {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "quickReplyMessage"},
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "quickReplyMessage"},
                 // disable depending features
                 {Action: enum.ActionUpdate, Name: "autoQuickReplyEnabled", Value: false},
             })
         } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
                 {Action: enum.ActionUpdate, Name: "quickReplyMessage", Value: quickReplyMessage},
             })
         }
@@ -176,21 +177,21 @@ func ProcessMessageEvent(event *linebot.Event,
                 }, err
             }
 
-            attributeActions := []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "businessDescription"},
+            attributeActions := []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "businessDescription"},
                 // disable depending features
                 {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
             }
 
             // disable depending features
             if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
-                attributeActions = append(attributeActions, ddbDao.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
+                attributeActions = append(attributeActions, dbModel.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
             }
 
             updatedUser, err = userDao.UpdateAttributes(userId, attributeActions)
 
         } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
                 {Action: enum.ActionUpdate, Name: "businessDescription", Value: businessDescription},
             })
         }
@@ -235,14 +236,14 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(signature) {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "signature"},
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "signature"},
                 // disable depending features
                 {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: false},
             })
 
         } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
                 {Action: enum.ActionUpdate, Name: "signature", Value: signature},
             })
         }
@@ -287,13 +288,13 @@ func ProcessMessageEvent(event *linebot.Event,
         var updatedUser model.User
         var err error
         if util.IsEmptyString(keywords) {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "keywords"},
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "keywords"},
                 // disable depending features
                 {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
             })
         } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
                 {Action: enum.ActionUpdate, Name: "keywords", Value: keywords},
             })
         }
@@ -347,18 +348,18 @@ func ProcessMessageEvent(event *linebot.Event,
                 }, err
             }
 
-            actions := []ddbDao.AttributeAction{
-                {Action: enum.ActionDelete, Name: "serviceRecommendation"},
+            actions := []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "serviceRecommendation"},
             }
 
             if util.IsEmptyStringPtr(user.BusinessDescription) {
-                actions = append(actions, ddbDao.AttributeAction{
+                actions = append(actions, dbModel.AttributeAction{
                     Action: enum.ActionUpdate, Name: "ServiceRecommendationEnabled", Value: false})
             }
 
             updatedUser, err = userDao.UpdateAttributes(userId, actions)
         } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []ddbDao.AttributeAction{
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
                 {Action: enum.ActionUpdate, Name: "serviceRecommendation", Value: serviceRecommendation},
             })
         }

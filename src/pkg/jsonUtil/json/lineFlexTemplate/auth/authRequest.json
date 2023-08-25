@@ -33,7 +33,7 @@
                 "action": {
                     "type": "uri",
                     "label": "好的",
-                    "uri": "https://accounts.google.com/o/oauth2/v2/auth?openExternalBrowser=1&redirect_uri=https://developers.google.com/oauthplayground&client_id=285556284401-duuhainiju04kfn9bdrme18fvq9f2v8g.apps.googleusercontent.com&response_type=code&scope=https://www.googleapis.com/auth/business.manage&access_type=offline&include_granted_scopes=true&login_hint=onboard@tryintellilead.com&prompt=consent"
+                    "uri": "https://accounts.google.com/o/oauth2/v2/auth?openExternalBrowser=1&redirect_uri=https://developers.google.com/oauthplayground&client_id=285556284401-duuhainiju04kfn9bdrme18fvq9f2v8g.apps.googleusercontent.com&response_type=code&scope=https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/userinfo.profile email&access_type=offline&include_granted_scopes=true&prompt=consent&state=USER_ID"
                 },
                 "adjustMode": "shrink-to-fit",
                 "color": "#445783"

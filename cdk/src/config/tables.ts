@@ -22,6 +22,7 @@ export interface DynamoDbTableAttribute {
 export enum TableName {
     REVIEW = 'Review',
     USER = 'User',
+    BUSINESS = 'Business',
 }
 
 const reviewTable: DynamoDbTableAttribute = {
@@ -110,4 +111,34 @@ const userTable: DynamoDbTableAttribute = {
     billingMode: BillingMode.PAY_PER_REQUEST,
 };
 
-export const Tables: DynamoDbTableAttribute[] = [reviewTable, userTable];
+const businessTable: DynamoDbTableAttribute = {
+    tableName: TableName.BUSINESS,
+    partitionKey: {
+        name: 'businessId',
+        type: AttributeType.STRING,
+    },
+    sortKey: {
+        name: 'uniqueId',
+        type: AttributeType.STRING,
+    },
+    localSecondaryIndexes: [
+        {
+            indexName: 'createdAt-lsi',
+            projectionType: ProjectionType.ALL,
+            sortKey: {
+                name: 'createdAt',
+                type: AttributeType.NUMBER,
+            },
+        },
+        {
+            indexName: 'lastUpdated-lsi',
+            projectionType: ProjectionType.ALL,
+            sortKey: {
+                name: 'lastUpdated',
+                type: AttributeType.NUMBER,
+            },
+        },
+    ],
+    billingMode: BillingMode.PAY_PER_REQUEST,
+};
+export const Tables: DynamoDbTableAttribute[] = [reviewTable, userTable, businessTable];
