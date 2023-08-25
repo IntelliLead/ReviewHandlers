@@ -142,7 +142,7 @@ func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
         l.log.Error("Error building flex message in RequestAuth: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("智引力請求讀取 Google", flexMessage)).Do()
+    resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("智引力請求訪問 Google 資料", flexMessage)).Do()
     if err != nil {
         l.log.Error("Error sending message in RequestAuth: ", err)
         return err
