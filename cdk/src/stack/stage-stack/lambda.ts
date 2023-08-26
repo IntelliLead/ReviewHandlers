@@ -53,7 +53,7 @@ export class LambdaStack extends Stack {
         this.createWebhookHandler('newReviewEventHandler');
 
         const authRedirectUrlParameterName = '/auth/authRedirectUrl';
-        const authHandler = this.createWebhookHandler('AuthHandler', {
+        const authHandler = this.createWebhookHandler('authHandler', {
             AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
         });
 
