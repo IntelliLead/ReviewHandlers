@@ -15,8 +15,10 @@ import (
 
 // ProcessMessageEvent processes a message event from LINE
 // It returns a LambdaFunctionURLResponse and an error
-func ProcessMessageEvent(event *linebot.Event,
+func ProcessMessageEvent(
+    event *linebot.Event,
     userId string,
+    businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
@@ -165,64 +167,15 @@ func ProcessMessageEvent(event *linebot.Event,
         // process update quick reply message request
         businessDescription := args
 
-        // update DDB
-        var updatedUser model.User
-        var err error
-        if util.IsEmptyString(businessDescription) {
-            user, err := userDao.GetUser(userId)
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to get user: %s"}`, err),
-                }, err
-            }
-
-            attributeActions := []dbModel.AttributeAction{
-                {Action: enum.ActionRemove, Name: "businessDescription"},
-                // disable depending features
-                {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
-            }
-
-            // disable depending features
-            if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
-                attributeActions = append(attributeActions, dbModel.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
-            }
-
-            updatedUser, err = userDao.UpdateAttributes(userId, attributeActions)
-
-        } else {
-            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
-                {Action: enum.ActionUpdate, Name: "businessDescription", Value: businessDescription},
-            })
-        }
+        err := HandleBusinessDescriptionUpdate(userId, event.ReplyToken, businessDescription, userDao, businessDao, line, log)
         if err != nil {
             log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
-
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update business description failed: %s"}`, err),
-                }, err
-            }
-            log.Error("Successfully notified user of update business description failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update business description: %s"}`, err),
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
-        if err != nil {
-            log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
-            }, err
-        }
-
-        log.Infof("Successfully processed update business description request for user '%s'", userId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Body:       `{"message": "Successfully processed update business description request"}`,

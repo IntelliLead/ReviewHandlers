@@ -86,12 +86,33 @@ func newGptClient() *openai.Client {
     return openai.NewClient(secrets.GptApiKey)
 }
 
-func (ai *Ai) buildPrompt(user model.User) string {
+func (ai *Ai) buildPrompt(user model.User, business *model.Business) string {
+    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+    var businessId string
+    var businessDescription, keywords *string
+    var keywordEnabled bool
+    if business != nil {
+        businessId = business.BusinessId
+        businessDescription = business.BusinessDescription
+        keywords = business.Keywords
+        keywordEnabled = business.KeywordEnabled
+    } else {
+        businessId = "nil"
+        businessDescription = user.BusinessDescription
+        keywords = user.Keywords
+        if user.KeywordEnabled == nil {
+            ai.log.Errorf("Invalid state: KeywordEnabled is nil for user %s, but there is no business entity for user", user.UserId)
+            keywordEnabled = false
+        } else {
+            keywordEnabled = *user.KeywordEnabled
+        }
+    }
+
     businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
 
     // business prompt
-    if !util.IsEmptyStringPtr(user.BusinessDescription) {
-        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *user.BusinessDescription)
+    if !util.IsEmptyStringPtr(businessDescription) {
+        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *businessDescription)
     }
 
     // emoji prompt
@@ -110,11 +131,11 @@ func (ai *Ai) buildPrompt(user model.User) string {
     }
 
     // keyword prompt
-    if *user.KeywordEnabled {
-        if util.IsEmptyStringPtr(user.Keywords) {
-            ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
+    if keywordEnabled {
+        if util.IsEmptyStringPtr(keywords) {
+            ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", businessId, user.UserId)
         } else {
-            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *user.Keywords)
+            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *keywords)
         }
     }
 

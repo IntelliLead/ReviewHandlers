@@ -57,6 +57,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // DDB
     mySession := session.Must(session.NewSession())
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
 
@@ -103,7 +104,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         switch event.Type {
         case linebot.EventTypeMessage:
             log.Info("Received Message event")
-            return messageEvent.ProcessMessageEvent(event, userId, userDao, reviewDao, line, log)
+            return messageEvent.ProcessMessageEvent(event, userId, businessDao, userDao, reviewDao, line, log)
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")

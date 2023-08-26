@@ -43,6 +43,7 @@ func ProcessFollowEvent(event *linebot.Event,
     }
 
     // if not exists, create new user in DB
+    // TODO: move to authHandler
     user := model.NewUser(userId, lineUserProfile, event.Timestamp)
     err = userDao.CreateUser(user)
     if err != nil {

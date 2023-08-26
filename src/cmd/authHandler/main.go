@@ -132,6 +132,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         1. user have this business and business exists: update Google token for business
         2. user does not have this business and business exists: add user to business (secondary user or not first time login)
         3. user does not have this business and business does not exist: create new business for user (primary user)
+            1. Also backfill from user table if user exists
 
         Other scenarios are error state
     */
@@ -235,6 +236,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             },
             userId,
         )
+
+        // TODO: [INT-91] remove back-fill logic once back-fill is completed
+        if user.KeywordEnabled != nil {
+            backfillBusinessFromUser(&business, user)
+        }
+
         err = businessDao.CreateBusiness(business)
         if err != nil {
             log.Errorf("Error creating business object %v: %v", business, err)
@@ -293,4 +300,11 @@ func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAc
     }
 
     return []dbModel.AttributeAction{accessTokenAction, accessTokenExpireAtAction, refreshTokenAction}, nil
+}
+
+// backfillBusinessFromUser in-place backfills business attributes from user
+func backfillBusinessFromUser(business *model.Business, user model.User) {
+    business.BusinessDescription = user.BusinessDescription
+    business.Keywords = user.Keywords
+    business.KeywordEnabled = *user.KeywordEnabled
 }
