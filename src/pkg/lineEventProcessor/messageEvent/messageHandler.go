@@ -101,7 +101,7 @@ func handleBusinessDescriptionUpdate(
 
     // update DDB
     var updatedUser model.User
-    var updatedBusiness *model.Business
+    updatedBusiness := &model.Business{}
     if util.IsEmptyString(businessDescription) {
         removeBusinessDescriptionAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "businessDescription", nil)
         if err != nil {
@@ -261,8 +261,7 @@ func handleUpdateKeywords(
 
         return &updatedUser, nil, nil
     } else {
-
-        var updatedBusiness *model.Business
+        updatedBusiness := &model.Business{}
         if util.IsEmptyString(keywords) {
             removeKeywordsAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "keywords", nil)
             if err != nil {

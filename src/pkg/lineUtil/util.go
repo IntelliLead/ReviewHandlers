@@ -155,10 +155,6 @@ func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, qu
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(autoQuickReplyEnabled)
 
-    // DEBUG
-    l.log.Debug("user.AutoQuickReplyEnabled: ", autoQuickReplyEnabled)
-    l.log.Debug("end jsonMap in buildQuickReplySettingsFlexMessage: ", jsonUtil.AnyToJson(jsonMap))
-
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 

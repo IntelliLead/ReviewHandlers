@@ -227,8 +227,6 @@ func (l *Line) NotifyUserCannotUseLineEmoji(replyToken string) (*linebot.BasicRe
 
 func (l *Line) ParseRequest(request *events.LambdaFunctionURLRequest) ([]*linebot.Event, error) {
     httpRequest := convertToHttpRequest(request)
-    l.log.Debug("wrapped HTTP request is: ", request)
-
     return l.lineClient.ParseRequest(httpRequest)
 }
 
