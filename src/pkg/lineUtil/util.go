@@ -122,7 +122,7 @@ type message struct {
     Type linebot.MessageType `json:"type"`
 }
 
-func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, quickReplyMessage *string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
     if err != nil {
         l.log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
@@ -130,22 +130,22 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.Flex
     }
 
     // update quick reply message text box
-    quickReplyMessage := " "
-    if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
-        quickReplyMessage = *user.QuickReplyMessage
+    quickReplyMessageDisplayed := " "
+    if !util.IsEmptyStringPtr(quickReplyMessage) {
+        quickReplyMessageDisplayed = *quickReplyMessage
     }
     // body -> contents[2] -> contents[1] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[0].
-    (map[string]interface{})["text"] = quickReplyMessage
+    (map[string]interface{})["text"] = quickReplyMessageDisplayed
     // body -> contents[2] -> contents[1] -> action -> fillInText
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["action"].
-    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessage
+    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessageDisplayed
 
     // update auto quick reply toggle
     // body -> contents[3] -> contents[0] -> contents[1] -> url
@@ -153,10 +153,10 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.Flex
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["url"] = util.GetToggleUrl(user.AutoQuickReplyEnabled)
+    (map[string]interface{})["url"] = util.GetToggleUrl(autoQuickReplyEnabled)
 
     // DEBUG
-    l.log.Debug("user.AutoQuickReplyEnabled: ", user.AutoQuickReplyEnabled)
+    l.log.Debug("user.AutoQuickReplyEnabled: ", autoQuickReplyEnabled)
     l.log.Debug("end jsonMap in buildQuickReplySettingsFlexMessage: ", jsonUtil.AnyToJson(jsonMap))
 
     return l.jsonMapToLineFlexContainer(jsonMap)

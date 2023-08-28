@@ -1,12 +1,8 @@
 package lineEventProcessor
 
 import (
-    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -34,33 +30,31 @@ func ProcessFollowEvent(event *linebot.Event,
         log.Debug("Successfully notified Slack channel of new user follow event")
     }
 
-    // get LINE username
-    lineUserProfile, err := line.GetUser(userId)
-    if err != nil {
-        log.Error("Error getting LINE user profile:", err)
-    } else {
-        log.Debug("Successfully retrieved LINE user profile:", jsonUtil.AnyToJson(lineUserProfile))
-    }
+    // // get LINE username
+    // lineUserProfile, err := line.GetUser(userId)
+    // if err != nil {
+    //     log.Error("Error getting LINE user profile:", err)
+    // } else {
+    //     log.Debug("Successfully retrieved LINE user profile:", jsonUtil.AnyToJson(lineUserProfile))
+    // }
 
-    // if not exists, create new user in DB
-    // TODO: move to authHandler
-    user := model.NewUser(userId, lineUserProfile, event.Timestamp)
-    err = userDao.CreateUser(user)
-    if err != nil {
-        if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
-            log.Info("User already exists. No action taken on Follow event:", userAlreadyExistErr.Error())
-            // return 200 OK
-        } else {
-            log.Error("Error creating user:", err)
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to create user: %s"}`, err),
-            }, nil
-        }
-    }
-
-    log.Debug("Successfully created new user in DB from Follow event:", user)
+    // // if not exists, create new user in DB
+    // // TODO: move to authHandler
+    // user := model.NewUser(userId, lineUserProfile, event.Timestamp)
+    // err = userDao.CreateUser(user)
+    // if err != nil {
+    //     if userAlreadyExistErr, ok := err.(*exception.UserAlreadyExistException); ok {
+    //         log.Info("User already exists. No action taken on Follow event:", userAlreadyExistErr.Error())
+    //         // return 200 OK
+    //     } else {
+    //         log.Error("Error creating user:", err)
+    //
+    //         return events.LambdaFunctionURLResponse{
+    //             StatusCode: 500,
+    //             Body:       fmt.Sprintf(`{"error": "Failed to create user: %s"}`, err),
+    //         }, nil
+    //     }
+    // }
 
     log.Info("Successfully handled Follow event for user: ", userId)
 

@@ -82,8 +82,8 @@ func (l *Line) SendNewReview(review model.Review, user model.User) error {
     return nil
 }
 
-func (l *Line) ShowQuickReplySettings(replyToken string, user model.User) error {
-    flexMessage, err := l.buildQuickReplySettingsFlexMessage(user)
+func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled bool, quickReplyMessage *string) error {
+    flexMessage, err := l.buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled, quickReplyMessage)
     if err != nil {
         l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)
     }
@@ -94,7 +94,7 @@ func (l *Line) ShowQuickReplySettings(replyToken string, user model.User) error 
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings: %s", jsonUtil.AnyToJson(resp))
 
     return nil
 }

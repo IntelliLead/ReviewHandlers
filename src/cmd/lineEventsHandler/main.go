@@ -7,6 +7,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/postbackEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
@@ -113,7 +114,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
         case linebot.EventTypePostback:
             log.Info("Received Postback event")
-            return lineEventProcessor.ProcessPostbackEvent(event, userId, userDao, reviewDao, line, log)
+            return postbackEvent.ProcessPostbackEvent(event, userId, businessDao, userDao, reviewDao, line, log)
 
         default:
             log.Info("Unhandled event type: ", event.Type)

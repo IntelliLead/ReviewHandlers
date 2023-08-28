@@ -24,10 +24,10 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
     }
 }
 
-func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
+func (ai *Ai) GenerateReply(review string, business *model.Business, user model.User) (string, error) {
     temp := 1.12
 
-    prompt := ai.buildPrompt(user)
+    prompt := ai.buildPrompt(business, user)
     // DEBUG
     ai.log.Debug("AI Reply Prompt: ", prompt)
 
@@ -86,9 +86,9 @@ func newGptClient() *openai.Client {
     return openai.NewClient(secrets.GptApiKey)
 }
 
-func (ai *Ai) buildPrompt(user model.User, business *model.Business) string {
+func (ai *Ai) buildPrompt(business *model.Business, user model.User) string {
     // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    var businessId string
+    businessId := "nil"
     var businessDescription, keywords *string
     var keywordEnabled bool
     if business != nil {
@@ -97,7 +97,6 @@ func (ai *Ai) buildPrompt(user model.User, business *model.Business) string {
         keywords = business.Keywords
         keywordEnabled = business.KeywordEnabled
     } else {
-        businessId = "nil"
         businessDescription = user.BusinessDescription
         keywords = user.Keywords
         if user.KeywordEnabled == nil {

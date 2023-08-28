@@ -23,8 +23,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     stage := os.Getenv(util.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
-    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
-    const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
+    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb" // 今遇良研
+    // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
+    const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie
 
     // --------------------
     // Send Auth Request
@@ -32,6 +33,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     line := lineUtil.NewLine(log)
 
     // send auth request
+    // Supplied via tst SAM template
     authRedirectUrl := os.Getenv(util.AuthRedirectUrlEnvKey)
     err := line.RequestAuth(sendingUserId, authRedirectUrl)
     if err != nil {

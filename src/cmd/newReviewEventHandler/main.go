@@ -75,11 +75,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // validate user exists
     // --------------------
-    isUserExist, user, err := userDao.IsUserExist(review.UserId)
+    user, err := userDao.GetUser(review.UserId)
     if err != nil {
-        log.Error("Error checking if user exists: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
+        log.Error("Error getting user: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
     }
+    isUserExist := userDao.IsUserExist(user)
     if !isUserExist {
         log.Error("User does not exist: ", review.UserId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
