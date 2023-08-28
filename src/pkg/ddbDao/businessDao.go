@@ -14,6 +14,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
+    "time"
 )
 
 type BusinessDao struct {
@@ -117,7 +118,7 @@ func (b *BusinessDao) marshalMap(Business model.Business) (map[string]*dynamodb.
 //         Value:  []string{"keyword1", "keyword2"},
 //     }
 // }    )
-func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.AttributeAction) (model.Business, error) {
+func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.AttributeAction, updatedByUserId string) (model.Business, error) {
     err := dbModel.ValidateUniqueAttributeNames(actions)
     if err != nil {
         return model.Business{}, err
@@ -141,6 +142,11 @@ func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.Attr
             return model.Business{}, errors.New(fmt.Sprintf("Unsupported action '%s' in userDao.UpdateAttributes", action.Action))
         }
     }
+
+    // update audit fields
+    // TODO: [INT-90] use ms instead of s
+    updateBuilder = updateBuilder.Set(expression.Name("lastUpdated"), expression.Value(time.Now().Unix()))
+    updateBuilder = updateBuilder.Set(expression.Name("lastUpdatedBy"), expression.Value(updatedByUserId))
 
     expr, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
     if err != nil {

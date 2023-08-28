@@ -122,7 +122,7 @@ type message struct {
     Type linebot.MessageType `json:"type"`
 }
 
-func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, quickReplyMessage *string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
     if err != nil {
         l.log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
@@ -130,22 +130,22 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.Flex
     }
 
     // update quick reply message text box
-    quickReplyMessage := " "
-    if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
-        quickReplyMessage = *user.QuickReplyMessage
+    quickReplyMessageDisplayed := " "
+    if !util.IsEmptyStringPtr(quickReplyMessage) {
+        quickReplyMessageDisplayed = *quickReplyMessage
     }
     // body -> contents[2] -> contents[1] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[0].
-    (map[string]interface{})["text"] = quickReplyMessage
+    (map[string]interface{})["text"] = quickReplyMessageDisplayed
     // body -> contents[2] -> contents[1] -> action -> fillInText
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["action"].
-    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessage
+    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessageDisplayed
 
     // update auto quick reply toggle
     // body -> contents[3] -> contents[0] -> contents[1] -> url
@@ -153,11 +153,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(user model.User) (linebot.Flex
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["url"] = util.GetToggleUrl(user.AutoQuickReplyEnabled)
-
-    // DEBUG
-    l.log.Debug("user.AutoQuickReplyEnabled: ", user.AutoQuickReplyEnabled)
-    l.log.Debug("end jsonMap in buildQuickReplySettingsFlexMessage: ", jsonUtil.AnyToJson(jsonMap))
+    (map[string]interface{})["url"] = util.GetToggleUrl(autoQuickReplyEnabled)
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
@@ -322,9 +318,26 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-// TODO: [INT-88] source some fields from business
-// func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.Business) (linebot.FlexContainer, error) {
-func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexContainer, error) {
+func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business *model.Business) (linebot.FlexContainer, error) {
+    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+    var businessDescriptionDb *string
+    var keywordEnabledDb bool
+    var keywordsDb *string
+    if business == nil {
+        businessDescriptionDb = user.BusinessDescription
+        if user.KeywordEnabled == nil {
+            l.log.Errorf("User %s has no KeywordEnabled field but has not been backfilled", user.UserId)
+            keywordEnabledDb = false
+        } else {
+            keywordEnabledDb = *user.KeywordEnabled
+        }
+        keywordsDb = user.Keywords
+    } else {
+        businessDescriptionDb = business.BusinessDescription
+        keywordEnabledDb = business.KeywordEnabled
+        keywordsDb = business.Keywords
+    }
+
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
     if err != nil {
@@ -333,12 +346,10 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
 
     // substitute business description
     var businessDescription string
-    // TODO: [INT-88]
-    if util.IsEmptyStringPtr(user.BusinessDescription) {
+    if util.IsEmptyStringPtr(businessDescriptionDb) {
         businessDescription = " "
     } else {
-        // TODO: [INT-88]
-        businessDescription = *user.BusinessDescription
+        businessDescription = *businessDescriptionDb
 
         // update fillInText
         // body -> contents[2] -> contents[2] -> action -> fillInText
@@ -400,16 +411,16 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
         // TODO: [INT-88]
-    (map[string]interface{})["url"] = util.GetToggleUrl(*user.KeywordEnabled)
+    (map[string]interface{})["url"] = util.GetToggleUrl(keywordEnabledDb)
 
     // substitute keywords
     var keywords string
     // TODO: [INT-88]
-    if util.IsEmptyStringPtr(user.Keywords) {
+    if util.IsEmptyStringPtr(keywordsDb) {
         keywords = " "
     } else {
         // TODO: [INT-88]
-        keywords = *user.Keywords
+        keywords = *keywordsDb
 
         // body -> contents[5] -> contents[3] -> action -> fillInText
         jsonMap["body"].

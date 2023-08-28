@@ -68,17 +68,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // DDB
     mySession := session.Must(session.NewSession())
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
 
     // --------------------
     // validate user exists
     // --------------------
-    isUserExist, user, err := userDao.IsUserExist(review.UserId)
+    user, err := userDao.GetUser(review.UserId)
     if err != nil {
-        log.Error("Error checking if user exists: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
+        log.Error("Error getting user: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
     }
+    isUserExist := userDao.IsUserExist(user)
     if !isUserExist {
         log.Error("User does not exist: ", review.UserId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
@@ -127,9 +129,31 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
 
-    if user.AutoQuickReplyEnabled && util.IsEmptyString(review.Review) && review.NumberRating == 5 {
+    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+    var autoQuickReplyEnabled bool
+    var quickReplyMessage string
+    if user.ActiveBusinessId != nil {
+        business, err := businessDao.GetBusiness(*user.ActiveBusinessId)
+        if err != nil {
+            log.Errorf("Error getting business %s: %s", *user.ActiveBusinessId, jsonUtil.AnyToJson(err))
+            return events.LambdaFunctionURLResponse{
+                Body: `{"message": "Error getting business"}`, StatusCode: 500}, err
+        }
+        autoQuickReplyEnabled = business.AutoQuickReplyEnabled
+        quickReplyMessage = *business.QuickReplyMessage
+    } else {
+        if user.AutoQuickReplyEnabled == nil {
+            log.Errorf("User is not backfilled but has no autoQuickReplyEnabled flag: %s", user.UserId)
+            autoQuickReplyEnabled = false
+        } else {
+            autoQuickReplyEnabled = *user.AutoQuickReplyEnabled
+            quickReplyMessage = *user.QuickReplyMessage
+        }
+    }
+
+    if autoQuickReplyEnabled && util.IsEmptyString(review.Review) && review.NumberRating == 5 {
         lambdaReturn, err := lineEventProcessor.ReplyReview(
-            user.UserId, nil, *user.QuickReplyMessage, review, reviewDao, line, log, true)
+            user.UserId, nil, quickReplyMessage, review, reviewDao, line, log, true)
         if err != nil {
             return lambdaReturn, err
         }
