@@ -2,11 +2,8 @@ package googleUtil
 
 import (
     "context"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/ssm"
     "go.uber.org/zap"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
@@ -15,7 +12,6 @@ import (
     "google.golang.org/api/mybusinessbusinessinformation/v1"
     googleOauth "google.golang.org/api/oauth2/v2"
     "google.golang.org/api/option"
-    "os"
 )
 
 type Google struct {
@@ -52,21 +48,10 @@ func NewGoogleWithToken(logger *zap.SugaredLogger, token oauth2.Token) (*Google,
 }
 
 func newGoogle(logger *zap.SugaredLogger) (*Google, error) {
-    // TODO: [INT-84] use Lambda extension to cache and fetch auth redirect URL
-    // retrieve from SSM parameter store
-    authRedirectUrlParameterName := os.Getenv(util.AuthRedirectUrlParameterNameEnvKey)
-    ssmClient := ssm.New(session.Must(session.NewSession()))
-    response, err := ssmClient.GetParameter(&ssm.GetParameterInput{
-        Name: &authRedirectUrlParameterName,
-    })
-    if err != nil {
-        logger.Error("Unable to retrieve auth redirect URL from SSM parameter store: ", err)
-        return &Google{}, err
-    }
+    aws := awsUtil.NewAws(logger)
+    authRedirectUrl, _ := aws.GetAuthRedirectUrl()
 
-    authRedirectUrl := *response.Parameter.Value
-
-    secrets := secret.GetSecrets()
+    secrets := aws.GetSecrets()
     config := oauth2.Config{
         ClientID:     secrets.GoogleClientID,
         ClientSecret: secrets.GoogleClientSecret,

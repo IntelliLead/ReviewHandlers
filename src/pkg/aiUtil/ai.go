@@ -4,9 +4,9 @@ import (
     "context"
     "errors"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/sashabaranov/go-openai"
     "go.uber.org/zap"
@@ -19,7 +19,7 @@ type Ai struct {
 
 func NewAi(logger *zap.SugaredLogger) *Ai {
     return &Ai{
-        gptClient: newGptClient(),
+        gptClient: newGptClient(logger),
         log:       logger,
     }
 }
@@ -78,8 +78,8 @@ func (ai *Ai) GenerateReply(review string, business *model.Business, user model.
     return response.Choices[0].Message.Content, nil
 }
 
-func newGptClient() *openai.Client {
-    secrets := secret.GetSecrets()
+func newGptClient(logger *zap.SugaredLogger) *openai.Client {
+    secrets := awsUtil.NewAws(logger).GetSecrets()
     return openai.NewClient(secrets.GptApiKey)
 }
 

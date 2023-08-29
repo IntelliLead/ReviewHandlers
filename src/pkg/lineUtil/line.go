@@ -2,9 +2,9 @@ package lineUtil
 
 import (
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -245,7 +245,7 @@ func convertToHttpRequest(request *events.LambdaFunctionURLRequest) *http.Reques
 }
 
 func newLineClient(log *zap.SugaredLogger) *linebot.Client {
-    secrets := secret.GetSecrets()
+    secrets := awsUtil.NewAws(log).GetSecrets()
     lineClient, err := linebot.New(secrets.LineChannelSecret, secrets.LineChannelAccessToken)
     if err != nil {
         log.Fatal("cannot create new Line Client", err)
