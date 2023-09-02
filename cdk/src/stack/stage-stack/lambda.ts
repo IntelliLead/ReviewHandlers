@@ -49,16 +49,22 @@ export class LambdaStack extends Stack {
         this.props = props;
         const { stage } = this.props.stackCreationInfo;
 
-        this.createWebhookHandler('lineEventsHandler');
-        this.createWebhookHandler('newReviewEventHandler');
-
         const authRedirectUrlParameterName = '/auth/authRedirectUrl';
+
+        this.createWebhookHandler('lineEventsHandler',{
+            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+        });
+        this.createWebhookHandler('newReviewEventHandler' ,{
+            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+        });
+
         const authHandler = this.createWebhookHandler('authHandler', {
             AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
         });
 
         // This unfortunately creates a circular dependency
         // authHandler.lambdaFn.addEnvironment('AUTH_REDIRECT_URL', authHandler.functionUrl.url);
+
         // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
         // TODO: [INT-84] use Lambda extension to cache the value
         new StringParameter(this, 'authRedirectUrl', {
@@ -72,10 +78,6 @@ export class LambdaStack extends Stack {
                 resources: ['*'],
             })
         );
-        //
-        // this.createWebhookHandler('tst', {
-        //     AUTH_REDIRECT_URL: authHandler.functionUrl.url,
-        // });
     }
 
     /**

@@ -80,8 +80,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Error("Error getting user: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
     }
-    isUserExist := userDao.IsUserExist(user)
-    if !isUserExist {
+    if user == nil {
         log.Error("User does not exist: ", review.UserId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
     }
@@ -121,7 +120,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     line := lineUtil.NewLine(log)
 
-    err = line.SendNewReview(review, user)
+    err = line.SendNewReview(review, *user)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil

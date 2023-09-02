@@ -2,10 +2,10 @@ package main
 
 import (
     "context"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
@@ -27,21 +27,23 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
     const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
 
+    auth.ValidateUserAuthOrRequestAuth()
+
     // --------------------
     // Send Auth Request
     // --------------------
-    line := lineUtil.NewLine(log)
-
-    // send auth request
-    // Supplied via tst SAM template
-    authRedirectUrl := os.Getenv(util.AuthRedirectUrlEnvKey)
-    err := line.RequestAuth(sendingUserId, authRedirectUrl)
-    if err != nil {
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Failed to send auth request"}`,
-        }, err
-    }
+    // line := lineUtil.NewLine(log)
+    //
+    // // send auth request
+    // // Supplied via tst SAM template
+    // authRedirectUrl := os.Getenv(util.AuthRedirectUrlEnvKey)
+    // err := line.RequestAuth(sendingUserId, authRedirectUrl)
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //         Body:       `{"error": "Failed to send auth request"}`,
+    //     }, err
+    // }
 
     // --------------------
     // ???

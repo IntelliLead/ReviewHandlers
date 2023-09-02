@@ -318,25 +318,10 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business *model.Business) (linebot.FlexContainer, error) {
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    var businessDescriptionDb *string
-    var keywordEnabledDb bool
-    var keywordsDb *string
-    if business == nil {
-        businessDescriptionDb = user.BusinessDescription
-        if user.KeywordEnabled == nil {
-            l.log.Errorf("User %s has no KeywordEnabled field but has not been backfilled", user.UserId)
-            keywordEnabledDb = false
-        } else {
-            keywordEnabledDb = *user.KeywordEnabled
-        }
-        keywordsDb = user.Keywords
-    } else {
-        businessDescriptionDb = business.BusinessDescription
-        keywordEnabledDb = business.KeywordEnabled
-        keywordsDb = business.Keywords
-    }
+func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.Business) (linebot.FlexContainer, error) {
+    businessDescriptionDb := business.BusinessDescription
+    keywordEnabledDb := business.KeywordEnabled
+    keywordsDb := business.Keywords
 
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)

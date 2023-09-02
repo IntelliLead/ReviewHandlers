@@ -44,7 +44,7 @@ func (l *Line) GetUser(userId string) (linebot.UserProfileResponse, error) {
     return *resp, nil
 }
 
-func (l *Line) SendUnknownResponseReply(replyToken string) error {
+func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
     reviewMessage := fmt.Sprintf("對不起，我還不會處理您的訊息。如需幫助，請回覆\"/help\"")
 
     message := linebot.NewTextMessage(reviewMessage).WithQuickReplies(linebot.NewQuickReplyItems(
@@ -61,7 +61,7 @@ func (l *Line) SendUnknownResponseReply(replyToken string) error {
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in SendUnknownResponseReply: %s", jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in ReplyUnknownResponseReply: %s", jsonUtil.AnyToJson(resp))
     return nil
 }
 
@@ -99,7 +99,7 @@ func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled b
     return nil
 }
 
-func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business *model.Business) error {
+func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business model.Business) error {
     flexMessage, err := l.buildAiReplySettingsFlexMessage(user, business)
     if err != nil {
         l.log.Error("Error building flex message in ShowAiReplySettings: ", err)
@@ -131,6 +131,30 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review) error {
     l.log.Debugf("Successfully executed PushMessage in SendAiGeneratedReply to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
 
     return nil
+}
+
+func (l *Line) ReplyAuthRequest(replyToken string, userId string) error {
+    authRedirectUrl, err := awsUtil.NewAws(l.log).GetAuthRedirectUrl()
+    if err != nil {
+        l.log.Error("Error getting auth redirect url in ReplyAuthRequest: ", err)
+        return err
+    }
+
+    flexMessage, err := l.buildAuthRequestFlexMessage(userId, authRedirectUrl)
+    if err != nil {
+        l.log.Error("Error building flex message in RequestAuth: ", err)
+    }
+
+    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("智引力請求訪問 Google 資料", flexMessage)).Do()
+    if err != nil {
+        l.log.Error("Error replying message in ReplyAuthRequest: ", err)
+        return err
+    }
+
+    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+
+    return nil
+
 }
 
 func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
@@ -210,7 +234,7 @@ func (l *Line) ReplyUser(replyToken string, message string) (*linebot.BasicRespo
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(message)).Do()
 }
 
-func (l *Line) NotifyUserReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {
+func (l *Line) ReplyUserReviewReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {
     var text string
     if succeeded {
         text = fmt.Sprintf("已回覆 %s 的評論。感謝您使用智引力。", reviewerName)
