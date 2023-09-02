@@ -127,7 +127,7 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
         return mybusinessbusinessinformation.Location{}, "", err
     }
     accounts := resp.Accounts
-    // g.log.Debug("Retrieved accounts: ", jsonUtil.AnyToJson(accounts))
+    g.log.Debug("Retrieved accounts: ", jsonUtil.AnyToJson(accounts))
 
     if len(accounts) == 0 {
         g.log.Warn("User has no Google business accounts")
@@ -150,7 +150,7 @@ func (g *Google) GetBusinessLocation() (mybusinessbusinessinformation.Location, 
     }
 
     locations := locationsResp.Locations
-    // g.log.Debug("Retrieved locations: ", jsonUtil.AnyToJson(locations))
+    g.log.Debug("Retrieved locations: ", jsonUtil.AnyToJson(locations))
 
     if len(locations) == 0 {
         g.log.Warn("User has no Google business locations under account ", accountId)

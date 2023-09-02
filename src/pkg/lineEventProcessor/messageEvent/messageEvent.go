@@ -15,10 +15,8 @@ import (
 
 // ProcessMessageEvent processes a message event from LINE
 // It returns a LambdaFunctionURLResponse and an error
-func ProcessMessageEvent(
-    event *linebot.Event,
+func ProcessMessageEvent(event *linebot.Event,
     userId string,
-    businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
@@ -116,9 +114,23 @@ func ProcessMessageEvent(
 
         quickReplyMessage := args
 
-        autoQuickReplyEnabled, storedQuickReplyMessage, err := handleUpdateQuickReply(userId, quickReplyMessage, businessDao, userDao, log)
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(quickReplyMessage) {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "quickReplyMessage"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "autoQuickReplyEnabled", Value: false},
+            })
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "quickReplyMessage", Value: quickReplyMessage},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
+
             _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
             if err != nil {
                 return events.LambdaFunctionURLResponse{
@@ -133,7 +145,8 @@ func ProcessMessageEvent(
                 Body:       fmt.Sprintf(`{"error": "Failed to update quick reply message: %s"}`, err),
             }, err
         }
-        err = line.ShowQuickReplySettings(event.ReplyToken, autoQuickReplyEnabled, storedQuickReplyMessage)
+
+        err = line.ShowQuickReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -152,15 +165,64 @@ func ProcessMessageEvent(
         // process update quick reply message request
         businessDescription := args
 
-        err := handleBusinessDescriptionUpdate(userId, event.ReplyToken, businessDescription, userDao, businessDao, line, log)
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(businessDescription) {
+            user, err := userDao.GetUser(userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to get user: %s"}`, err),
+                }, err
+            }
+
+            attributeActions := []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "businessDescription"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
+            }
+
+            // disable depending features
+            if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
+                attributeActions = append(attributeActions, dbModel.AttributeAction{Action: enum.ActionUpdate, Name: "serviceRecommendationEnabled", Value: false})
+            }
+
+            updatedUser, err = userDao.UpdateAttributes(userId, attributeActions)
+
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "businessDescription", Value: businessDescription},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
+
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update business description failed: %s"}`, err),
+                }, err
+            }
+            log.Error("Successfully notified user of update business description failed")
+
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update business description: %s"}`, err),
             }, err
         }
 
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
+        if err != nil {
+            log.Errorf("Error showing seo settings for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to show seo settings: %s"}`, err),
+            }, err
+        }
+
+        log.Infof("Successfully processed update business description request for user '%s'", userId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Body:       `{"message": "Successfully processed update business description request"}`,
@@ -170,7 +232,21 @@ func ProcessMessageEvent(
         // process update quick reply message request
         signature := args
 
-        user, business, err := handleUpdateSignature(userId, signature, userDao, businessDao, log)
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(signature) {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "signature"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "signatureEnabled", Value: false},
+            })
+
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "signature", Value: signature},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating signature '%s' for user '%s': %v", signature, userId, err)
 
@@ -189,19 +265,9 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, *user, business)
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
-
-            _, err := line.ReplyUser(event.ReplyToken, "簽名更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update signature success: %s"}`, err),
-                }, err
-            }
-            log.Error("Successfully replied user of update signature success but show settings failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
@@ -218,38 +284,41 @@ func ProcessMessageEvent(
         // process update quick reply message request
         keywords := args
 
-        user, business, err := handleUpdateKeywords(userId, keywords, userDao, businessDao, log)
+        // update DDB
+        var updatedUser model.User
+        var err error
+        if util.IsEmptyString(keywords) {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "keywords"},
+                // disable depending features
+                {Action: enum.ActionUpdate, Name: "keywordEnabled", Value: false},
+            })
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "keywords", Value: keywords},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating keywords '%s' for user '%s': %v", keywords, userId, err)
 
             _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
             if err != nil {
-                log.Errorf("Failed to notify user of update keywords failed: %v", err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
                     Body:       fmt.Sprintf(`{"error": "Failed to notify user of update keywords failed: %s"}`, err),
                 }, err
             }
             log.Error("Successfully notified user of update keywords failed")
+
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update keywords: %s"}`, err),
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, *user, business)
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
-
-            _, err := line.ReplyUser(event.ReplyToken, "關鍵字更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                log.Errorf("Failed to reply user of update keywords success: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update keywords success: %s"}`, err),
-                }, err
-            }
-            log.Error("Successfully replied user of update keywords success but show settings failed")
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings : %s"}`, err),
@@ -263,18 +332,12 @@ func ProcessMessageEvent(
         }, nil
 
     case "r", util.UpdateRecommendationMessageCmd, "推薦":
+        // process update quick reply message request
         serviceRecommendation := args
 
-        business, err := businessDao.GetBusiness(userId)
-        if err != nil {
-            log.Errorf("Error getting business for user '%s': %v", userId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get business: %s"}`, err),
-            }, err
-        }
-
+        // update DDB
         var updatedUser model.User
+        var err error
         if util.IsEmptyString(serviceRecommendation) {
             // disable depending features
             user, err := userDao.GetUser(userId)
@@ -318,18 +381,9 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser, business)
+        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
-
-            _, err := line.ReplyUser(event.ReplyToken, "推薦更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                log.Errorf("Failed to reply user of update service recommendation success: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update service recommendation success: %s"}`, err),
-                }, err
-            }
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),

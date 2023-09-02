@@ -10,36 +10,34 @@ import (
 )
 
 type User struct {
-    UserId string `dynamodbav:"userId"` // partition key
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    ActiveBusinessId             *string                `dynamodbav:"activeBusinessId,omitempty"`
+    UserId                       string                 `dynamodbav:"userId"` // partition key
+    BusinessIds                  []string               `dynamodbav:"businessIds,omitemptyelem"`
     CreatedAt                    time.Time              `dynamodbav:"createdAt,unixtime"`
     LineUsername                 string                 `dynamodbav:"lineUsername"`
     LineProfilePictureUrl        *string                `dynamodbav:"lineProfilePicture,omitempty" validate:"url"`
     Language                     *string                `dynamodbav:"language,omitempty"`
     ZapierReplyWebhook           *string                `dynamodbav:"zapierReplyWebhook,omitempty" validate:"url"` // to be filled by PM during user onboarding
-    SubscriptionTier             *enum.SubscriptionTier `dynamodbav:"subscriptionTier,omitempty"`
+    SubscriptionTier             *enum.SubscriptionTier `dynamodbav:"subscriptionTier"`
     ExpireAt                     *time.Time             `dynamodbav:"expireAt,omitempty,unixtime"`
     LastUpdated                  time.Time              `dynamodbav:"lastUpdated,unixtime"`
     QuickReplyMessage            *string                `dynamodbav:"quickReplyMessage,omitempty"`
-    BusinessDescription          *string                `dynamodbav:"businessDescription,omitempty"` // TODO: [INT-91] remove this field
+    BusinessDescription          *string                `dynamodbav:"businessDescription,omitempty"` // TODO: [INT-88] remove this field
     EmojiEnabled                 bool                   `dynamodbav:"emojiEnabled"`                  // FAC for emoji
     Signature                    *string                `dynamodbav:"signature,omitempty"`
     SignatureEnabled             bool                   `dynamodbav:"signatureEnabled"`   // FAC for signature
-    Keywords                     *string                `dynamodbav:"keywords,omitempty"` // TODO: [INT-91] remove this field
-    KeywordEnabled               *bool                  `dynamodbav:"keywordEnabled"`     // FAC for keywords    // TODO: [INT-91] remove this field
+    Keywords                     *string                `dynamodbav:"keywords,omitempty"` // TODO: [INT-88] remove this field
+    KeywordEnabled               *bool                  `dynamodbav:"keywordEnabled"`     // FAC for keywords    // TODO: [INT-88] remove this field
     ServiceRecommendation        *string                `dynamodbav:"serviceRecommendation,omitempty"`
     ServiceRecommendationEnabled bool                   `dynamodbav:"serviceRecommendationEnabled"` // FAC for serviceRecommendation
-    AutoQuickReplyEnabled        *bool                  `dynamodbav:"autoQuickReplyEnabled"`        // FAC for auto quick reply // TODO: [INT-91] remove this field
+    AutoQuickReplyEnabled        bool                   `dynamodbav:"autoQuickReplyEnabled"`        // FAC for auto quick reply
 }
 
 func NewUser(lineUserId string,
-    businessId string,
     lineUserProfile linebot.UserProfileResponse,
     createdAt time.Time) User {
     user := User{
         UserId:                       lineUserId,
-        ActiveBusinessId:             &businessId,
+        BusinessIds:                  []string{},
         LineUsername:                 lineUserProfile.DisplayName,
         LineProfilePictureUrl:        &lineUserProfile.PictureURL,
         Language:                     &lineUserProfile.Language,
@@ -48,6 +46,7 @@ func NewUser(lineUserId string,
         EmojiEnabled:                 false,
         SignatureEnabled:             false,
         ServiceRecommendationEnabled: false,
+        AutoQuickReplyEnabled:        false,
     }
 
     return user

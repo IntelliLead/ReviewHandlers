@@ -8,7 +8,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/service/dynamodb"
@@ -16,7 +15,6 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb/expression"
     "go.uber.org/zap"
     "strings"
-    "time"
 )
 
 type UserDao struct {
@@ -36,10 +34,15 @@ func NewUserDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *UserDao {
 // 1. user already exist UserAlreadyExistException
 // 2. aws error
 func (d *UserDao) CreateUser(user model.User) error {
+    d.log.Debug("Putting user in DDB if not exist: ", user)
+
     av, err := userMarshalMap(user)
     if err != nil {
         return err
     }
+
+    // Execute the PutItem operation
+    d.log.Debug("Executing PutItem operation in DDB")
 
     _, err = d.client.PutItem(&dynamodb.PutItemInput{
         TableName:           aws.String(enum.TableUser.String()),
@@ -59,15 +62,28 @@ func (d *UserDao) CreateUser(user model.User) error {
         return err
     }
 
+    d.log.Debug("Successfully put user in DDB: ", user)
+
     return nil
 }
 
-// IsUserExist checks if a user object is empty, if empty, return false
-func (d *UserDao) IsUserExist(user model.User) bool {
-    return !util.IsEmptyString(user.UserId)
+// IsUserExist checks if a user with the given userId exists in the User table
+func (d *UserDao) IsUserExist(userId string) (bool, model.User, error) {
+    user, err := d.GetUser(userId)
+    if err != nil {
+        if _, ok := err.(*exception.UserDoesNotExistException); ok {
+            return false, model.User{}, nil
+        }
+        return false, model.User{}, err
+    }
+
+    return true, user, nil
 }
 
 // GetUser gets a user with the given userId from the User table
+// error handling
+// 1. user does not exist UserDoesNotExistException
+// 2. aws error
 func (d *UserDao) GetUser(userId string) (model.User, error) {
     response, err := d.client.GetItem(&dynamodb.GetItemInput{
         TableName: aws.String(enum.TableUser.String()),
@@ -75,6 +91,13 @@ func (d *UserDao) GetUser(userId string) (model.User, error) {
     })
     if err != nil {
         d.log.Errorf("Unable to get item with userId '%s' in GetUser: %v", userId, err)
+
+        switch err.(type) {
+        case *dynamodb.ResourceNotFoundException:
+            return model.User{}, exception.NewUserDoesNotExistExceptionWithErr(fmt.Sprintf("User with userId %s does not exist", userId), err)
+        default:
+            d.log.Error("Unknown error in GetUser: ", err)
+        }
         return model.User{}, exception.NewUnknownDDBException(fmt.Sprintf("GetUser failed for userId '%s' with unknown error: ", userId), err)
     }
 
@@ -146,10 +169,6 @@ func (d *UserDao) UpdateAttributes(userId string, actions []dbModel.AttributeAct
         }
     }
 
-    // update timestamp (epoch seconds)
-    // TODO: [INT-90] use ms instead of s
-    updateBuilder = updateBuilder.Set(expression.Name("lastUpdated"), expression.Value(time.Now().Unix()))
-
     expr, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
     if err != nil {
         d.log.Errorf("Unable to build expression for UpdateItem in UpdateAttributes: %v", err)
@@ -166,6 +185,7 @@ func (d *UserDao) UpdateAttributes(userId string, actions []dbModel.AttributeAct
         ExpressionAttributeValues: expr.Values(),
         ReturnValues:              &allNewStr,
     }
+    d.log.Debugf("DDB UpdateItem input: %s", jsonUtil.AnyToJson(ddbInput))
     response, err := d.client.UpdateItem(ddbInput)
     if err != nil {
         d.log.Errorf("DDB UpdateItem failed in UpdateAttributes with DDB input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)

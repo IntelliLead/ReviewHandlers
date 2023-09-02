@@ -24,10 +24,10 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
     }
 }
 
-func (ai *Ai) GenerateReply(review string, business *model.Business, user model.User) (string, error) {
+func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
     temp := 1.12
 
-    prompt := ai.buildPrompt(business, user)
+    prompt := ai.buildPrompt(user)
     // DEBUG
     ai.log.Debug("AI Reply Prompt: ", prompt)
 
@@ -86,32 +86,12 @@ func newGptClient() *openai.Client {
     return openai.NewClient(secrets.GptApiKey)
 }
 
-func (ai *Ai) buildPrompt(business *model.Business, user model.User) string {
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    businessId := "nil"
-    var businessDescription, keywords *string
-    var keywordEnabled bool
-    if business != nil {
-        businessId = business.BusinessId
-        businessDescription = business.BusinessDescription
-        keywords = business.Keywords
-        keywordEnabled = business.KeywordEnabled
-    } else {
-        businessDescription = user.BusinessDescription
-        keywords = user.Keywords
-        if user.KeywordEnabled == nil {
-            ai.log.Errorf("Invalid state: KeywordEnabled is nil for user %s, but there is no business entity for user", user.UserId)
-            keywordEnabled = false
-        } else {
-            keywordEnabled = *user.KeywordEnabled
-        }
-    }
-
+func (ai *Ai) buildPrompt(user model.User) string {
     businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
 
     // business prompt
-    if !util.IsEmptyStringPtr(businessDescription) {
-        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *businessDescription)
+    if !util.IsEmptyStringPtr(user.BusinessDescription) {
+        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *user.BusinessDescription)
     }
 
     // emoji prompt
@@ -130,11 +110,11 @@ func (ai *Ai) buildPrompt(business *model.Business, user model.User) string {
     }
 
     // keyword prompt
-    if keywordEnabled {
-        if util.IsEmptyStringPtr(keywords) {
-            ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", businessId, user.UserId)
+    if *user.KeywordEnabled {
+        if util.IsEmptyStringPtr(user.Keywords) {
+            ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
         } else {
-            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *keywords)
+            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *user.Keywords)
         }
     }
 
