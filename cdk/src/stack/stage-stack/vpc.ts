@@ -5,8 +5,8 @@ import {
     GatewayVpcEndpointAwsService,
     IpAddresses,
     SubnetType,
-    Vpc
-} from "aws-cdk-lib/aws-ec2";
+    Vpc,
+} from 'aws-cdk-lib/aws-ec2';
 import { AnyPrincipal, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { StackCreationInfo } from 'common-cdk';
@@ -45,7 +45,7 @@ export class VpcStack extends Stack {
             // TODO: downgrade to S3 for half price https://aws.amazon.com/cloudwatch/pricing/#:~:text=0.01%20per%20minute-,Vended%20Logs,-Vended%20logs%20are
             // destination: FlowLogDestination.toS3(),
             maxAggregationInterval: FlowLogMaxAggregationInterval.TEN_MINUTES,
-        })
+        });
 
         const dynamoGatewayEndpoint = this.vpc.addGatewayEndpoint('DynamoDBGatewayEndpoint', {
             service: GatewayVpcEndpointAwsService.DYNAMODB,

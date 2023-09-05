@@ -4,7 +4,7 @@ import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IRole } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
-import { DynamoDbTableAttribute, TableName, Tables } from '../../config/tables';
+import { DynamoDbTableAttribute, TableName, DdbTable } from '../../config/ddbTable';
 
 export interface DdbStackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -21,7 +21,7 @@ export class DdbStack extends Stack {
     constructor(scope: Construct, id: string, props: DdbStackProps) {
         super(scope, id, props);
 
-        Tables.forEach((table) => {
+        DdbTable.forEach((table) => {
             this.tableEntries.set(table.tableName, this.createTable(table));
         });
     }

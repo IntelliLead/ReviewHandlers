@@ -1,29 +1,16 @@
 import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { ORGANIZATION_ID, StackCreationInfo, STAGE } from 'common-cdk';
-import {
-    Code,
-    FunctionUrlAuthType,
-    LambdaInsightsVersion,
-    LayerVersion,
-    ParamsAndSecretsVersions,
-    Runtime,
-} from 'aws-cdk-lib/aws-lambda';
+import { StackCreationInfo, STAGE } from 'common-cdk';
+import { FunctionUrlAuthType, LambdaInsightsVersion, LayerVersion, Tracing } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 import { DdbStack } from './ddb';
-import {
-    AccountRootPrincipal,
-    ManagedPolicy,
-    OrganizationPrincipal,
-    PolicyStatement,
-    Role,
-    ServicePrincipal,
-} from 'aws-cdk-lib/aws-iam';
+import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { VpcStack } from './vpc';
 import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { FunctionUrl } from 'aws-cdk-lib/aws-lambda/lib/function-url';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
+import { LambdaHandlerName } from '../../config/lambdaHandler';
 
 export interface LambdaStackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -41,35 +28,47 @@ interface WebhookHandler {
     readonly functionUrl: FunctionUrl;
 }
 
+// lambda functions type
+export interface LambdaFunctions {
+    [key: string]: GoFunction;
+}
+
 export class LambdaStack extends Stack {
     private readonly props: LambdaStackProps;
+    public readonly lambdaFunctions: LambdaFunctions = {};
 
     constructor(scope: Construct, id: string, props: LambdaStackProps) {
         super(scope, id, props);
         this.props = props;
-        const { stage } = this.props.stackCreationInfo;
 
         const authRedirectUrlParameterName = '/auth/authRedirectUrl';
 
-        this.createWebhookHandler('lineEventsHandler', {
-            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
-        });
-        this.createWebhookHandler('newReviewEventHandler', {
-            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
-        });
+        this.lambdaFunctions[LambdaHandlerName.LINE_EVENTS_HANDLER] = this.createWebhookHandler(
+            LambdaHandlerName.LINE_EVENTS_HANDLER,
+            {
+                AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+            }
+        ).lambdaFn;
 
-        const authHandler = this.createWebhookHandler('authHandler', {
+        this.lambdaFunctions[LambdaHandlerName.NEW_REVIEW_EVENT_HANDLER] = this.createWebhookHandler(
+            LambdaHandlerName.NEW_REVIEW_EVENT_HANDLER,
+            {
+                AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+            }
+        ).lambdaFn;
+
+        const authHandlerWebhook = this.createWebhookHandler(LambdaHandlerName.AUTH_HANDLER, {
             AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
         });
+        this.lambdaFunctions[LambdaHandlerName.AUTH_HANDLER] = authHandlerWebhook.lambdaFn;
 
-        // This unfortunately creates a circular dependency
+        // This would unfortunately create a circular dependency:
         // authHandler.lambdaFn.addEnvironment('AUTH_REDIRECT_URL', authHandler.functionUrl.url);
-
         // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
         // TODO: [INT-84] use Lambda extension to cache the value
         new StringParameter(this, 'authRedirectUrl', {
             parameterName: authRedirectUrlParameterName,
-            stringValue: authHandler.functionUrl.url,
+            stringValue: authHandlerWebhook.functionUrl.url,
             description: 'The auth handler lambda function url, used as Google OAuth2 redirect url',
         });
     }
@@ -84,7 +83,7 @@ export class LambdaStack extends Stack {
      * @private
      */
     private createWebhookHandler(
-        handlerName: string,
+        handlerName: LambdaHandlerName,
         additionalEnv: EnvObject = {},
         ...layers: LayerVersion[]
     ): WebhookHandler {
@@ -103,6 +102,7 @@ export class LambdaStack extends Stack {
         handlerRole.addToPolicy(this.buildGetSecretPolicy());
         handlerRole.addToPolicy(this.buildKmsDecryptPolicy());
         handlerRole.addToPolicy(this.buildGetParameterPolicy());
+        handlerRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'));
 
         const handlerFunction = new GoFunction(this, handlerName, {
             entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/main.go`),
@@ -119,8 +119,7 @@ export class LambdaStack extends Stack {
             timeout: Duration.minutes(5),
             insightsVersion: LambdaInsightsVersion.VERSION_1_0_143_0,
             logRetention: RetentionDays.SIX_MONTHS,
-            // TODO: INT-47 enable tracing
-            // tracing: Tracing.ACTIVE,
+            tracing: Tracing.ACTIVE,
 
             // Lambda cannot reach Internet even in public subnet without NAT gateway
             // https://stackoverflow.com/a/52994841

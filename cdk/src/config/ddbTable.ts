@@ -141,4 +141,4 @@ const businessTable: DynamoDbTableAttribute = {
     ],
     billingMode: BillingMode.PAY_PER_REQUEST,
 };
-export const Tables: DynamoDbTableAttribute[] = [reviewTable, userTable, businessTable];
+export const DdbTable: DynamoDbTableAttribute[] = [reviewTable, userTable, businessTable];

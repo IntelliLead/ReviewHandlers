@@ -5,6 +5,7 @@ import { VpcStack } from './stage-stack/vpc';
 import { DdbStack } from './stage-stack/ddb';
 import { SecretStack } from './stage-stack/secret';
 import { LambdaStack } from './stage-stack/lambda';
+import { CloudwatchStack } from './stage-stack/cloudwatch';
 
 export interface DeploymentStacksProps extends StackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -16,6 +17,7 @@ export class DeploymentStacks extends Stage {
     public readonly ddb: DdbStack;
     public readonly lambda: LambdaStack;
     public readonly secret: SecretStack;
+    public readonly cloudwatch: CloudwatchStack;
 
     constructor(scope: Construct, id: string, props: DeploymentStacksProps) {
         super(scope, id, props);
@@ -44,12 +46,18 @@ export class DeploymentStacks extends Stage {
             terminationProtection,
         });
 
-        // if (deploySecret) {
         this.secret = new SecretStack(this, `${stackPrefix}-Secret`, {
             stackCreationInfo,
             terminationProtection,
         });
         this.lambda.addDependency(this.secret);
+
+        this.cloudwatch = new CloudwatchStack(this, `${stackPrefix}-Cloudwatch`, {
+            stackCreationInfo,
+            lambdas: this.lambda,
+            terminationProtection,
+        });
+
         // }
         //
         // const use1StackCreationInfo = stackCreationInfo;
