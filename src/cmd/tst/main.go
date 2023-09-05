@@ -3,13 +3,18 @@ package main
 import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
 )
@@ -23,11 +28,32 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     stage := os.Getenv(util.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
-    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb" // 今遇良研
-    // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
-    const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
+    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
+    const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
+    // const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
 
-    auth.ValidateUserAuthOrRequestAuth()
+    mySession := session.Must(session.NewSession())
+    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    line := lineUtil.NewLine(log)
+    hasUserAuthed, user, business, err := auth.ValidateUserAuthOrRequestAuthTst(
+        sendingUserId,
+        userDao,
+        businessDao,
+        line,
+        log,
+    )
+    if err != nil {
+        log.Errorf("Failed to validate user auth: %s", err.Error())
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Failed to validate user auth"}`,
+        }, err
+    }
+
+    log.Infof("User authed: %t", hasUserAuthed)
+    log.Infof("User: %s", jsonUtil.AnyToJson(user))
+    log.Infof("Business: %s", jsonUtil.AnyToJson(business))
 
     // --------------------
     // Send Auth Request
@@ -52,8 +78,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // const userId = "Ucc29292b212e271132cee980c58e94eb" // IL alpha
     //
     // mySession := session.Must(session.NewSession())
-    // // userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    //
+    // userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     // businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     //
     // // business, err := businessDao.GetBusiness(businessId)

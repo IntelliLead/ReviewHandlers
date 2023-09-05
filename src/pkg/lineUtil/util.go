@@ -167,12 +167,12 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     }
 
     // update review message
-    isEmptyReview := review.Review == ""
     var reviewMessage string
+    isEmptyReview := util.IsEmptyStringPtr(review.Review)
     if isEmptyReview {
         reviewMessage = "（無文字內容）"
     } else {
-        reviewMessage = review.Review
+        reviewMessage = *review.Review
     }
 
     if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
@@ -319,10 +319,6 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
 }
 
 func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.Business) (linebot.FlexContainer, error) {
-    businessDescriptionDb := business.BusinessDescription
-    keywordEnabledDb := business.KeywordEnabled
-    keywordsDb := business.Keywords
-
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
     if err != nil {
@@ -331,10 +327,10 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
 
     // substitute business description
     var businessDescription string
-    if util.IsEmptyStringPtr(businessDescriptionDb) {
+    if util.IsEmptyStringPtr(business.BusinessDescription) {
         businessDescription = " "
     } else {
-        businessDescription = *businessDescriptionDb
+        businessDescription = *business.BusinessDescription
 
         // update fillInText
         // body -> contents[2] -> contents[2] -> action -> fillInText
@@ -395,17 +391,14 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
     (map[string]interface{})["contents"].([]interface{})[5].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-        // TODO: [INT-88]
-    (map[string]interface{})["url"] = util.GetToggleUrl(keywordEnabledDb)
+    (map[string]interface{})["url"] = util.GetToggleUrl(business.KeywordEnabled)
 
     // substitute keywords
     var keywords string
-    // TODO: [INT-88]
-    if util.IsEmptyStringPtr(keywordsDb) {
+    if util.IsEmptyStringPtr(business.Keywords) {
         keywords = " "
     } else {
-        // TODO: [INT-88]
-        keywords = *keywordsDb
+        keywords = *business.Keywords
 
         // body -> contents[5] -> contents[3] -> action -> fillInText
         jsonMap["body"].

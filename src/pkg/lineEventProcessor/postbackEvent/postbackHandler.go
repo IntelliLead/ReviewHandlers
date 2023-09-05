@@ -1,6 +1,8 @@
 package postbackEvent
 
 import (
+    "errors"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/aiUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
@@ -61,7 +63,12 @@ func handleGenerateAiReply(
     }
 
     // invoke gpt4
-    aiReply, err := aiUtil.NewAi(log).GenerateReply(review.Review, business, user)
+    if util.IsEmptyStringPtr(review.Review) {
+        errStr := fmt.Sprintf("Review is empty. Cannot generate AI reply. userId: %s ; ReviewId: %s", userId, reviewId)
+        log.Error(errStr)
+        return errors.New(errStr)
+    }
+    aiReply, err := aiUtil.NewAi(log).GenerateReply(*review.Review, business, user)
     if err != nil {
         log.Errorf("Error invoking GPT to generate AI reply: %v", err)
         return err
@@ -133,7 +140,7 @@ func handleKeywordToggle(
     if err != nil {
         return model.Business{}, err
     }
-    updatedBusiness, err := businessDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{action}, user.UserId)
+    updatedBusiness, err := businessDao.UpdateAttributes(business.BusinessId, []dbModel.AttributeAction{action}, user.UserId)
     if err != nil {
         return model.Business{}, err
     }

@@ -8,8 +8,20 @@ import (
     "go.uber.org/zap"
 )
 
-// ValidateUserAuthOrRequestAuth checks if the user has completed oauth. If not, it sends an auth request to the user.
-// Returns hasUserAuthed, user, business, error
+// ValidateUserAuthOrRequestAuthTst in testing, there is no replyToken, send to user instead.
+func ValidateUserAuthOrRequestAuthTst(
+    userId string,
+    userDao *ddbDao.UserDao,
+    businessDao *ddbDao.BusinessDao,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger,
+) (bool, *model.User, *model.Business, error) {
+    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, businessDao, line, log)
+}
+
+// ValidateUserAuthOrRequestAuth checks if the user has completed oauth.
+// If not, it sends an auth request to the user. Invoker would terminate its execution after this call.
+// Returns: hasUserAuthed, user, business, error
 // if hasUserAuthed is true, user and business will not be nil
 // If user has not completed oauth, hasUserAuthed will be false, and business may be nil
 // If user is not found, hasUserAuthed will be false, and user will also be nil
@@ -33,14 +45,19 @@ func ValidateUserAuthOrRequestAuth(
     }
 
     if user == nil {
-        log.Warn("User with id " + userId + " does not exist. Requesting auth")
+        log.Info("User with id " + userId + " does not exist. Requesting auth")
     } else if business == nil {
-        log.Warnf("Business does not exist. User '%s' has not been backfilled. Requesting auth", userId)
+        log.Info("Business does not exist. User '%s' has not been backfilled. Requesting auth", userId)
     } else if !hasUserCompletedOauth {
-        log.Warnf("User %s has associated business %s, but has not completed oauth. Requesting auth", userId, business.BusinessId)
+        log.Info("User %s has associated business %s, but has not completed oauth. Requesting auth", userId, business.BusinessId)
     }
 
-    err = line.ReplyAuthRequest(replyToken, userId)
+    // DEBUG:
+    if replyToken == "TST" {
+        err = line.SendAuthRequest(userId)
+    } else {
+        err = line.ReplyAuthRequest(replyToken, userId)
+    }
     if err != nil {
         log.Errorf("Error replying auth request: %s", err)
         return false, user, business, err
@@ -62,7 +79,6 @@ func ValidateUserAuth(
     }
 
     if user == nil {
-        logger.Warn("User with id " + userId + " does not exist")
         return false, nil, nil, nil
     }
 
