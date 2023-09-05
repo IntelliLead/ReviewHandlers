@@ -95,11 +95,16 @@ export class CloudwatchStack extends Stack {
         dashboard.addWidgets(
             new TextWidget({
                 markdown: `## ${handlerName} Metrics`,
-                width: 18, // Spanning the width to cover all three graphs
+                width: 24, // Spanning the width to cover all four graphs
             })
         );
 
         dashboard.addWidgets(
+            new GraphWidget({
+                title: `Invocations`,
+                left: [lambdaFn.metricInvocations()],
+                width: 6,
+            }),
             new GraphWidget({
                 title: `4XX Errors`,
                 left: [metric4xx],

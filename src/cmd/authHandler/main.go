@@ -8,6 +8,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
@@ -20,7 +21,7 @@ import (
 )
 
 func main() {
-    lambda.Start(handleRequest)
+    lambda.Start(middleware.MetricMiddleware(handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
