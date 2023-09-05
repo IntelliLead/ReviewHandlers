@@ -138,7 +138,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
         Other scenarios are error state
     */
-    opsCompleted := false
     if !isUserExist {
         log.Infof("User %s does not exist. Creating new user.", userId)
 
@@ -182,7 +181,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
                 }, err
             }
         }
-        opsCompleted = true
     }
 
     if business == nil {
@@ -217,19 +215,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             userId,
         )
 
-        err = businessDao.CreateBusiness(newBusiness)
-        if err != nil {
-            log.Errorf("Error creating business object %v: %v", newBusiness, err)
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error creating business object"}`,
-            }, err
-        }
-
         // TODO: [INT-91] Remove backfill logic once all users have been backfilled
         if isUserExist {
-            log.Infof("User %s exists. Backfilling user %s to business %s", userId, userId, businessId)
             backfillBusinessFromUser(&newBusiness, user)
 
             // associate business with user
@@ -251,10 +238,16 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             }
         }
 
-        opsCompleted = true
-    }
+        err = businessDao.CreateBusiness(newBusiness)
+        if err != nil {
+            log.Errorf("Error creating business object %v: %v", newBusiness, err)
 
-    if business != nil && isUserExist {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error creating business object"}`,
+            }, err
+        }
+    } else if business != nil && isUserExist {
         if util.StringInSlice(userId, business.UserIds) {
             log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
 
@@ -323,15 +316,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
                 }, err
             }
         }
-        opsCompleted = true
-    }
-
-    if !opsCompleted {
+    } else {
         // error states
         log.Errorf("Error associating user %s with business %s", userId, businessId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,
-            Body:       `{"錯誤": "無法將此用戶與 google 商家建立關聯"}`,
+            Body:       `{"error": "Error associating user with business"}`,
         }, err
     }
 
