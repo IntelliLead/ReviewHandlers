@@ -179,24 +179,6 @@ func (l *Line) ReplyAuthRequest(replyToken string, userId string) error {
     return nil
 }
 
-// TODO: remove testing code
-// func (l *Line) RequestAuth(userId string, authRedirectUrl string) error {
-//     flexMessage, err := l.buildAuthRequestFlexMessage(userId, authRedirectUrl)
-//     if err != nil {
-//         l.log.Error("Error building flex message in RequestAuth: ", err)
-//     }
-//
-//     resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("智引力請求訪問 Google 資料", flexMessage)).Do()
-//     if err != nil {
-//         l.log.Error("Error sending message in RequestAuth: ", err)
-//         return err
-//     }
-//
-//     l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
-//
-//     return nil
-// }
-
 func (l *Line) ReplyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(buildReplyProcessedMessage(succeeded, reviewerName, isAutoReply))).Do()
 }

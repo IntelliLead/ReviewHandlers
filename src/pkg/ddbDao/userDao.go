@@ -61,11 +61,6 @@ func (d *UserDao) CreateUser(user model.User) error {
     return nil
 }
 
-// // IsUserExist checks if a user object is empty, if empty, return false
-// func (d *UserDao) IsUserExist(user model.User) bool {
-//     return !util.IsEmptyString(user.UserId)
-// }
-
 // GetUser gets a user with the given userId from the User table
 func (d *UserDao) GetUser(userId string) (*model.User, error) {
     response, err := d.client.GetItem(&dynamodb.GetItemInput{
