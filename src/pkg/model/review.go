@@ -14,7 +14,7 @@ type Review struct {
     VendorReviewId       string             `dynamodbav:"vendorReviewId"`
     VendorEventId        string             `dynamodbav:"vendorEventId"`
     NumberRating         _type.NumberRating `dynamodbav:"numberRating" validate:"min=1,max=5"`
-    Review               *string            `dynamodbav:"review,omitempty"`
+    Review               string             `dynamodbav:"review"`
     CreatedAt            time.Time          `dynamodbav:"createdAt,unixtime"`
     ReviewLastUpdated    time.Time          `dynamodbav:"reviewLastUpdated,unixtime"`
     ReviewerProfilePhoto string             `dynamodbav:"reviewerProfilePhoto" validate:"url"`

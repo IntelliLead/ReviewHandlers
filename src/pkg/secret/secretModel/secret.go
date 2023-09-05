@@ -1,4 +1,4 @@
-package awsModel
+package secretModel
 
 type Secrets struct {
     SlackToken               string `json:"SlackToken"`

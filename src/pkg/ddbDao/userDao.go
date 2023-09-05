@@ -8,6 +8,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/service/dynamodb"
@@ -61,19 +62,20 @@ func (d *UserDao) CreateUser(user model.User) error {
     return nil
 }
 
+// IsUserExist checks if a user object is empty, if empty, return false
+func (d *UserDao) IsUserExist(user model.User) bool {
+    return !util.IsEmptyString(user.UserId)
+}
+
 // GetUser gets a user with the given userId from the User table
-func (d *UserDao) GetUser(userId string) (*model.User, error) {
+func (d *UserDao) GetUser(userId string) (model.User, error) {
     response, err := d.client.GetItem(&dynamodb.GetItemInput{
         TableName: aws.String(enum.TableUser.String()),
         Key:       model.BuildDdbUserKey(userId),
     })
     if err != nil {
         d.log.Errorf("Unable to get item with userId '%s' in GetUser: %v", userId, err)
-        return nil, exception.NewUnknownDDBException(fmt.Sprintf("GetUser failed for userId '%s' with unknown error: ", userId), err)
-    }
-
-    if response.Item == nil {
-        return nil, nil
+        return model.User{}, exception.NewUnknownDDBException(fmt.Sprintf("GetUser failed for userId '%s' with unknown error: ", userId), err)
     }
 
     var user model.User
@@ -81,9 +83,10 @@ func (d *UserDao) GetUser(userId string) (*model.User, error) {
     if err != nil {
         d.log.Errorf("Unable to unmarshal from DDB response '%s' to User object in GetUser: %v",
             jsonUtil.AnyToJson(response.Item), err)
-        return nil, err
+        return model.User{}, err
     }
-    return &user, nil
+
+    return user, nil
 }
 
 func userMarshalMap(user model.User) (map[string]*dynamodb.AttributeValue, error) {

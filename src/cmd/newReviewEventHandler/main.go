@@ -80,7 +80,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Error("Error getting user: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
     }
-    if user == nil {
+    isUserExist := userDao.IsUserExist(user)
+    if !isUserExist {
         log.Error("User does not exist: ", review.UserId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
     }
@@ -120,7 +121,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     line := lineUtil.NewLine(log)
 
-    err = line.SendNewReview(review, *user)
+    err = line.SendNewReview(review, user)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
@@ -130,7 +131,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     // TODO: [INT-91] Remove backfill logic once all users have been backfilled
     var autoQuickReplyEnabled bool
-    var quickReplyMessage *string
+    var quickReplyMessage string
     if user.ActiveBusinessId != nil {
         business, err := businessDao.GetBusiness(*user.ActiveBusinessId)
         if err != nil {
@@ -139,26 +140,20 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
                 Body: `{"message": "Error getting business"}`, StatusCode: 500}, err
         }
         autoQuickReplyEnabled = business.AutoQuickReplyEnabled
-        quickReplyMessage = business.QuickReplyMessage
+        quickReplyMessage = *business.QuickReplyMessage
     } else {
         if user.AutoQuickReplyEnabled == nil {
-            log.Warn("User is not backfilled but has no autoQuickReplyEnabled flag: %s", user.UserId)
+            log.Errorf("User is not backfilled but has no autoQuickReplyEnabled flag: %s", user.UserId)
             autoQuickReplyEnabled = false
         } else {
             autoQuickReplyEnabled = *user.AutoQuickReplyEnabled
-            quickReplyMessage = user.QuickReplyMessage
+            quickReplyMessage = *user.QuickReplyMessage
         }
     }
 
-    if autoQuickReplyEnabled && util.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
-        if quickReplyMessage == nil {
-            log.Error("User has autoQuickReplyEnabled but no quickReplyMessage: %s", user.UserId)
-            return events.LambdaFunctionURLResponse{
-                Body: `{"message": "Error getting quick reply message"}`, StatusCode: 501}, nil
-        }
-
+    if autoQuickReplyEnabled && util.IsEmptyString(review.Review) && review.NumberRating == 5 {
         lambdaReturn, err := lineEventProcessor.ReplyReview(
-            user.UserId, nil, *quickReplyMessage, review, reviewDao, line, log, true)
+            user.UserId, nil, quickReplyMessage, review, reviewDao, line, log, true)
         if err != nil {
             return lambdaReturn, err
         }
@@ -175,13 +170,10 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 }
 
 func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
-    if event.Review == nil {
-        return
-    }
-    text := *event.Review
+    text := event.Review
 
     originalLine, translationFound := util.ExtractOriginalFromGoogleTranslate(text)
     if translationFound {
-        event.Review = &originalLine
+        event.Review = originalLine
     }
 }

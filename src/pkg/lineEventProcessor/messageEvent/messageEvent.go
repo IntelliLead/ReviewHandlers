@@ -2,8 +2,9 @@ package messageEvent
 
 import (
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -48,12 +49,12 @@ func ProcessMessageEvent(
     if !isTextMessageFromUser {
         log.Info("Message from user is not a text message.")
 
-        err := line.ReplyUnknownResponseReply(event.ReplyToken)
+        err := line.SendUnknownResponseReply(event.ReplyToken)
         if err != nil {
-            log.Error("Error executing ReplyUnknownResponseReply: ", err)
+            log.Error("Error executing SendUnknownResponseReply: ", err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error executing ReplyUnknownResponseReply: %s"}`, err),
+                Body:       fmt.Sprintf(`{"error": "Error executing SendUnknownResponseReply: %s"}`, err),
             }, err
         }
 
@@ -76,29 +77,6 @@ func ProcessMessageEvent(
     // process command requests
     cmdMsg := lineUtil.ParseCommandMessage(message, false)
     args := cmdMsg.Args[0]
-
-    var businessPtr *model.Business
-    var userPtr *model.User
-    if cmdMsg.Command != "h" && cmdMsg.Command != "Help" && cmdMsg.Command != "help" && cmdMsg.Command != "幫助" && cmdMsg.Command != "協助" {
-        var hasUserAuthed bool
-        hasUserAuthed, userPtr, businessPtr, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
-        if err != nil {
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to validate user auth: %s"}`, err),
-            }, err
-        }
-        if !hasUserAuthed {
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 200,
-                Body:       `{"message": "User has not authenticated. Requested authentication."}`,
-            }, nil
-        }
-    }
-    // neither user nor business is nil if user has authenticated
-    user := *userPtr
-    business := *businessPtr
-
     switch cmdMsg.Command {
     case "h", "Help", "help", "幫助", "協助":
         _, err := line.ReplyHelpMessage(event.ReplyToken)
@@ -116,6 +94,7 @@ func ProcessMessageEvent(
         }, nil
 
     case "q", util.UpdateQuickReplyMessageCmd, "快速回覆":
+        // process update quick reply message request
 
         // validate message does not contain LINE emojis
         // --------------------------------
@@ -137,7 +116,7 @@ func ProcessMessageEvent(
 
         quickReplyMessage := args
 
-        autoQuickReplyEnabled, storedQuickReplyMessage, err := handleUpdateQuickReply(user, quickReplyMessage, businessDao, log)
+        autoQuickReplyEnabled, storedQuickReplyMessage, err := handleUpdateQuickReply(userId, quickReplyMessage, businessDao, userDao, log)
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
             _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
@@ -173,40 +152,15 @@ func ProcessMessageEvent(
         // process update quick reply message request
         businessDescription := args
 
-        possiblyUpdatedUser, updatedBusiness, err := handleBusinessDescriptionUpdate(user, businessDescription, userDao, businessDao, log)
+        err := handleBusinessDescriptionUpdate(userId, event.ReplyToken, businessDescription, userDao, businessDao, line, log)
         if err != nil {
             log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
-
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update business description failed: %s"}`, err),
-                }, err
-            }
-            log.Error("Successfully notified user of update signature failed")
-        }
-
-        err = line.ShowAiReplySettings(event.ReplyToken, possiblyUpdatedUser, updatedBusiness)
-        if err != nil {
-            log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
-
-            _, err := line.ReplyUser(event.ReplyToken, "主要業務更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update business description success but show settings failed: %s"}`, err),
-                }, err
-            }
-            log.Error("Successfully replied user of update business description success but show settings failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
+                Body:       fmt.Sprintf(`{"error": "Failed to update business description: %s"}`, err),
             }, err
         }
 
-        log.Infof("Successfully processed update business description request for user '%s'", userId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Body:       `{"message": "Successfully processed update business description request"}`,
@@ -216,7 +170,7 @@ func ProcessMessageEvent(
         // process update quick reply message request
         signature := args
 
-        updatedUser, err := handleUpdateSignature(user, signature, userDao, log)
+        user, business, err := handleUpdateSignature(userId, signature, userDao, businessDao, log)
         if err != nil {
             log.Errorf("Error updating signature '%s' for user '%s': %v", signature, userId, err)
 
@@ -235,7 +189,7 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, updatedUser, business)
+        err = line.ShowAiReplySettings(event.ReplyToken, *user, business)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
@@ -264,7 +218,7 @@ func ProcessMessageEvent(
         // process update quick reply message request
         keywords := args
 
-        updatedBusiness, err := handleUpdateKeywords(user, keywords, businessDao, log)
+        user, business, err := handleUpdateKeywords(userId, keywords, userDao, businessDao, log)
         if err != nil {
             log.Errorf("Error updating keywords '%s' for user '%s': %v", keywords, userId, err)
 
@@ -283,7 +237,7 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, user, updatedBusiness)
+        err = line.ShowAiReplySettings(event.ReplyToken, *user, business)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
@@ -311,19 +265,53 @@ func ProcessMessageEvent(
     case "r", util.UpdateRecommendationMessageCmd, "推薦":
         serviceRecommendation := args
 
-        updatedUser, err := handleUpdateServiceRecommendation(user, serviceRecommendation, userDao)
+        business, err := businessDao.GetBusiness(userId)
+        if err != nil {
+            log.Errorf("Error getting business for user '%s': %v", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to get business: %s"}`, err),
+            }, err
+        }
+
+        var updatedUser model.User
+        if util.IsEmptyString(serviceRecommendation) {
+            // disable depending features
+            user, err := userDao.GetUser(userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to get user: %s"}`, err),
+                }, err
+            }
+
+            actions := []dbModel.AttributeAction{
+                {Action: enum.ActionRemove, Name: "serviceRecommendation"},
+            }
+
+            if util.IsEmptyStringPtr(user.BusinessDescription) {
+                actions = append(actions, dbModel.AttributeAction{
+                    Action: enum.ActionUpdate, Name: "ServiceRecommendationEnabled", Value: false})
+            }
+
+            updatedUser, err = userDao.UpdateAttributes(userId, actions)
+        } else {
+            updatedUser, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
+                {Action: enum.ActionUpdate, Name: "serviceRecommendation", Value: serviceRecommendation},
+            })
+        }
         if err != nil {
             log.Errorf("Error updating service recommendation '%s' for user '%s': %v", serviceRecommendation, userId, err)
 
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "推薦業務")
+            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
             if err != nil {
-                log.Errorf("Failed to notify user of update service recommendation failed: %v", err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
                     Body:       fmt.Sprintf(`{"error": "Failed to notify user of update service recommendation failed: %s"}`, err),
                 }, err
             }
             log.Error("Successfully notified user of update service recommendation failed")
+
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update service recommendation: %s"}`, err),
@@ -356,12 +344,12 @@ func ProcessMessageEvent(
 
     default:
         // handle unknown message from user
-        err = line.ReplyUnknownResponseReply(event.ReplyToken)
+        err = line.SendUnknownResponseReply(event.ReplyToken)
         if err != nil {
-            log.Error("Error executing ReplyUnknownResponseReply: ", err)
+            log.Error("Error executing SendUnknownResponseReply: ", err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Error executing ReplyUnknownResponseReply: %s"}`, err),
+                Body:       fmt.Sprintf(`{"error": "Error executing SendUnknownResponseReply: %s"}`, err),
             }, err
         }
 

@@ -110,7 +110,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
             slack := slackUtil.NewSlack(log, stage)
-            return lineEventProcessor.ProcessFollowEvent(event, businessDao, userDao, slack, line, log)
+            return lineEventProcessor.ProcessFollowEvent(event, userDao, slack, line, log)
 
         case linebot.EventTypePostback:
             log.Info("Received Postback event")
