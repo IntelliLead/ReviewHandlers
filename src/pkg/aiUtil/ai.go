@@ -26,7 +26,10 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
 
 func (ai *Ai) GenerateReply(review string, business *model.Business, user model.User) (string, error) {
     temp := 1.12
+
     prompt := ai.buildPrompt(business, user)
+    // DEBUG
+    ai.log.Debug("AI Reply Prompt: ", prompt)
 
     response, err := ai.gptClient.CreateChatCompletion(
         context.Background(),
