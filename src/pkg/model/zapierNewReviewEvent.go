@@ -8,7 +8,7 @@ import (
 type ZapierNewReviewEvent struct {
     CreatedAt            time.Time          `json:"createdAt"`
     NumberRating         _type.NumberRating `json:"numberRating" validate:"min=1,max=5"`
-    Review               string             `json:"review"`
+    Review               *string            `json:"review"`
     ReviewLastUpdated    time.Time          `json:"reviewLastUpdated"`
     ReviewerName         string             `json:"reviewerName"`
     ReviewerProfilePhoto string             `json:"reviewerProfilePhoto" validate:"url"`

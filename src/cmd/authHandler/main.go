@@ -93,7 +93,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Error("Error checking if user exists: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
     }
-    isUserExist := userDao.IsUserExist(user)
 
     google, err := googleUtil.NewGoogleWithAuthCode(log, code)
     if err != nil {
@@ -139,7 +138,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         Other scenarios are error state
     */
     opsCompleted := false
-    if !isUserExist {
+    if user == nil {
         log.Infof("User %s does not exist. Creating new user.", userId)
 
         line := lineUtil.NewLine(log)
@@ -228,9 +227,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
 
         // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-        if isUserExist {
+        if user != nil {
             log.Infof("User %s exists. Backfilling user %s to business %s", userId, userId, businessId)
-            backfillBusinessFromUser(&newBusiness, user)
+            backfillBusinessFromUser(newBusiness, *user)
 
             // associate business with user
             businessIdUpdateAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "activeBusinessId", businessId)
@@ -254,7 +253,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         opsCompleted = true
     }
 
-    if business != nil && isUserExist {
+    if business != nil && user != nil {
         if util.StringInSlice(userId, business.UserIds) {
             log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
 
@@ -360,7 +359,7 @@ func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAc
 
 // TODO: [INT-91] Remove backfill logic once all users have been backfilled
 // backfillBusinessFromUser in-place backfills business attributes from user
-func backfillBusinessFromUser(business *model.Business, user model.User) {
+func backfillBusinessFromUser(business model.Business, user model.User) {
     business.BusinessDescription = user.BusinessDescription
     business.Keywords = user.Keywords
     if user.KeywordEnabled == nil {

@@ -2,6 +2,7 @@ package postbackEvent
 
 import (
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -32,15 +33,54 @@ func ProcessPostbackEvent(
     // shift off the first element, which is empty
     dataSlice = dataSlice[1:]
 
+    var businessPtr *model.Business
+    var userPtr *model.User
+    if dataSlice[1] == "GenerateAiReply" || dataSlice[1] == "Toggle" || (dataSlice[0] == "RichMenu" && dataSlice[1] != "Help") {
+        var hasUserCompletedAuth bool
+        var err error
+        hasUserCompletedAuth, userPtr, businessPtr, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+        if err != nil {
+            log.Errorf("Error validating user '%s' auth: %s", userId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf("Error validating user '%s' auth: %s", userId, err),
+            }, err
+        }
+        if !hasUserCompletedAuth {
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 200,
+                Body:       `{"message": "User has not completed auth"}`,
+            }, nil
+        }
+    }
+    business := *businessPtr
+    user := *userPtr
+
     switch dataSlice[0] {
     // /[NewReview|AiReply]/GenerateAiReply/{REVIEW_ID}
     case "NewReview", "AiReply":
         if len(dataSlice) == 3 && dataSlice[1] == "GenerateAiReply" && !util.IsEmptyString(dataSlice[2]) {
             reviewId := _type.NewReviewId(dataSlice[2])
-            lambdaReturn, err := handleGenerateAiReply(event, userId, reviewId, businessDao, userDao, reviewDao, line, log)
+            err := handleGenerateAiReply(event.ReplyToken, user, business, reviewId, reviewDao, line, log)
             if err != nil {
-                return lambdaReturn, err
-            } // else continue
+                log.Errorf("Error handling /%s/GenerateAiReply: %s", dataSlice[0], err)
+
+                _, err := line.NotifyUserAiReplyGenerationFailed(userId)
+                if err != nil {
+                    log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
+                    return events.LambdaFunctionURLResponse{
+                        StatusCode: 500,
+                        Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
+                    }, err
+                }
+
+                log.Errorf("Successfully notified user '%s' that AI reply generation failed", userId)
+
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Error handling /%s/GenerateAiReply: %s"}`, dataSlice[0], err),
+                }, err
+            }
 
         } else if dataSlice[0] == "NewReview" {
             if dataSlice[1] == "QuickReply" {
@@ -57,38 +97,13 @@ func ProcessPostbackEvent(
                     return returnUnhandledPostback(log, *event), nil
                 }
 
-                // get user
-                user, err := userDao.GetUser(userId)
-                if err != nil {
-                    log.Error("Error getting user during handling /AiReply/KeywordToggle: ", err)
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
-                    }, err
-                }
-
-                // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-                var business *model.Business
-                if user.ActiveBusinessId != nil {
-                    business, err = businessDao.GetBusiness(*user.ActiveBusinessId)
-                    if err != nil {
-                        log.Errorf("Error getting business %s: %s", *user.ActiveBusinessId, err)
-                        return events.LambdaFunctionURLResponse{
-                            StatusCode: 500,
-                            Body:       fmt.Sprintf(`{"error": "Error getting business: %s"}`, err),
-                        }, err
-                    }
-                }
-
-                var updatedUser model.User
-                var updatedBusiness *model.Business
+                var err error
                 switch dataSlice[2] {
                 case "Emoji":
-                    updatedUser, err = handleEmojiToggle(user, userDao, log)
+                    user, err = handleEmojiToggle(user, userDao, log)
                     if err != nil {
                         log.Errorf("Error handling emoji toggle: %s", err)
 
-                        // notify user of error
                         _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "Emoji AI 回覆")
                         if err != nil {
                             log.Errorf("Error notifying user '%s' of update emoji enabled failed: %v", user.UserId, err)
@@ -101,7 +116,7 @@ func ProcessPostbackEvent(
                     }
 
                 case "Signature":
-                    updatedUser, err = handleSignatureToggle(user, userDao, log)
+                    user, err = handleSignatureToggle(user, userDao, log)
 
                     if err != nil {
                         log.Errorf("Error handling signature toggle: %s", err)
@@ -131,7 +146,7 @@ func ProcessPostbackEvent(
                     }
 
                 case "Keyword":
-                    updatedBusiness, updatedUser, err = handleKeywordToggle(user, userDao, business, businessDao, log)
+                    business, err = handleKeywordToggle(user, business, businessDao)
                     if err != nil {
                         log.Errorf("Error handling keyword toggle: %s", err)
 
@@ -162,7 +177,7 @@ func ProcessPostbackEvent(
                     }
 
                 case "ServiceRecommendation":
-                    updatedUser, err = handleServiceRecommendationToggle(user, userDao, log)
+                    user, err = handleServiceRecommendationToggle(user, userDao, log)
                     if err != nil {
                         log.Errorf("Error handling service recommendation toggle: %s", err)
 
@@ -194,7 +209,7 @@ func ProcessPostbackEvent(
 
                 }
 
-                err = line.ShowAiReplySettings(event.ReplyToken, updatedUser, updatedBusiness)
+                err = line.ShowAiReplySettings(event.ReplyToken, user, business)
                 if err != nil {
                     log.Errorf("Error showing updated AI Reply settings for user '%s': %v", user.UserId, err)
                     return events.LambdaFunctionURLResponse{
@@ -227,28 +242,7 @@ func ProcessPostbackEvent(
 
         switch dataSlice[1] {
         case "QuickReplySettings":
-            user, err := userDao.GetUser(userId)
-            if err != nil {
-                log.Error("Error getting user during handling /RichMenu/QuickReplySettings: ", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
-                }, err
-            }
-            if user.ActiveBusinessId == nil {
-                // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-                err = line.ShowQuickReplySettings(event.ReplyToken, *user.AutoQuickReplyEnabled, user.QuickReplyMessage)
-            } else {
-                business, err := businessDao.GetBusiness(*user.ActiveBusinessId)
-                if err != nil {
-                    log.Error("Error getting business during handling /RichMenu/QuickReplySettings: ", err)
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Error getting business: %s"}`, err),
-                    }, err
-                }
-                err = line.ShowQuickReplySettings(event.ReplyToken, business.AutoQuickReplyEnabled, business.QuickReplyMessage)
-            }
+            err := line.ShowQuickReplySettings(event.ReplyToken, business.AutoQuickReplyEnabled, business.QuickReplyMessage)
             if err != nil {
                 log.Errorf("Error sending quick reply settings to user '%s': %v", user.UserId, err)
                 return events.LambdaFunctionURLResponse{
@@ -258,34 +252,12 @@ func ProcessPostbackEvent(
             }
 
         case "AiReplySettings":
-            // get user
-            user, err := userDao.GetUser(userId)
+            err := line.ShowAiReplySettings(event.ReplyToken, user, business)
             if err != nil {
-                log.Error("Error getting user during handling /RichMenu/AiReplySettings: ", err)
+                log.Errorf("Error sending AI reply settings to user '%s': %v", user.UserId, err)
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error getting user: %s"}`, err),
-                }, err
-            }
-            // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-            var business *model.Business
-            if user.ActiveBusinessId != nil {
-                business, err = businessDao.GetBusiness(*user.ActiveBusinessId)
-                if err != nil {
-                    log.Error("Error getting business during handling /RichMenu/AiReplySettings: ", err)
-                    return events.LambdaFunctionURLResponse{
-                        StatusCode: 500,
-                        Body:       fmt.Sprintf(`{"error": "Error getting business: %s"}`, err),
-                    }, err
-                }
-            }
-
-            err = line.ShowAiReplySettings(event.ReplyToken, user, business)
-            if err != nil {
-                log.Errorf("Error sending seo settings to user '%s': %v", user.UserId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error sending seo settings: %s"}`, err),
+                    Body:       fmt.Sprintf(`{"error": "Error sending AI reply settings: %s"}`, err),
                 }, err
             }
 
@@ -298,16 +270,16 @@ func ProcessPostbackEvent(
                     Body:       fmt.Sprintf(`{"error": "Error replying help message: %s"}`, err),
                 }, err
             }
-
-        case "More":
-            _, err := line.ReplyMoreMessage(event.ReplyToken)
-            if err != nil {
-                log.Errorf("Error replying More message to user '%s': %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error replying more message: %s"}`, err),
-                }, err
-            }
+        //
+        // case "More":
+        //     _, err := line.ReplyMoreMessage(event.ReplyToken)
+        //     if err != nil {
+        //         log.Errorf("Error replying More message to user '%s': %v", userId, err)
+        //         return events.LambdaFunctionURLResponse{
+        //             StatusCode: 500,
+        //             Body:       fmt.Sprintf(`{"error": "Error replying more message: %s"}`, err),
+        //         }, err
+        //     }
 
         default:
             log.Error("Unknown RichMenu postback data: ", dataSlice[1])
@@ -329,7 +301,7 @@ func ProcessPostbackEvent(
                 return returnUnhandledPostback(log, *event), nil
             }
 
-            autoQuickReplyEnabled, quickReplyMessage, err := handleAutoQuickReplyToggle(userId, userDao, businessDao)
+            autoQuickReplyEnabled, quickReplyMessage, err := handleAutoQuickReplyToggle(user, business, businessDao)
             if err != nil {
                 if _, ok := err.(*exception.AutoQuickReplyConditionNotMetException); ok {
                     log.Warnf("Auto reply condition not met for user '%s': %v", userId, err)

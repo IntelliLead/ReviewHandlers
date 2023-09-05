@@ -49,16 +49,22 @@ export class LambdaStack extends Stack {
         this.props = props;
         const { stage } = this.props.stackCreationInfo;
 
-        this.createWebhookHandler('lineEventsHandler');
-        this.createWebhookHandler('newReviewEventHandler');
-
         const authRedirectUrlParameterName = '/auth/authRedirectUrl';
+
+        this.createWebhookHandler('lineEventsHandler', {
+            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+        });
+        this.createWebhookHandler('newReviewEventHandler', {
+            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+        });
+
         const authHandler = this.createWebhookHandler('authHandler', {
             AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
         });
 
         // This unfortunately creates a circular dependency
         // authHandler.lambdaFn.addEnvironment('AUTH_REDIRECT_URL', authHandler.functionUrl.url);
+
         // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
         // TODO: [INT-84] use Lambda extension to cache the value
         new StringParameter(this, 'authRedirectUrl', {
@@ -66,16 +72,6 @@ export class LambdaStack extends Stack {
             stringValue: authHandler.functionUrl.url,
             description: 'The auth handler lambda function url, used as Google OAuth2 redirect url',
         });
-        authHandler.lambdaFn.role?.addToPrincipalPolicy(
-            new PolicyStatement({
-                actions: ['ssm:GetParameter'],
-                resources: ['*'],
-            })
-        );
-        //
-        // this.createWebhookHandler('tst', {
-        //     AUTH_REDIRECT_URL: authHandler.functionUrl.url,
-        // });
     }
 
     /**
@@ -106,6 +102,7 @@ export class LambdaStack extends Stack {
         });
         handlerRole.addToPolicy(this.buildGetSecretPolicy());
         handlerRole.addToPolicy(this.buildKmsDecryptPolicy());
+        handlerRole.addToPolicy(this.buildGetParameterPolicy());
 
         const handlerFunction = new GoFunction(this, handlerName, {
             entry: path.join(__dirname, `../../../../src/cmd/${handlerName}/main.go`),
@@ -174,6 +171,13 @@ export class LambdaStack extends Stack {
     private buildKmsDecryptPolicy(): PolicyStatement {
         return new PolicyStatement({
             actions: ['kms:Decrypt'],
+            resources: ['*'],
+        });
+    }
+
+    private buildGetParameterPolicy(): PolicyStatement {
+        return new PolicyStatement({
+            actions: ['ssm:GetParameter'],
             resources: ['*'],
         });
     }

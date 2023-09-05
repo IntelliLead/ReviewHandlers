@@ -169,7 +169,7 @@
                     },
                     {
                         "type": "text",
-                        "text": "以您的簽名結束回覆，以示誠意。\n(Google 官方推薦回覆秘訣)",
+                        "text": "以您的簽名結束回覆，以示誠意。(Google 官方推薦回覆秘訣)",
                         "size": "xs",
                         "color": "#aaaaaa",
                         "wrap": true,
@@ -300,7 +300,7 @@
                     },
                     {
                         "type": "text",
-                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,藝文特區美食",
+                        "text": "請用逗號分隔關鍵字。例：餐酒館,西餐,中山區美食",
                         "size": "xxs",
                         "color": "#aaaaaa",
                         "wrap": true,
@@ -358,7 +358,7 @@
                     },
                     {
                         "type": "text",
-                        "text": "邀請顧客下次來體驗不一樣的業務，也對 SEO 有幫助。\n(Google 官方推薦的回覆秘訣)",
+                        "text": "邀請顧客下次來體驗不一樣的業務，也對 SEO 有幫助。(Google 官方推薦的回覆秘訣)",
                         "size": "xs",
                         "color": "#aaaaaa",
                         "wrap": true,
