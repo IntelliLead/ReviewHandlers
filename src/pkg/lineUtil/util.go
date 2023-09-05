@@ -395,18 +395,12 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User) (linebot.FlexCon
 
     // substitute keyword toggle
     // body -> contents[5] -> contents[0] -> contents[1] -> url
-    var keywordEnabled bool
-    if user.KeywordEnabled == nil {
-        keywordEnabled = false
-    } else {
-        keywordEnabled = *user.KeywordEnabled
-    }
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[5].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
         // TODO: [INT-88]
-    (map[string]interface{})["url"] = util.GetToggleUrl(keywordEnabled)
+    (map[string]interface{})["url"] = util.GetToggleUrl(*user.KeywordEnabled)
 
     // substitute keywords
     var keywords string
