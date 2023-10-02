@@ -102,6 +102,7 @@ export class LambdaStack extends Stack {
         handlerRole.addToPolicy(this.buildGetSecretPolicy());
         handlerRole.addToPolicy(this.buildKmsDecryptPolicy());
         handlerRole.addToPolicy(this.buildGetParameterPolicy());
+        handlerRole.addToPolicy(this.buildCloudwatchMetricPolicy());
         handlerRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'));
 
         const handlerFunction = new GoFunction(this, handlerName, {
@@ -177,6 +178,13 @@ export class LambdaStack extends Stack {
     private buildGetParameterPolicy(): PolicyStatement {
         return new PolicyStatement({
             actions: ['ssm:GetParameter'],
+            resources: ['*'],
+        });
+    }
+
+    private buildCloudwatchMetricPolicy(): PolicyStatement {
+        return new PolicyStatement({
+            actions: ['cloudwatch:PutMetricData'],
             resources: ['*'],
         });
     }
