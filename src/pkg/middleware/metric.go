@@ -2,6 +2,7 @@ package middleware
 
 import (
     "context"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
@@ -9,14 +10,24 @@ import (
     "log"
 )
 
+var (
+    _log = logger.NewLogger()
+)
+
 func MetricMiddleware(handler func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error)) func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     return func(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
         response, err := handler(ctx, request)
 
+        // DEBUG
+        log.Println("Response status code: ", response.StatusCode)
+        _log.Debugf("Response status code: %d", response.StatusCode)
+
         // Emit custom metrics based on the response status code
         if response.StatusCode >= 400 && response.StatusCode < 500 {
+            _log.Infof("Emitting 4XXError metric")
             emitMetric("4XXError", 1.0)
         } else if response.StatusCode >= 500 {
+            _log.Infof("Emitting 5XXError metric")
             emitMetric("5XXError", 1.0)
         }
 
@@ -37,6 +48,8 @@ func emitMetric(metricName string, value float64) {
         },
     })
     if err != nil {
+        // DEBUG
         log.Println("Error emitting metric: ", err)
+        _log.Error("Error emitting metric: ", err)
     }
 }
