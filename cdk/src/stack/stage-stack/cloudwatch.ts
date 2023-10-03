@@ -1,11 +1,11 @@
 import { StackCreationInfo, STAGE } from 'common-cdk';
 import { Duration, Stack } from 'aws-cdk-lib';
-import { LambdaFunctions, LambdaStack } from './lambda';
+import { LambdaStack } from './lambda';
 import { Construct } from 'constructs';
 import { Topic } from 'aws-cdk-lib/aws-sns';
 import { SlackChannelConfiguration } from 'aws-cdk-lib/aws-chatbot';
 import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
-import { Alarm, Dashboard, GraphWidget, Metric, TextWidget, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
+import { Dashboard, GraphWidget, Metric, TextWidget, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { SnsAction } from 'aws-cdk-lib/aws-cloudwatch-actions';
 import { PREPROD_SLACK_CHANNEL_ID, PROD_SLACK_CHANNEL_ID, SLACK_WORKSPACE_ID } from '../../constant';
 

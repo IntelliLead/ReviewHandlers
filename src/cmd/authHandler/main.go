@@ -10,6 +10,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -21,7 +22,7 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameAuthHandler.String(), handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
