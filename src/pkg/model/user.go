@@ -3,7 +3,7 @@ package model
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "strings"
     "time"
@@ -53,15 +53,12 @@ func NewUser(lineUserId string,
     return user
 }
 
-func BuildDdbUserKey(userId string) map[string]*dynamodb.AttributeValue {
+func BuildDdbUserKey(userId string) map[string]types.AttributeValue {
     uniqueId := util.DefaultUniqueId
-    return map[string]*dynamodb.AttributeValue{
-        "userId": {
-            S: &userId,
-        },
-        "uniqueId": {
-            S: &uniqueId,
-        }}
+    return map[string]types.AttributeValue{
+        "userId":   &types.AttributeValueMemberS{Value: userId},
+        "uniqueId": &types.AttributeValueMemberS{Value: uniqueId},
+    }
 }
 
 // GetFinalQuickReplyMessage returns the final quick reply message to be sent to the user.

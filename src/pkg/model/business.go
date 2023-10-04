@@ -2,7 +2,7 @@ package model
 
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "time"
 )
 
@@ -41,13 +41,10 @@ func NewBusiness(businessId string,
     }
 }
 
-func BuildDdbBusinessKey(userId string) map[string]*dynamodb.AttributeValue {
+func BuildDdbBusinessKey(userId string) map[string]types.AttributeValue {
     uniqueId := util.DefaultUniqueId
-    return map[string]*dynamodb.AttributeValue{
-        "businessId": {
-            S: &userId,
-        },
-        "uniqueId": {
-            S: &uniqueId,
-        }}
+    return map[string]types.AttributeValue{
+        "businessId": &types.AttributeValueMemberS{Value: userId},
+        "uniqueId":   &types.AttributeValueMemberS{Value: uniqueId},
+    }
 }

@@ -17,9 +17,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "os"
 )
@@ -58,11 +56,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    mySession := session.Must(session.NewSession())
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-
+    ddbOptions := dynamodb.Options{
+        Region: "ap-northeast-1",
+    }
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(ddbOptions), log)
+    userDao := ddbDao.NewUserDao(dynamodb.New(ddbOptions), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.New(ddbOptions), log)
     // LINE
     line := lineUtil.NewLine(log)
 

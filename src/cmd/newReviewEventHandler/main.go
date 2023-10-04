@@ -15,9 +15,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/go-playground/validator/v10"
     "github.com/google/uuid"
     "os"
@@ -68,33 +66,35 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    mySession := session.Must(session.NewSession())
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
+    ddbOptions := dynamodb.Options{
+        Region: "ap-northeast-1",
+    }
+    businessDao := ddbDao.NewBusinessDao(dynamodb.New(ddbOptions), log)
+    userDao := ddbDao.NewUserDao(dynamodb.New(ddbOptions), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.New(ddbOptions), log)
 
     // --------------------
     // validate user exists
     // --------------------
-    user, err := userDao.GetUser(review.UserId)
+    user, err := userDao.GetUser(review.BusinessId)
     if err != nil {
         log.Error("Error getting user: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
     }
     isUserExist := userDao.IsUserExist(user)
     if !isUserExist {
-        log.Error("User does not exist: ", review.UserId)
+        log.Error("User does not exist: ", review.BusinessId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
     }
 
-    log.Debugf("User %s exists, proceeding", review.UserId)
+    log.Debugf("User %s exists, proceeding", review.BusinessId)
 
     // --------------------
     // store review
     // --------------------
-    nextReviewId, err := reviewDao.GetNextReviewID(review.UserId)
+    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
     if err != nil {
-        log.Errorf("Error getting next review id for userId %s: %v", review.UserId, err)
+        log.Errorf("Error getting next review id for userId %s: %v", review.BusinessId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
     }
 
@@ -124,11 +124,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     err = line.SendNewReview(review, user)
     if err != nil {
-        log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
+        log.Errorf("Error sending new review to LINE user %s: %s", review.BusinessId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
 
-    log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
+    log.Debugf("Successfully sent new review to LINE user: '%s'", review.BusinessId)
 
     // TODO: [INT-91] Remove backfill logic once all users have been backfilled
     var autoQuickReplyEnabled bool

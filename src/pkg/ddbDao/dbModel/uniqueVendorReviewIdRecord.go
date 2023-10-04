@@ -11,7 +11,7 @@ const uniqueVendorReviewIdPrefix = "#UNIQUE_VENDOR_REVIEW_ID#"
 
 func NewUniqueVendorReviewIdRecord(review model.Review) UniqueVendorReviewIdRecord {
     uniqueVendorReviewID := UniqueVendorReviewIdRecord{
-        UserId:                  review.UserId,
+        UserId:                  review.BusinessId,
         VendorReviewIdUniqueKey: uniqueVendorReviewIdPrefix + review.VendorReviewId,
     }
     return uniqueVendorReviewID
