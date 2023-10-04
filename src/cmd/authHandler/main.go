@@ -2,11 +2,14 @@ package main
 
 import (
     "context"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
@@ -19,6 +22,7 @@ import (
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
+    "time"
 )
 
 func main() {
@@ -86,15 +90,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
     businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
 
-    isUserExist, user, err := userDao.IsUserExist(userId)
+    user, err := userDao.GetUser(userId)
     if err != nil {
         log.Error("Error checking if user exists: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, nil
     }
-    if !isUserExist {
-        log.Error("User does not exist: ", userId)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
-    }
+    isUserExist := userDao.IsUserExist(user)
 
     google, err := googleUtil.NewGoogleWithAuthCode(log, code)
     if err != nil {
@@ -117,7 +118,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             Body:       `{"error": "Error retrieving Google business location"}`,
         }, err
     }
-    log.Debugf("Google business location: %s", jsonUtil.AnyToJson(location))
+    // log.Debugf("Google business location: %s", jsonUtil.AnyToJson(location))
     businessId := accountId + "/" + location.Name
 
     business, err := businessDao.GetBusiness(businessId)
@@ -131,88 +132,66 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     /*
        scenarios:
-        1. user have this business and business exists: update Google token for business
-        2. user does not have this business and business exists: add user to business (secondary user or not first time login)
-        3. user does not have this business and business does not exist: create new business for user (primary user)
+        1. Neither user nor business exist: create new user and associated business (primary user first time auth)
+        2. user exists, but business does not exist: create new business for user (backfill - primary user)
+        2. Business exists, but user does not exist: create new user associated with business (secondary user first time auth)
+        3. user and business both exist, user have this business: update Google token for business
+        4. user and business both exist, but user does not have this business: add user to business (backfill - secondary user)
 
         Other scenarios are error state
     */
-    if business != nil && util.StringInSlice(userId, business.UserIds) && util.StringInSlice(businessId, user.BusinessIds) {
-        log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
+    if !isUserExist {
+        log.Infof("User %s does not exist. Creating new user.", userId)
 
-        actions, err := buildUpdateTokenAttributeActions(google.Token)
+        line := lineUtil.NewLine(log)
+        lineGetUserResp, err := line.GetUser(userId)
         if err != nil {
+            log.Errorf("Error retrieving user %s from LINE: %s", userId, err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       `{"error": "Error building update token attribute actions"}`,
+                Body:       `{"error": "Error retrieving user from LINE"}`,
             }, err
         }
 
-        _, err = businessDao.UpdateAttributes(businessId, actions)
+        newUser := model.NewUser(userId, businessId, lineGetUserResp, time.Now())
+        err = userDao.CreateUser(newUser)
         if err != nil {
+            if _, ok := err.(*exception.UserAlreadyExistException); ok {
+                log.Errorf("User %s already exists. Concurrency issue?", userId)
+            } else {
+                log.Error("Error creating user:", err)
+            }
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
-                Body:       `{"error": "Error updating business attributes"}`,
-            }, err
+                Body:       fmt.Sprintf(`{"error": "Failed to create user: %s"}`, err),
+            }, nil
         }
 
-    } else if business != nil && !util.StringInSlice(businessId, user.BusinessIds) {
-        log.Infof("User %s does not have association with business %s yet. Adding user to business.", userId, businessId)
-
-        // add user to business and update business Google token
-        userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})
-        if err != nil {
-            log.Errorf("Error building user id append action: %s", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error building user id append action"}`,
-            }, err
+        if business != nil {
+            action, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error creating attribute action"}`,
+                }, err
+            }
+            _, err = businessDao.UpdateAttributes(businessId, []dbModel.AttributeAction{action}, userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error updating business"}`,
+                }, err
+            }
         }
-        tokenActions, err := buildUpdateTokenAttributeActions(google.Token)
-        if err != nil {
-            log.Errorf("Error building update token attribute actions: %s", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error building update token attribute actions"}`,
-            }, err
-        }
+    }
 
-        _, err = businessDao.UpdateAttributes(businessId, append(tokenActions, userIdAppendAction))
-        if err != nil {
-            log.Errorf("Error updating business %s attributes %v: %s", businessId, append(tokenActions, userIdAppendAction), err)
+    if business == nil {
+        log.Infof("Business '%s' does not exist. Creating new business.", businessId)
 
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error updating business attributes"}`,
-            }, err
-        }
-
-        // add business to user
-        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId})
-        if err != nil {
-            log.Errorf("Error building business id append action: %s", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error building business id append action"}`,
-            }, err
-        }
-        _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdAppendAction})
-        if err != nil {
-            log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdAppendAction, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error updating user attributes"}`,
-            }, err
-        }
-
-    } else if business == nil && !util.StringInSlice(businessId, user.BusinessIds) {
-        log.Infof("Business %s does not exist. Creating and associating with user %s.", businessId, userId)
-
-        // get user info from Google and create business
+        // get user info from Google
         userInfo, err := google.GetGoogleUserInfo()
         if err != nil {
             log.Errorf("Error retrieving Google user info: %s", err)
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       `{"error": "Error retrieving Google user info"}`,
@@ -222,7 +201,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Debug("Google user info: ", jsonUtil.AnyToJson(userInfo))
 
         // create business
-        business := model.NewBusiness(
+        newBusiness := model.NewBusiness(
             accountId+"/"+location.Name,
             location.Title,
             model.Google{
@@ -237,34 +216,108 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             },
             userId,
         )
-        err = businessDao.CreateBusiness(business)
+
+        // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+        if isUserExist {
+            backfillBusinessFromUser(&newBusiness, user)
+
+            // associate business with user
+            businessIdUpdateAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "activeBusinessId", businessId)
+            if err != nil {
+                log.Errorf("Error building business id update action: %s", err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error building business id update action"}`,
+                }, err
+            }
+            _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdUpdateAction})
+            if err != nil {
+                log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdUpdateAction, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error updating user attributes"}`,
+                }, err
+            }
+        }
+
+        err = businessDao.CreateBusiness(newBusiness)
         if err != nil {
-            log.Errorf("Error creating business object %v: %v", business, err)
+            log.Errorf("Error creating business object %v: %v", newBusiness, err)
 
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       `{"error": "Error creating business object"}`,
             }, err
         }
+    } else if business != nil && isUserExist {
+        if util.StringInSlice(userId, business.UserIds) {
+            log.Infof("User %s already has association with business %s. Updating OAUTH token only.", userId, businessId)
 
-        // associate business with user
-        businessIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId})
-        if err != nil {
-            log.Errorf("Error building business id append action: %s", err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error building business id append action"}`,
-            }, err
-        }
-        _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdAppendAction})
-        if err != nil {
-            log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdAppendAction, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       `{"error": "Error updating user attributes"}`,
-            }, err
-        }
+            actions, err := buildUpdateTokenAttributeActions(google.Token)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error building update token attribute actions"}`,
+                }, err
+            }
 
+            _, err = businessDao.UpdateAttributes(businessId, actions, userId)
+            if err != nil {
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error updating business attributes"}`,
+                }, err
+            }
+        } else {
+            // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+            log.Infof("User %s does not have association with business %s yet. Creating association and refreshing OAUTH token.", userId, businessId)
+
+            // add user to business and update business Google token
+            userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})
+            if err != nil {
+                log.Errorf("Error building user id append action: %s", err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error building user id append action"}`,
+                }, err
+            }
+            tokenActions, err := buildUpdateTokenAttributeActions(google.Token)
+            if err != nil {
+                log.Errorf("Error building update token attribute actions: %s", err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error building update token attribute actions"}`,
+                }, err
+            }
+
+            _, err = businessDao.UpdateAttributes(businessId, append(tokenActions, userIdAppendAction), userId)
+            if err != nil {
+                log.Errorf("Error updating business %s attributes %v: %s", businessId, append(tokenActions, userIdAppendAction), err)
+
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error updating business attributes"}`,
+                }, err
+            }
+
+            // add business to user
+            businessIdUpdateAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "activeBusinessId", businessId)
+            if err != nil {
+                log.Errorf("Error building business id update action: %s", err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error building business id update action"}`,
+                }, err
+            }
+            _, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{businessIdUpdateAction})
+            if err != nil {
+                log.Errorf("Error updating user %s attributes %v: %s", userId, businessIdUpdateAction, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       `{"error": "Error updating user attributes"}`,
+                }, err
+            }
+        }
     } else {
         // error states
         log.Errorf("Error associating user %s with business %s", userId, businessId)
@@ -295,4 +348,22 @@ func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAc
     }
 
     return []dbModel.AttributeAction{accessTokenAction, accessTokenExpireAtAction, refreshTokenAction}, nil
+}
+
+// TODO: [INT-91] Remove backfill logic once all users have been backfilled
+// backfillBusinessFromUser in-place backfills business attributes from user
+func backfillBusinessFromUser(business *model.Business, user model.User) {
+    business.BusinessDescription = user.BusinessDescription
+    business.Keywords = user.Keywords
+    if user.KeywordEnabled == nil {
+        business.KeywordEnabled = false
+    } else {
+        business.KeywordEnabled = *user.KeywordEnabled
+    }
+    business.QuickReplyMessage = user.QuickReplyMessage
+    if user.AutoQuickReplyEnabled == nil {
+        business.AutoQuickReplyEnabled = false
+    } else {
+        business.AutoQuickReplyEnabled = *user.AutoQuickReplyEnabled
+    }
 }
