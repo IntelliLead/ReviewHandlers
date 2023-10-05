@@ -56,10 +56,15 @@ func handleGenerateAiReply(
     }
 
     // get review
-    review, err := reviewDao.GetReview(userId, reviewId)
+    review, err := reviewDao.GetReview(business.BusinessId, reviewId)
     if err != nil {
         log.Errorf("Error getting review during handling generate AI reply: %s", err)
         return err
+    }
+    if review == nil {
+        errStr := fmt.Sprintf("Review not found for businessId: %s ; ReviewId: %s", business.BusinessId, reviewId)
+        log.Error(errStr)
+        return errors.New(errStr)
     }
 
     // invoke gpt4
@@ -75,7 +80,7 @@ func handleGenerateAiReply(
     }
 
     // create AI generated result card
-    err = line.SendAiGeneratedReply(aiReply, review, user.UserId)
+    err = line.SendAiGeneratedReply(aiReply, *review, user.UserId)
     if err != nil {
         log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
         return err

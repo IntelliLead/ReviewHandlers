@@ -16,6 +16,10 @@ import (
     "strings"
 )
 
+func shouldAuth(postbackEvent []string) bool {
+    return postbackEvent[1] == "GenerateAiReply" || postbackEvent[1] == "Toggle" || (postbackEvent[0] == "RichMenu" && postbackEvent[1] != "Help")
+}
+
 func ProcessPostbackEvent(
     event *linebot.Event,
     userId string,
@@ -33,12 +37,14 @@ func ProcessPostbackEvent(
     // shift off the first element, which is empty
     dataSlice = dataSlice[1:]
 
-    var businessPtr *model.Business
-    var userPtr *model.User
-    if dataSlice[1] == "GenerateAiReply" || dataSlice[1] == "Toggle" || (dataSlice[0] == "RichMenu" && dataSlice[1] != "Help") {
+    // business and user are empty if event does not require auth
+    // WARN: ensure event handlers that require auth are added to shouldAuth() list
+    var business model.Business
+    var user model.User
+    if shouldAuth(dataSlice) {
         var hasUserCompletedAuth bool
         var err error
-        hasUserCompletedAuth, userPtr, businessPtr, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+        hasUserCompletedAuth, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
         if err != nil {
             log.Errorf("Error validating user '%s' auth: %s", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -49,12 +55,13 @@ func ProcessPostbackEvent(
         if !hasUserCompletedAuth {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 200,
-                Body:       `{"message": "User has not completed auth"}`,
+                Body:       `{"message": "User has not completed auth. Prompted auth."}`,
             }, nil
         }
+
+        business = *businessPtr
+        user = *userPtr
     }
-    business := *businessPtr
-    user := *userPtr
 
     switch dataSlice[0] {
     // /[NewReview|AiReply]/GenerateAiReply/{REVIEW_ID}

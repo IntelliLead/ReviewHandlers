@@ -52,7 +52,7 @@ func ValidateUserAuthOrRequestAuth(
         log.Info("User %s has associated business %s, but has not completed oauth. Requesting auth", userId, business.BusinessId)
     }
 
-    // when testing in local, there is no replyToken, send to user instead.
+    // when testing in local, there is no replyToken, send to user instead of replying
     if replyToken == "TST" {
         err = line.SendAuthRequest(userId)
     } else {

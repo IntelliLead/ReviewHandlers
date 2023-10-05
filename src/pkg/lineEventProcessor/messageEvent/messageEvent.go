@@ -12,6 +12,12 @@ import (
     "go.uber.org/zap"
 )
 
+func shouldAuth(message string) bool {
+    cmdMsg := lineUtil.ParseCommandMessage(message, false)
+
+    return lineUtil.IsReviewReplyMessage(message) || (cmdMsg.Command != "h" && cmdMsg.Command != "Help" && cmdMsg.Command != "help" && cmdMsg.Command != "幫助" && cmdMsg.Command != "協助")
+}
+
 // ProcessMessageEvent processes a message event from LINE
 // It returns a LambdaFunctionURLResponse and an error
 func ProcessMessageEvent(
@@ -69,19 +75,14 @@ func ProcessMessageEvent(
 
     // process review reply request
     // --------------------------------
-    if lineUtil.IsReviewReplyMessage(message) {
-        return ProcessReviewReplyMessage(userId, event, reviewDao, line, log)
-    }
 
-    // process command requests
-    cmdMsg := lineUtil.ParseCommandMessage(message, false)
-    args := cmdMsg.Args[0]
-
-    var businessPtr *model.Business
-    var userPtr *model.User
-    if cmdMsg.Command != "h" && cmdMsg.Command != "Help" && cmdMsg.Command != "help" && cmdMsg.Command != "幫助" && cmdMsg.Command != "協助" {
+    // business and user are empty if event does not require auth
+    // WARN: ensure event handlers that require auth are added to shouldAuth() list
+    var business model.Business
+    var user model.User
+    if shouldAuth(message) {
         var hasUserAuthed bool
-        hasUserAuthed, userPtr, businessPtr, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+        hasUserAuthed, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
@@ -94,11 +95,21 @@ func ProcessMessageEvent(
                 Body:       `{"message": "User has not authenticated. Requested authentication."}`,
             }, nil
         }
-    }
-    // neither user nor business is nil if user has authenticated
-    user := *userPtr
-    business := *businessPtr
 
+        user = *userPtr
+        business = *businessPtr
+    }
+
+    if lineUtil.IsReviewReplyMessage(message) {
+        return ProcessReviewReplyMessage(business, user, event, reviewDao, line, log)
+    }
+
+    // process command requests
+    cmdMsg := lineUtil.ParseCommandMessage(message, false)
+    args := ""
+    if len(cmdMsg.Args) > 0 {
+        args = cmdMsg.Args[0]
+    }
     switch cmdMsg.Command {
     case "h", "Help", "help", "幫助", "協助":
         _, err := line.ReplyHelpMessage(event.ReplyToken)

@@ -163,6 +163,7 @@ type UpdateReviewInput struct {
     LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
     LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
     Reply       string         `dynamodbav:"reply"`
+    RepliedBy   string         `dynamodbav:"repliedBy"` // userId
 }
 
 func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
@@ -185,6 +186,9 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     ).Set(
         expression.Name("reply"),
         expression.Value(input.Reply),
+    ).Set(
+        expression.Name("replyBy"),
+        expression.Value(input.RepliedBy),
     )
     expr, err := expression.NewBuilder().
         WithUpdate(update).
@@ -229,14 +233,14 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     return nil
 }
 
-func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (model.Review, error) {
+func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (*model.Review, error) {
     // Create the key for the GetItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
         util.ReviewTablePartitionKey: businessId,
         util.ReviewTableSortKey:      reviewId,
     })
     if err != nil {
-        return model.Review{}, err
+        return nil, err
     }
 
     result, err := d.client.GetItem(context.TODO(), &dynamodb.GetItemInput{
@@ -244,34 +248,25 @@ func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (model
         Key:       key,
     })
     if err != nil {
-        var resourceNotFoundException *types.ResourceNotFoundException
-        switch {
-        case errors.As(err, &resourceNotFoundException):
-            return model.Review{}, exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with businessId '%s' and reviewId '%s' does not exist", businessId, reviewId), err)
-        default:
-            d.log.Errorf("Unknown DDB error in GetReview for businessId %s reviewId %s: %s", businessId, reviewId, jsonUtil.AnyToJson(err))
-        }
-
-        return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for businessId %s reviewId %s with unknown error: ", businessId, reviewId), err)
+        d.log.Errorf("GetReview failed for businessId '%s' reviewId '%s': %v", businessId, reviewId, err)
+        return nil, err
     }
 
-    // Check if the item was found
     if result.Item == nil {
-        return model.Review{}, exception.NewUnknownDDBException("GetReview failed for unknown reason: no error thrown but result.Item was nil", nil)
+        return nil, nil
     }
 
     // Unmarshal the item into a review object
     review := &model.Review{}
     err = attributevalue.UnmarshalMap(result.Item, review)
     if err != nil {
-        return model.Review{}, fmt.Errorf("failed to unmarshal Review, %v", err)
+        return nil, fmt.Errorf("failed to unmarshal Review, %v", err)
     }
 
     err = model.ValidateReview(review)
     if err != nil {
-        return model.Review{}, fmt.Errorf("invalid review fetched: %v", err)
+        return nil, fmt.Errorf("invalid review fetched: %v", err)
     }
 
-    return *review, nil
+    return review, nil
 }
