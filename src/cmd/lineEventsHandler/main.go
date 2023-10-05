@@ -17,6 +17,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "os"
@@ -56,12 +57,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    ddbOptions := dynamodb.Options{
-        Region: "ap-northeast-1",
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        log.Error("Error loading AWS config: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
     }
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(ddbOptions), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(ddbOptions), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(ddbOptions), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
     // LINE
     line := lineUtil.NewLine(log)
 

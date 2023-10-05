@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/cloudwatch"
     "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
@@ -32,11 +33,12 @@ func MetricMiddleware(handlerName string,
 }
 
 func emitMetric(metricName string, handlerName string, value float64) {
-    svc := cloudwatch.New(
-        cloudwatch.Options{
-            Region: "ap-northeast-1",
-        })
-    _, err := svc.PutMetricData(context.TODO(), &cloudwatch.PutMetricDataInput{
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        _log.Error("Error loading AWS config: ", err)
+    }
+    svc := cloudwatch.NewFromConfig(cfg)
+    _, err = svc.PutMetricData(context.TODO(), &cloudwatch.PutMetricDataInput{
         Namespace: aws.String("AWS/Lambda"),
         MetricData: []types.MetricDatum{
             {

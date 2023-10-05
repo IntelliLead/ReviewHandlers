@@ -3,6 +3,7 @@ package main
 import (
     "context"
     "encoding/json"
+    "errors"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -15,6 +16,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/go-playground/validator/v10"
     "github.com/google/uuid"
@@ -55,7 +57,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
     }
     review := *reviewPtr
-    // local/alpha testing: generate a new vendor review ID to prevent duplication
+    // local testing: generate a new vendor review ID to prevent duplication
     if stage == enum.StageLocal.String() {
         review.VendorReviewId = uuid.New().String()
     }
@@ -66,13 +68,46 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    ddbOptions := dynamodb.Options{
-        Region: "ap-northeast-1",
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        log.Error("Error loading AWS config: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
     }
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(ddbOptions), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(ddbOptions), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(ddbOptions), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
 
+    // --------------------
+    // store review
+    // --------------------
+    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
+    if err != nil {
+        log.Errorf("Error getting next review id for BusinessId %s: %v", review.BusinessId, err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
+    }
+
+    review.ReviewId = &nextReviewId
+
+    log.Debugf("Assigned review id %s to new review", nextReviewId.String())
+
+    err = reviewDao.CreateReview(review)
+    if err != nil {
+        log.Error("Error creating review: ", err)
+
+        var reviewAlreadyExistException exception.ReviewAlreadyExistException
+        var vendorReviewIdAlreadyExistException exception.VendorReviewIdAlreadyExistException
+        switch {
+        case errors.As(err, &reviewAlreadyExistException):
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Review already exists"}`, StatusCode: 400}, nil
+        case errors.As(err, &vendorReviewIdAlreadyExistException):
+            log.Error("Create review failed because vendorReviewId unique record exists but not the review object: ", review)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Database conflict"}`, StatusCode: 500}, nil
+        default:
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating review"}`, StatusCode: 500}, nil
+        }
+    }
+
+    // TODO: [INT-94] Send to all users in the business instead of relying on the review-associated user (legacy)
     // --------------------
     // validate user exists
     // --------------------
@@ -88,34 +123,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     }
 
     log.Debugf("User %s exists, proceeding", review.BusinessId)
-
-    // --------------------
-    // store review
-    // --------------------
-    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
-    if err != nil {
-        log.Errorf("Error getting next review id for userId %s: %v", review.BusinessId, err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
-    }
-
-    review.ReviewId = &nextReviewId
-
-    log.Debugf("Assigned review id %s to new review", nextReviewId.String())
-
-    err = reviewDao.CreateReview(review)
-    if err != nil {
-        log.Error("Error creating review: ", err)
-
-        switch err.(type) {
-        case exception.ReviewAlreadyExistException:
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Review already exists"}`, StatusCode: 400}, nil
-        case exception.VendorReviewIdAlreadyExistException:
-            log.Error("Create review failed because vendorReviewId unique record exists but not the review object: ", review)
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Database conflict"}`, StatusCode: 500}, nil
-        default:
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating review"}`, StatusCode: 500}, nil
-        }
-    }
 
     // --------------------------------
     // forward to LINE by calling LINE messaging API

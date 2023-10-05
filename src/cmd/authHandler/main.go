@@ -17,6 +17,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
@@ -85,11 +86,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // 1. Check if user exists
     // ----
     // DDB
-    ddbOptions := dynamodb.Options{
-        Region: "ap-northeast-1",
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        log.Error("Error loading AWS config: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
     }
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(ddbOptions), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(ddbOptions), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
 
     user, err := userDao.GetUser(userId)
     if err != nil {

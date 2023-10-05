@@ -10,6 +10,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
@@ -31,15 +32,10 @@ func NewReviewDao(client *dynamodb.Client, logger *zap.SugaredLogger) *ReviewDao
     }
 }
 
-var (
-    ReviewTablePartitionKey = "userId"
-    ReviewTableSortKey      = "uniqueId"
-)
-
 func (d *ReviewDao) GetNextReviewID(businessId string) (_type.ReviewId, error) {
     // Define the expression to retrieve the largest ReviewId for the given BusinessId
     expr, err := expression.NewBuilder().
-        WithKeyCondition(expression.Key(ReviewTablePartitionKey).Equal(expression.Value(businessId))).
+        WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(businessId))).
         Build()
     if err != nil {
         d.log.Error("Unable to produce key condition expression for GetNextReviewID with businessId %s: ", businessId, err)
@@ -60,7 +56,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string) (_type.ReviewId, error) {
         return "", err
     }
 
-    // If there are no existing reviews, start with ReviewId 1
+    // If there are no existing reviews, start with ReviewId 0
     if len(result.Items) == 0 {
         return _type.NewReviewId("0"), nil
     }
@@ -96,6 +92,27 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
         return err
     }
 
+    // DEBUG
+    input := dynamodb.TransactWriteItemsInput{
+        TransactItems: []types.TransactWriteItem{
+            {
+                Put: &types.Put{
+                    TableName:           aws.String(enum.TableReview.String()),
+                    Item:                av,
+                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
+                },
+            },
+            {
+                Put: &types.Put{
+                    TableName:           aws.String(enum.TableReview.String()),
+                    Item:                uniqueAv,
+                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
+                },
+            },
+        },
+    }
+    d.log.Debugf("TransactWriteItemsInput: %s", jsonUtil.AnyToJson(input))
+
     _, err = d.client.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
         TransactItems: []types.TransactWriteItem{
             {
@@ -119,10 +136,6 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
         switch {
         case errors.As(err, &t):
             failedRequests := t.CancellationReasons
-            // assert length should be 2
-            if len(failedRequests) != 2 {
-                return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons - unexpected CancellationReasons length: ", err)
-            }
 
             if *(failedRequests[0].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
                 return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
@@ -132,7 +145,9 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
                 return exception.NewVendorReviewIdAlreadyExistException(fmt.Sprintf("UniqueVendorReviewId with vendorReviewID %s already exists", review.VendorReviewId), err)
             }
 
-            return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons: ", err)
+            d.log.Debug("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
+
+            return err
         default:
             d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
             return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
@@ -181,8 +196,8 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
 
     // Create the key for the UpdateItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
-        "userId":   input.BusinessId,
-        "uniqueId": input.ReviewId,
+        util.ReviewTablePartitionKey: input.BusinessId,
+        util.ReviewTableSortKey:      input.ReviewId,
     })
     if err != nil {
         return err
@@ -202,7 +217,7 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
         switch {
         case errors.As(err, &resourceNotFoundException):
             return exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", input.BusinessId, input.ReviewId), err)
+                fmt.Sprintf("Review with businessId '%s' and reviewId '%s' does not exist", input.BusinessId, input.ReviewId), err)
         default:
             d.log.Errorf("Unknown DDB error in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
             return err
@@ -217,8 +232,8 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
 func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (model.Review, error) {
     // Create the key for the GetItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
-        "userId":   businessId, // userId is the partition key name, even though we are now using businessId
-        "uniqueId": reviewId,
+        util.ReviewTablePartitionKey: businessId,
+        util.ReviewTableSortKey:      reviewId,
     })
     if err != nil {
         return model.Review{}, err
