@@ -1,8 +1,8 @@
 package slackUtil
 
 import (
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/slack-go/slack"
     "go.uber.org/zap"
@@ -15,13 +15,15 @@ So we have to use the web API instead: https://api.slack.com/web
 */
 
 type Slack struct {
-    client *slack.Client
-    log    *zap.SugaredLogger
-    stage  enum.Stage
+    client    *slack.Client
+    log       *zap.SugaredLogger
+    stage     enum.Stage
+    channelId string
 }
 
 func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
-    client := slack.New(secret.GetSecrets().SlackToken)
+    secrets := awsUtil.NewAws(logger).GetSecrets()
+    client := slack.New(secrets.SlackToken)
 
     // DEBUG: Test authentication
     // _, err := client.AuthTest()
@@ -31,13 +33,12 @@ func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
     // }
 
     return &Slack{
-        client: client,
-        log:    logger,
-        stage:  stage,
+        client:    client,
+        log:       logger,
+        stage:     stage,
+        channelId: secrets.NewUserSlackBotChannelId,
     }
 }
-
-var channelId = secret.GetSecrets().NewUserSlackBotChannelId
 
 func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) error {
     readableTimestamp, err := util.UtcToReadableTwTimestamp(timestamp)
@@ -52,7 +53,7 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
     }
     msg1 += "New user followed IntelliLead App LINE Official Account at " + readableTimestamp + ". User ID: "
     respChannel, respTimestamp, err := s.client.PostMessage(
-        channelId,
+        s.channelId,
         slack.MsgOptionText(msg1, false),
     )
     if err != nil {
@@ -67,7 +68,7 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
         slack.NewDividerBlock(),
     }
     respChannel, respTimestamp, err = s.client.PostMessage(
-        channelId,
+        s.channelId,
         slack.MsgOptionBlocks(blocks...),
     )
     if err != nil {
