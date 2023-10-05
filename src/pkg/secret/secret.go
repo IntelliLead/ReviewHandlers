@@ -3,6 +3,7 @@ package secret
 import (
     "encoding/json"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/secret/secretModel"
+    // TODO: use aws sdk v2 https://github.com/aws/aws-secretsmanager-caching-go/issues/39
     "github.com/aws/aws-secretsmanager-caching-go/secretcache"
     "log"
 )

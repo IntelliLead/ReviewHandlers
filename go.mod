@@ -11,15 +11,18 @@ require (
 require (
 	cloud.google.com/go/compute v1.20.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	github.com/aws/aws-sdk-go v1.44.287 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.21.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.10.40 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.4.67 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.41 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.35 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.27.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.22.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.15.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.7.35 // indirect
+	github.com/aws/aws-secretsmanager-caching-go v1.1.2 // indirect
 	github.com/aws/smithy-go v1.14.2 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

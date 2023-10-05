@@ -64,7 +64,7 @@ func ReplyReview(
     // update DDB
     // --------------------
     err = reviewDao.UpdateReview(ddbDao.UpdateReviewInput{
-        UserId:      userId,
+        BusinessId:  userId,
         ReviewId:    *review.ReviewId,
         LastUpdated: time.Now(),
         LastReplied: time.Now(),

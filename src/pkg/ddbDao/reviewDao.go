@@ -143,7 +143,7 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 }
 
 type UpdateReviewInput struct {
-    UserId      string         `dynamodbav:"userId"`
+    BusinessId  string         `dynamodbav:"userId"`
     ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
     LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
     LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
@@ -181,7 +181,7 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
 
     // Create the key for the UpdateItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
-        "userId":   input.UserId,
+        "userId":   input.BusinessId,
         "uniqueId": input.ReviewId,
     })
     if err != nil {
@@ -202,7 +202,7 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
         switch {
         case errors.As(err, &resourceNotFoundException):
             return exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", input.UserId, input.ReviewId), err)
+                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", input.BusinessId, input.ReviewId), err)
         default:
             d.log.Errorf("Unknown DDB error in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
             return err
@@ -214,10 +214,10 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     return nil
 }
 
-func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Review, error) {
+func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (model.Review, error) {
     // Create the key for the GetItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
-        "userId":   userId,
+        "userId":   businessId, // userId is the partition key name, even though we are now using businessId
         "uniqueId": reviewId,
     })
     if err != nil {
@@ -233,12 +233,12 @@ func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Rev
         switch {
         case errors.As(err, &resourceNotFoundException):
             return model.Review{}, exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", userId, reviewId), err)
+                fmt.Sprintf("Review with businessId '%s' and reviewId '%s' does not exist", businessId, reviewId), err)
         default:
-            d.log.Errorf("Unknown DDB error in GetReview for userId %s reviewId %s: %s", userId, reviewId, jsonUtil.AnyToJson(err))
+            d.log.Errorf("Unknown DDB error in GetReview for businessId %s reviewId %s: %s", businessId, reviewId, jsonUtil.AnyToJson(err))
         }
 
-        return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for userId %s reviewId %s with unknown error: ", userId, reviewId), err)
+        return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for businessId %s reviewId %s with unknown error: ", businessId, reviewId), err)
     }
 
     // Check if the item was found
