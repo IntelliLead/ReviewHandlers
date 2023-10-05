@@ -4,9 +4,9 @@ import (
     "context"
     "errors"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/sashabaranov/go-openai"
     "go.uber.org/zap"
@@ -19,12 +19,12 @@ type Ai struct {
 
 func NewAi(logger *zap.SugaredLogger) *Ai {
     return &Ai{
-        gptClient: newGptClient(),
+        gptClient: newGptClient(logger),
         log:       logger,
     }
 }
 
-func (ai *Ai) GenerateReply(review string, business *model.Business, user model.User) (string, error) {
+func (ai *Ai) GenerateReply(review string, business model.Business, user model.User) (string, error) {
     temp := 1.12
     prompt := ai.buildPrompt(business, user)
 
@@ -78,31 +78,15 @@ func (ai *Ai) GenerateReply(review string, business *model.Business, user model.
     return response.Choices[0].Message.Content, nil
 }
 
-func newGptClient() *openai.Client {
-    secrets := secret.GetSecrets()
+func newGptClient(logger *zap.SugaredLogger) *openai.Client {
+    secrets := awsUtil.NewAws(logger).GetSecrets()
     return openai.NewClient(secrets.GptApiKey)
 }
 
-func (ai *Ai) buildPrompt(business *model.Business, user model.User) string {
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    businessId := "nil"
-    var businessDescription, keywords *string
-    var keywordEnabled bool
-    if business != nil {
-        businessId = business.BusinessId
-        businessDescription = business.BusinessDescription
-        keywords = business.Keywords
-        keywordEnabled = business.KeywordEnabled
-    } else {
-        businessDescription = user.BusinessDescription
-        keywords = user.Keywords
-        if user.KeywordEnabled == nil {
-            ai.log.Errorf("Invalid state: KeywordEnabled is nil for user %s, but there is no business entity for user", user.UserId)
-            keywordEnabled = false
-        } else {
-            keywordEnabled = *user.KeywordEnabled
-        }
-    }
+func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
+    keywordEnabled := business.KeywordEnabled
+    businessDescription := business.BusinessDescription
+    keywords := business.Keywords
 
     businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
 
@@ -129,7 +113,7 @@ func (ai *Ai) buildPrompt(business *model.Business, user model.User) string {
     // keyword prompt
     if keywordEnabled {
         if util.IsEmptyStringPtr(keywords) {
-            ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", businessId, user.UserId)
+            ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", business.BusinessId, user.UserId)
         } else {
             keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *keywords)
         }
