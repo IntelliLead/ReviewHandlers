@@ -92,27 +92,6 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
         return err
     }
 
-    // DEBUG
-    input := dynamodb.TransactWriteItemsInput{
-        TransactItems: []types.TransactWriteItem{
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                av,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                uniqueAv,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-        },
-    }
-    d.log.Debugf("TransactWriteItemsInput: %s", jsonUtil.AnyToJson(input))
-
     _, err = d.client.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
         TransactItems: []types.TransactWriteItem{
             {
