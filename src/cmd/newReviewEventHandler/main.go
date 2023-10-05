@@ -125,7 +125,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
     }
 
-    // TODO: [INT-94] Send to all users in the business instead of relying on the review-associated user (legacy)
+    // TODO: [INT-94] Send to all users in the business instead of relying on the userId defined in Zapier (legacy)
     // --------------------
     // validate user exists
     // --------------------
@@ -143,11 +143,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     err = line.SendNewReview(review, *user)
     if err != nil {
-        log.Errorf("Error sending new review to LINE user %s: %s", review.BusinessId, jsonUtil.AnyToJson(err))
+        log.Errorf("Error sending new review to LINE user %s: %s", user.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
 
-    log.Debugf("Successfully sent new review to LINE user: '%s'", review.BusinessId)
+    log.Debugf("Successfully sent new review to LINE user: '%s'", user.UserId)
 
     if user.ActiveBusinessId == nil {
         log.Errorf("User %s has no active business. Cannot perform auto reply", user.UserId)
