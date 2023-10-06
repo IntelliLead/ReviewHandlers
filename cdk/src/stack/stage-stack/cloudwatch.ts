@@ -8,6 +8,7 @@ import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
 import { Dashboard, GraphWidget, Metric, TextWidget, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { SnsAction } from 'aws-cdk-lib/aws-cloudwatch-actions';
 import { PREPROD_SLACK_CHANNEL_ID, PROD_SLACK_CHANNEL_ID, SLACK_WORKSPACE_ID } from '../../constant';
+import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
 
 export interface CloudwatchStackProps {
     readonly stackCreationInfo: StackCreationInfo;
@@ -23,12 +24,13 @@ export class CloudwatchStack extends Stack {
 
         const alarmTopic = new Topic(this, 'LambdaAlarmTopic');
 
-        new SlackChannelConfiguration(this, 'SlackChannelConfig', {
+        const slackConfig = new SlackChannelConfiguration(this, 'SlackChannelConfig', {
             slackChannelConfigurationName: 'SlackChannelConfig',
             slackWorkspaceId: SLACK_WORKSPACE_ID,
             slackChannelId: stage == STAGE.PROD ? PROD_SLACK_CHANNEL_ID : PREPROD_SLACK_CHANNEL_ID,
             notificationTopics: [alarmTopic],
         });
+        slackConfig.role?.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('CloudWatchReadOnlyAccess'));
 
         const dashboard = new Dashboard(this, 'MetricsDashboard', {
             dashboardName: 'MetricsDashboard',
