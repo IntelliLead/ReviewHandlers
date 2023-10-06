@@ -21,6 +21,9 @@ In each stage:
     . ../get-tmp-creds.sh
     ```
 2. Run script with dry-run mode to verify the data to be migrated
+    ```
+    python consolidate-review-id.py --dry-run | tee >(pbcopy)
+    ```
 3. Run script without dry-run mode to make the change
 4. Repeat for next stage
 

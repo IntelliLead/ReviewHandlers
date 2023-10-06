@@ -77,7 +77,7 @@ def main(dry_run=False):
     for user_id in user_ids:
         reviews = get_all_review_objects_for_user(user_id)
 
-        # THIS ASSUMPTION IS INCORRECT. SOME USERS HAVE IT MESSED UP FROM SINGLE CHAR FOR SOME REASON
+        # THE COMMENTED OUT ASSUMPTION IS INCORRECT. SOME USERS HAVE IT MESSED UP FROM SINGLE CHAR FOR SOME REASON
         # if len(reviews) <= 62:  # If only the special records and <= 62 normal records, skip processing for this user
         #     print(f"Skipping user {user_id} because there are only {len(reviews)} reviews for this user. It's review "
         #           f"IDs are correct")
