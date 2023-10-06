@@ -16,17 +16,28 @@ var (
 func MetricMiddleware(handlerName string,
     handler func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error)) func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     return func(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
-        response, err := handler(ctx, request)
+        var response events.LambdaFunctionURLResponse
+        var err error
 
-        // Emit custom metrics based on the response status code
-        if response.StatusCode >= 400 && response.StatusCode < 500 {
-            _log.Infof("Emitting 4XXError metric")
-            emitMetric("4XXError", handlerName, 1.0)
-        } else if response.StatusCode >= 500 {
-            _log.Infof("Emitting 5XXError metric")
-            emitMetric("5XXError", handlerName, 1.0)
-        }
+        // Use defer to ensure metric emission even in case of panic
+        defer func() {
+            r := recover()
+            if r != nil {
+                _log.Infof("Emitting 5XXError metric due to panic")
+                emitMetric("5XXError", handlerName, 1.0)
+                panic(r)
+            } else {
+                if response.StatusCode >= 400 && response.StatusCode < 500 {
+                    _log.Infof("Emitting 4XXError metric")
+                    emitMetric("4XXError", handlerName, 1.0)
+                } else if response.StatusCode >= 500 {
+                    _log.Infof("Emitting 5XXError metric")
+                    emitMetric("5XXError", handlerName, 1.0)
+                }
+            }
+        }()
 
+        response, err = handler(ctx, request)
         return response, err
     }
 }

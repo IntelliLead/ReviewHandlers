@@ -3,6 +3,7 @@ package model
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
+    "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "strings"
@@ -47,6 +48,7 @@ func NewUser(lineUserId string,
         SignatureEnabled:             false,
         ServiceRecommendationEnabled: false,
         AutoQuickReplyEnabled:        false,
+        KeywordEnabled:               aws.Bool(false),
     }
 
     return user
