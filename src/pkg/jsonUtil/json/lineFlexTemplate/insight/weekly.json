@@ -10,7 +10,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "6 月",
+                        "text": "07/10 - 07/16",
                         "weight": "bold",
                         "size": "lg",
                         "margin": "md",
@@ -28,11 +28,25 @@
                                 "spacing": "sm",
                                 "contents": [
                                     {
-                                        "type": "text",
-                                        "color": "#666666",
-                                        "size": "sm",
-                                        "flex": 0,
-                                        "text": "商家檔案互動次數"
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "曝光次數"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "ℹ️",
+                                                "margin": "md"
+                                            }
+                                        ]
                                     },
                                     {
                                         "type": "box",
@@ -211,7 +225,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "5 月",
+                        "text": "07/03 - 07/09",
                         "weight": "bold",
                         "size": "lg",
                         "margin": "md",
@@ -229,11 +243,30 @@
                                 "spacing": "sm",
                                 "contents": [
                                     {
-                                        "type": "text",
-                                        "color": "#666666",
-                                        "size": "sm",
-                                        "flex": 0,
-                                        "text": "商家檔案互動次數"
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "曝光次數"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "ℹ️",
+                                                "margin": "md",
+                                                "action": {
+                                                    "type": "postback",
+                                                    "label": "action",
+                                                    "data": "hello"
+                                                }
+                                            }
+                                        ]
                                     },
                                     {
                                         "type": "box",
@@ -413,7 +446,7 @@
                 "contents": [
                     {
                         "type": "text",
-                        "text": "4 月",
+                        "text": "06/26 - 07/02",
                         "weight": "bold",
                         "size": "lg",
                         "margin": "md",
@@ -431,11 +464,30 @@
                                 "spacing": "sm",
                                 "contents": [
                                     {
-                                        "type": "text",
-                                        "color": "#666666",
-                                        "size": "sm",
-                                        "flex": 0,
-                                        "text": "商家檔案互動次數"
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "曝光次數"
+                                            },
+                                            {
+                                                "type": "text",
+                                                "color": "#666666",
+                                                "size": "sm",
+                                                "flex": 0,
+                                                "text": "ℹ️",
+                                                "margin": "md",
+                                                "action": {
+                                                    "type": "postback",
+                                                    "label": "action",
+                                                    "data": "hello"
+                                                }
+                                            }
+                                        ]
                                     },
                                     {
                                         "type": "box",
