@@ -71,13 +71,13 @@ func (l *Line) SendNewReview(review model.Review, user model.User) error {
         l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+    resp, err := l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
     if err != nil {
         l.log.Error("Error sending lineTextMessage to line in SendNewReview: ", err)
         return err
     }
 
-    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
 
     return nil
 }
@@ -116,19 +116,19 @@ func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business 
     return nil
 }
 
-func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review) error {
+func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, userId string) error {
     flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply)
     if err != nil {
         l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(review.UserId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
+    resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
     if err != nil {
         l.log.Error("Error sending message in SendAiGeneratedReply: ", err)
         return err
     }
 
-    l.log.Debugf("Successfully executed PushMessage in SendAiGeneratedReply to %s: %s", review.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed PushMessage in SendAiGeneratedReply to %s: %s", userId, jsonUtil.AnyToJson(resp))
 
     return nil
 }

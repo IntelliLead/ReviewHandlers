@@ -15,6 +15,7 @@ import (
 )
 
 func ReplyReview(
+    businessId string,
     userId string,
     replyToken *string,
     replyMessage string,
@@ -64,11 +65,12 @@ func ReplyReview(
     // update DDB
     // --------------------
     err = reviewDao.UpdateReview(ddbDao.UpdateReviewInput{
-        UserId:      userId,
+        BusinessId:  businessId,
         ReviewId:    *review.ReviewId,
         LastUpdated: time.Now(),
         LastReplied: time.Now(),
         Reply:       replyMessage,
+        RepliedBy:   userId,
     })
     if err != nil {
         log.Errorf("Error updating review '%s' from user '%s': %v", review.ReviewId, userId, err)

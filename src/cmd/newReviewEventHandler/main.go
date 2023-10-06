@@ -3,6 +3,8 @@ package main
 import (
     "context"
     "encoding/json"
+    "errors"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -15,9 +17,8 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/go-playground/validator/v10"
     "github.com/google/uuid"
     "os"
@@ -51,13 +52,43 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // Google may translate Mandarin to English. Remove the translation
     removeGoogleTranslate(&event)
 
-    reviewPtr, err := model.NewReview(event)
+    // --------------------
+    // initialize resources
+    // --------------------
+    // DDB
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
     if err != nil {
-        log.Error("Validation error during mapping to Review object: ", err)
+        log.Error("Error loading AWS config: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
+    }
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
+
+    // --------------------
+    // map to Review object
+    // --------------------
+    hasUserCompletedOauth, user, business, err := auth.ValidateUserAuth(event.UserId, userDao, businessDao, log)
+    if err != nil {
+        log.Errorf("Error checking if user %s has completed oauth: %s", event.UserId, err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user has completed oauth"}`, StatusCode: 500}, nil
+    }
+
+    businessId := event.UserId
+    if hasUserCompletedOauth {
+        log.Infof("User %s has completed oauth. Assigning its businessId '%s' as review partition key", event.UserId, *user.ActiveBusinessId)
+        businessId = *user.ActiveBusinessId
+    } else {
+        log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", event.UserId)
+    }
+
+    reviewPtr, err := model.NewReview(businessId, event)
+    if err != nil {
+        log.Error("Validation error occurred during mapping to Review object: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
     }
     review := *reviewPtr
-    // local/alpha testing: generate a new vendor review ID to prevent duplication
+    // local testing: generate a new vendor review ID to prevent duplication
     if stage == enum.StageLocal.String() {
         review.VendorReviewId = uuid.New().String()
     }
@@ -65,35 +96,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     log.Debug("Review object from request: ", jsonUtil.AnyToJson(review))
 
     // --------------------
-    // initialize resources
-    // --------------------
-    // DDB
-    mySession := session.Must(session.NewSession())
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-
-    // --------------------
-    // validate user exists
-    // --------------------
-    user, err := userDao.GetUser(review.UserId)
-    if err != nil {
-        log.Error("Error getting user: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting user"}`, StatusCode: 500}, nil
-    }
-    if user == nil {
-        log.Error("User does not exist: ", review.UserId)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
-    }
-
-    log.Debugf("User %s exists, proceeding", review.UserId)
-
-    // --------------------
     // store review
     // --------------------
-    nextReviewId, err := reviewDao.GetNextReviewID(review.UserId)
+    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
     if err != nil {
-        log.Errorf("Error getting next review id for userId %s: %v", review.UserId, err)
+        log.Errorf("Error getting next review id for BusinessId %s: %v", review.BusinessId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
     }
 
@@ -105,16 +112,29 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if err != nil {
         log.Error("Error creating review: ", err)
 
-        switch err.(type) {
-        case exception.ReviewAlreadyExistException:
+        var reviewAlreadyExistException exception.ReviewAlreadyExistException
+        var vendorReviewIdAlreadyExistException exception.VendorReviewIdAlreadyExistException
+        switch {
+        case errors.As(err, &reviewAlreadyExistException):
             return events.LambdaFunctionURLResponse{Body: `{"message": "Review already exists"}`, StatusCode: 400}, nil
-        case exception.VendorReviewIdAlreadyExistException:
+        case errors.As(err, &vendorReviewIdAlreadyExistException):
             log.Error("Create review failed because vendorReviewId unique record exists but not the review object: ", review)
             return events.LambdaFunctionURLResponse{Body: `{"message": "Database conflict"}`, StatusCode: 500}, nil
         default:
             return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating review"}`, StatusCode: 500}, nil
         }
     }
+
+    // TODO: [INT-94] Send to all users in the business instead of relying on the userId defined in Zapier (legacy)
+    // --------------------
+    // validate user exists
+    // --------------------
+    if user == nil {
+        log.Error("User does not exist: ", review.UserId)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
+    }
+
+    log.Debugf("User %s exists, proceeding", review.UserId)
 
     // --------------------------------
     // forward to LINE by calling LINE messaging API
@@ -123,33 +143,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     err = line.SendNewReview(review, *user)
     if err != nil {
-        log.Errorf("Error sending new review to LINE user %s: %s", review.UserId, jsonUtil.AnyToJson(err))
+        log.Errorf("Error sending new review to LINE user %s: %s", user.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
 
-    log.Debugf("Successfully sent new review to LINE user: '%s'", review.UserId)
+    log.Debugf("Successfully sent new review to LINE user: '%s'", user.UserId)
 
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    var autoQuickReplyEnabled bool
-    var quickReplyMessage *string
-    if user.ActiveBusinessId != nil {
-        business, err := businessDao.GetBusiness(*user.ActiveBusinessId)
-        if err != nil {
-            log.Errorf("Error getting business %s: %s", *user.ActiveBusinessId, jsonUtil.AnyToJson(err))
-            return events.LambdaFunctionURLResponse{
-                Body: `{"message": "Error getting business"}`, StatusCode: 500}, err
-        }
-        autoQuickReplyEnabled = business.AutoQuickReplyEnabled
-        quickReplyMessage = business.QuickReplyMessage
-    } else {
-        if user.AutoQuickReplyEnabled == nil {
-            log.Warn("User is not backfilled but has no autoQuickReplyEnabled flag: %s", user.UserId)
-            autoQuickReplyEnabled = false
-        } else {
-            autoQuickReplyEnabled = *user.AutoQuickReplyEnabled
-            quickReplyMessage = user.QuickReplyMessage
-        }
+    if user.ActiveBusinessId == nil {
+        log.Errorf("User %s has no active business. Cannot perform auto reply", user.UserId)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "User has no active business. Cannot perform auto reply"}`, StatusCode: 200}, nil
     }
+
+    autoQuickReplyEnabled := business.AutoQuickReplyEnabled
+    quickReplyMessage := business.QuickReplyMessage
 
     if autoQuickReplyEnabled && util.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
         if quickReplyMessage == nil {
@@ -159,6 +165,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
 
         lambdaReturn, err := lineEventProcessor.ReplyReview(
+            business.BusinessId,
             user.UserId, nil, *quickReplyMessage, review, reviewDao, line, log, true)
         if err != nil {
             return lambdaReturn, err

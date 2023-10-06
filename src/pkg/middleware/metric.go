@@ -4,9 +4,10 @@ import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
     "github.com/aws/aws-lambda-go/events"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/cloudwatch"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+    "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 var (
@@ -32,19 +33,23 @@ func MetricMiddleware(handlerName string,
 }
 
 func emitMetric(metricName string, handlerName string, value float64) {
-    svc := cloudwatch.New(session.New())
-    _, err := svc.PutMetricData(&cloudwatch.PutMetricDataInput{
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        _log.Error("Error loading AWS config: ", err)
+    }
+    svc := cloudwatch.NewFromConfig(cfg)
+    _, err = svc.PutMetricData(context.TODO(), &cloudwatch.PutMetricDataInput{
         Namespace: aws.String("AWS/Lambda"),
-        MetricData: []*cloudwatch.MetricDatum{
+        MetricData: []types.MetricDatum{
             {
                 MetricName: aws.String(metricName),
-                Dimensions: []*cloudwatch.Dimension{
+                Dimensions: []types.Dimension{
                     {
                         Name:  aws.String("FunctionName"),
                         Value: aws.String(handlerName),
                     },
                 },
-                Unit:  aws.String("Count"),
+                Unit:  types.StandardUnitCount,
                 Value: aws.Float64(value),
             },
         },

@@ -17,9 +17,8 @@ import (
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "os"
 )
@@ -58,11 +57,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    mySession := session.Must(session.NewSession())
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    reviewDao := ddbDao.NewReviewDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    if err != nil {
+        log.Error("Error loading AWS config: ", err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
+    }
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
     // LINE
     line := lineUtil.NewLine(log)
 

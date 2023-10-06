@@ -1,6 +1,8 @@
 package ddbDao
 
 import (
+    "context"
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
@@ -8,58 +10,60 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
-    "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-    "github.com/aws/aws-sdk-go/service/dynamodb/expression"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+    "github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "go.uber.org/zap"
     "time"
 )
 
 type ReviewDao struct {
-    client *dynamodb.DynamoDB
+    client *dynamodb.Client
     log    *zap.SugaredLogger
 }
 
-func NewReviewDao(client *dynamodb.DynamoDB, logger *zap.SugaredLogger) *ReviewDao {
+func NewReviewDao(client *dynamodb.Client, logger *zap.SugaredLogger) *ReviewDao {
     return &ReviewDao{
         client: client,
         log:    logger,
     }
 }
 
-func (d *ReviewDao) GetNextReviewID(userId string) (_type.ReviewId, error) {
-    // Define the expression to retrieve the largest ReviewId for the given UserId
+func (d *ReviewDao) GetNextReviewID(businessId string) (_type.ReviewId, error) {
+    // Define the expression to retrieve the largest ReviewId for the given BusinessId
     expr, err := expression.NewBuilder().
-        WithKeyCondition(expression.Key("userId").Equal(expression.Value(userId))).
+        WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(businessId))).
         Build()
     if err != nil {
-        d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
+        d.log.Error("Unable to produce key condition expression for GetNextReviewID with businessId %s: ", businessId, err)
         return "", err
     }
 
-    result, err := d.client.Query(&dynamodb.QueryInput{
+    result, err := d.client.Query(context.TODO(), &dynamodb.QueryInput{
         TableName:                 aws.String(enum.TableReview.String()),
         IndexName:                 aws.String(ReviewIndexCreatedAtLsi.String()),
         KeyConditionExpression:    expr.KeyCondition(),
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),
         ScanIndexForward:          aws.Bool(false), // get largest
-        Limit:                     aws.Int64(1),
+        Limit:                     aws.Int32(1),
     })
     if err != nil {
-        d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
+        d.log.Error("Unable to execute query in GetNextReviewID with businessId %s: ", businessId, err)
         return "", err
     }
 
-    // If there are no existing reviews, start with ReviewId 1
+    // If there are no existing reviews, start with ReviewId 0
     if len(result.Items) == 0 {
         return _type.NewReviewId("0"), nil
     }
 
     // Extract the current largest ReviewId
     var review model.Review
-    err = dynamodbattribute.UnmarshalMap(result.Items[0], &review)
+    err = attributevalue.UnmarshalMap(result.Items[0], &review)
     if err != nil {
         d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
         return "", err
@@ -78,27 +82,27 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 
     uniqueVendorReviewID := dbModel.NewUniqueVendorReviewIdRecord(review)
 
-    av, err := dynamodbattribute.MarshalMap(review)
+    av, err := attributevalue.MarshalMap(review)
     if err != nil {
         return err
     }
 
-    uniqueAv, err := dynamodbattribute.MarshalMap(uniqueVendorReviewID)
+    uniqueAv, err := attributevalue.MarshalMap(uniqueVendorReviewID)
     if err != nil {
         return err
     }
 
-    _, err = d.client.TransactWriteItems(&dynamodb.TransactWriteItemsInput{
-        TransactItems: []*dynamodb.TransactWriteItem{
+    _, err = d.client.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
+        TransactItems: []types.TransactWriteItem{
             {
-                Put: &dynamodb.Put{
+                Put: &types.Put{
                     TableName:           aws.String(enum.TableReview.String()),
                     Item:                av,
                     ConditionExpression: aws.String(KeyNotExistsConditionExpression),
                 },
             },
             {
-                Put: &dynamodb.Put{
+                Put: &types.Put{
                     TableName:           aws.String(enum.TableReview.String()),
                     Item:                uniqueAv,
                     ConditionExpression: aws.String(KeyNotExistsConditionExpression),
@@ -107,23 +111,22 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
         },
     })
     if err != nil {
-        switch t := err.(type) {
-        case *dynamodb.TransactionCanceledException:
+        var t *types.TransactionCanceledException
+        switch {
+        case errors.As(err, &t):
             failedRequests := t.CancellationReasons
-            // assert length should be 2
-            if len(failedRequests) != 2 {
-                return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons - unexpected CancellationReasons length: ", err)
-            }
 
-            if *(failedRequests[0].Code) == dynamodb.BatchStatementErrorCodeEnumConditionalCheckFailed {
+            if *(failedRequests[0].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
                 return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
             }
 
-            if *(failedRequests[1].Code) == dynamodb.BatchStatementErrorCodeEnumConditionalCheckFailed {
+            if *(failedRequests[1].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
                 return exception.NewVendorReviewIdAlreadyExistException(fmt.Sprintf("UniqueVendorReviewId with vendorReviewID %s already exists", review.VendorReviewId), err)
             }
 
-            return exception.NewUnknownTransactionCanceledException("Transaction failed in CreateReview for unknown reasons: ", err)
+            d.log.Debug("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
+
+            return err
         default:
             d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
             return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
@@ -134,22 +137,21 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 }
 
 type UpdateReviewInput struct {
-    UserId      string         `dynamodbav:"userId"`
+    BusinessId  string         `dynamodbav:"userId"`
     ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
     LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
     LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
     Reply       string         `dynamodbav:"reply"`
+    RepliedBy   string         `dynamodbav:"repliedBy"` // userId
 }
 
 func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
-    var lastUpdatedAv dynamodb.AttributeValue
-    err := dynamodbattribute.UnixTime(input.LastUpdated).MarshalDynamoDBAttributeValue(&lastUpdatedAv)
+    lastUpdatedAv, err := attributevalue.UnixTime(input.LastUpdated).MarshalDynamoDBAttributeValue()
     if err != nil {
         d.log.Error("Unable to marshal lastUpdated in UpdateReview: ", err)
     }
 
-    var lastRepliedAv dynamodb.AttributeValue
-    err = dynamodbattribute.UnixTime(input.LastReplied).MarshalDynamoDBAttributeValue(&lastRepliedAv)
+    lastRepliedAv, err := attributevalue.UnixTime(input.LastReplied).MarshalDynamoDBAttributeValue()
     if err != nil {
         d.log.Error("Unable to marshal lastReplied in UpdateReview: ", err)
     }
@@ -163,6 +165,9 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     ).Set(
         expression.Name("reply"),
         expression.Value(input.Reply),
+    ).Set(
+        expression.Name("replyBy"),
+        expression.Value(input.RepliedBy),
     )
     expr, err := expression.NewBuilder().
         WithUpdate(update).
@@ -173,9 +178,9 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     }
 
     // Create the key for the UpdateItem request
-    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
-        "userId":   input.UserId,
-        "uniqueId": input.ReviewId,
+    key, err := attributevalue.MarshalMap(map[string]interface{}{
+        util.ReviewTablePartitionKey: input.BusinessId,
+        util.ReviewTableSortKey:      input.ReviewId,
     })
     if err != nil {
         return err
@@ -189,12 +194,13 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),
     }
-    _, err = d.client.UpdateItem(ddbInput)
+    _, err = d.client.UpdateItem(context.TODO(), ddbInput)
     if err != nil {
-        switch err.(type) {
-        case *dynamodb.ResourceNotFoundException:
+        var resourceNotFoundException *types.ResourceNotFoundException
+        switch {
+        case errors.As(err, &resourceNotFoundException):
             return exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", input.UserId, input.ReviewId), err)
+                fmt.Sprintf("Review with businessId '%s' and reviewId '%s' does not exist", input.BusinessId, input.ReviewId), err)
         default:
             d.log.Errorf("Unknown DDB error in UpdateReview with input '%s': %v", jsonUtil.AnyToJson(ddbInput), err)
             return err
@@ -206,48 +212,40 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     return nil
 }
 
-func (d *ReviewDao) GetReview(userId string, reviewId _type.ReviewId) (model.Review, error) {
+func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (*model.Review, error) {
     // Create the key for the GetItem request
-    key, err := dynamodbattribute.MarshalMap(map[string]interface{}{
-        "userId":   userId,
-        "uniqueId": reviewId,
+    key, err := attributevalue.MarshalMap(map[string]interface{}{
+        util.ReviewTablePartitionKey: businessId,
+        util.ReviewTableSortKey:      reviewId,
     })
     if err != nil {
-        return model.Review{}, err
+        return nil, err
     }
 
-    result, err := d.client.GetItem(&dynamodb.GetItemInput{
+    result, err := d.client.GetItem(context.TODO(), &dynamodb.GetItemInput{
         TableName: aws.String(enum.TableReview.String()),
         Key:       key,
     })
     if err != nil {
-        switch err.(type) {
-        case *dynamodb.ResourceNotFoundException:
-            return model.Review{}, exception.NewReviewDoesNotExistExceptionWithErr(
-                fmt.Sprintf("Review with userId '%s' and reviewId '%s' does not exist", userId, reviewId), err)
-        default:
-            d.log.Errorf("Unknown DDB error in GetReview for userId %s reviewId %s: %s", userId, reviewId, jsonUtil.AnyToJson(err))
-        }
-
-        return model.Review{}, exception.NewUnknownDDBException(fmt.Sprintf("GetReview failed for userId %s reviewId %s with unknown error: ", userId, reviewId), err)
+        d.log.Errorf("GetReview failed for businessId '%s' reviewId '%s': %v", businessId, reviewId, err)
+        return nil, err
     }
 
-    // Check if the item was found
     if result.Item == nil {
-        return model.Review{}, exception.NewUnknownDDBException("GetReview failed for unknown reason: no error thrown but result.Item was nil", nil)
+        return nil, nil
     }
 
     // Unmarshal the item into a review object
     review := &model.Review{}
-    err = dynamodbattribute.UnmarshalMap(result.Item, review)
+    err = attributevalue.UnmarshalMap(result.Item, review)
     if err != nil {
-        return model.Review{}, fmt.Errorf("failed to unmarshal Review, %v", err)
+        return nil, fmt.Errorf("failed to unmarshal Review, %v", err)
     }
 
     err = model.ValidateReview(review)
     if err != nil {
-        return model.Review{}, fmt.Errorf("invalid review fetched: %v", err)
+        return nil, fmt.Errorf("invalid review fetched: %v", err)
     }
 
-    return *review, nil
+    return review, nil
 }
