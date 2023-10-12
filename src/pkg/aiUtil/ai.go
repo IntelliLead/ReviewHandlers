@@ -28,11 +28,10 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
 
 func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
     var totalPromptTokens, totalCompletionTokens int
+    temp := 1.12
+    prompt := ai.buildPrompt(user)
 
     operation := func() (openai.ChatCompletionResponse, error) {
-        temp := 1.12
-        prompt := ai.buildPrompt(user)
-
         response, err := ai.gptClient.CreateChatCompletion(
             context.Background(),
             openai.ChatCompletionRequest{
@@ -128,7 +127,7 @@ func (ai *Ai) buildPrompt(user model.User) string {
     }
 
     // keyword prompt
-    if *user.KeywordEnabled {
+    if user.KeywordEnabled != nil && *user.KeywordEnabled {
         if util.IsEmptyStringPtr(user.Keywords) {
             ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
         } else {
