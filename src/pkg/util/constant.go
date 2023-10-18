@@ -23,6 +23,9 @@ func MoreMessage() string {
 
 const DefaultUniqueId = "#"
 
+const ReviewTablePartitionKey = "userId"
+const ReviewTableSortKey = "uniqueId"
+
 const StageEnvKey = "STAGE"
 const AuthRedirectUrlParameterNameEnvKey = "AUTH_REDIRECT_URL_PARAMETER_NAME"
 const AuthRedirectUrlEnvKey = "AUTH_REDIRECT_URL"

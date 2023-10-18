@@ -4,9 +4,9 @@ import (
     "context"
     "errors"
     "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/secret"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/cenkalti/backoff/v4"
     "github.com/sashabaranov/go-openai"
@@ -21,15 +21,16 @@ type Ai struct {
 
 func NewAi(logger *zap.SugaredLogger) *Ai {
     return &Ai{
-        gptClient: newGptClient(),
+        gptClient: newGptClient(logger),
         log:       logger,
     }
 }
 
-func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
-    var totalPromptTokens, totalCompletionTokens int
+func (ai *Ai) GenerateReply(review string, business model.Business, user model.User) (string, error) {
     temp := 1.12
-    prompt := ai.buildPrompt(user)
+    prompt := ai.buildPrompt(business, user)
+    totalPromptTokens := 0
+    totalCompletionTokens := 0
 
     operation := func() (openai.ChatCompletionResponse, error) {
         response, err := ai.gptClient.CreateChatCompletion(
@@ -98,17 +99,21 @@ func (ai *Ai) GenerateReply(review string, user model.User) (string, error) {
     return response.Choices[0].Message.Content, nil
 }
 
-func newGptClient() *openai.Client {
-    secrets := secret.GetSecrets()
+func newGptClient(logger *zap.SugaredLogger) *openai.Client {
+    secrets := awsUtil.NewAws(logger).GetSecrets()
     return openai.NewClient(secrets.GptApiKey)
 }
 
-func (ai *Ai) buildPrompt(user model.User) string {
+func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
+    keywordEnabled := business.KeywordEnabled
+    businessDescription := business.BusinessDescription
+    keywords := business.Keywords
+
     businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
 
     // business prompt
-    if !util.IsEmptyStringPtr(user.BusinessDescription) {
-        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *user.BusinessDescription)
+    if !util.IsEmptyStringPtr(businessDescription) {
+        businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *businessDescription)
     }
 
     // emoji prompt
@@ -127,11 +132,11 @@ func (ai *Ai) buildPrompt(user model.User) string {
     }
 
     // keyword prompt
-    if user.KeywordEnabled != nil && *user.KeywordEnabled {
-        if util.IsEmptyStringPtr(user.Keywords) {
-            ai.log.Errorf("Keywords is empty for user %s but keyword is enabled", user.UserId)
+    if keywordEnabled {
+        if util.IsEmptyStringPtr(keywords) {
+            ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", business.BusinessId, user.UserId)
         } else {
-            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *user.Keywords)
+            keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *keywords)
         }
     }
 

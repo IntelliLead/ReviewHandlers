@@ -6,7 +6,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "讓智引力訪問 Google",
+                "text": "允許智引力訪問 Google",
                 "weight": "bold",
                 "size": "xl",
                 "wrap": true
@@ -17,7 +17,7 @@
                 "size": "md",
                 "style": "normal",
                 "wrap": true,
-                "text": "智引力需要您允許我們從 Google 獲得您的商家訊息以提供服務"
+                "text": "智引力需要您允許訪問 Google 獲得您的商家基本訊息，以開啟更多功能。"
             }
         ]
     },

@@ -20,7 +20,7 @@ var TestRichMenuAiReplySettingsEvent = []*linebot.Event{
         Postback: &linebot.Postback{
             Data: "/RichMenu/AiReplySettings",
         },
-        ReplyToken: "bf29b0151cfb4e5da7d13e943b613272",
+        ReplyToken: "TST",
         Mode:       linebot.EventModeActive,
     },
 }
