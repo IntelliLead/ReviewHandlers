@@ -98,7 +98,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // store review
     // --------------------
-    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
+    // TODO: Remove userId field after [INT-97] is done
+    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId, user.UserId)
+    // nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
     if err != nil {
         log.Errorf("Error getting next review id for BusinessId %s: %v", review.BusinessId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
