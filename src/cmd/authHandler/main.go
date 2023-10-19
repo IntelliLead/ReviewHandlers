@@ -332,17 +332,25 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     }
 
     if !opsCompleted {
-        // error states
         log.Errorf("Error associating user %s with business %s", userId, businessId)
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,
             Body:       `{"錯誤": "無法將此用戶與 google 商家建立關聯"}`,
+            Headers: map[string]string{
+                "Content-Type": "text/plain; charset=utf-8",
+            },
         }, err
     }
 
     log.Info("Successfully finished lambda execution")
 
-    return events.LambdaFunctionURLResponse{Body: "智引力驗證成功。可以關掉此頁面了！", StatusCode: 200}, nil
+    return events.LambdaFunctionURLResponse{
+        StatusCode: 200,
+        Body:       "智引力驗證成功。可以關掉此頁面了！",
+        Headers: map[string]string{
+            "Content-Type": "text/plain; charset=utf-8",
+        },
+    }, nil
 }
 
 func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAction, error) {

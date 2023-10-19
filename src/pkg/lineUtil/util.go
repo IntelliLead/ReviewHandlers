@@ -158,7 +158,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, qu
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessage(review model.Review, business model.Business) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
@@ -252,7 +252,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
 
     // update quick reply button
     // must be done LAST because it will remove the quick reply button if the quick reply message is empty
-    quickReplyMsg := user.GetFinalQuickReplyMessage(review)
+    quickReplyMsg := business.GetFinalQuickReplyMessage(review)
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if util.IsEmptyString(quickReplyMsg) {
@@ -271,7 +271,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, user model.User) (lin
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string) (linebot.FlexContainer, error) {
+func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplyResult)
     if err != nil {
         l.log.Debug("Error unmarshalling AiReplyResult JSON: ", err)
@@ -301,6 +301,13 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = aiReply
+
+    // update generate author name
+    // body -> contents[4] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = generateAuthorName
 
     // update buttons
     // footer -> contents[0] -> action -> fillInText
@@ -509,4 +516,97 @@ func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (lineb
     }
 
     return flexContainer, nil
+}
+
+func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.ReviewReplied)
+    if err != nil {
+        l.log.Debug("Error unmarshalling ReviewReplied JSON: ", err)
+        return nil, err
+    }
+
+    // substitute title to whether it is auto-reply
+    if isAutoReply {
+        // body -> contents[0] -> text
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["text"] = "評論自動回覆通知"
+    }
+
+    // substitute review
+    // body -> contents[1] -> contents[0] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = review.Review
+
+    // substitute reviewer name
+    // body -> contents[1] -> contents[1] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = review.ReviewerName
+
+    // substitute reply
+    // body -> contents[1] -> contents[3] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = reply
+
+    // substitute replier name
+    // body -> contents[1] -> contents[4] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = replierName
+
+    // substitute button fillInText
+    // footer -> contents[0] -> action -> fillInText
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%s %s", review.ReviewId.String(), reply)
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.QuickReplySettingsUpdated)
+    if err != nil {
+        l.log.Debug("Error unmarshalling QuickReplySettingsUpdated JSON: ", err)
+        return nil, err
+    }
+
+    // substitute updater name
+    // body -> contents[1] -> contents[0] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = updaterName
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.AiReplySettingsUpdated)
+    if err != nil {
+        l.log.Debug("Error unmarshalling AiReplySettingsUpdated JSON: ", err)
+        return nil, err
+    }
+
+    // substitute updater name
+    // body -> contents[1] -> contents[0] -> contents[1] -> text
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["text"] = updaterName
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
 }

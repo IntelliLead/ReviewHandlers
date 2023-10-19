@@ -82,3 +82,5 @@ For negative reviews:
 - Apologize when appropriate. It’s best to say something that demonstrates compassion and empathy
 - Show that you’re a real person by signing off with your name or initials. This helps you come across as more authentic
 */
+
+const TestReplyToken = "TST"

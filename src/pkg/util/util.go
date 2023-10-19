@@ -62,3 +62,13 @@ func StringInSlice(str string, list []string) bool {
     }
     return false
 }
+
+func RemoveStringFromSlice(slice []string, str string) []string {
+    var result []string
+    for _, s := range slice {
+        if s != str {
+            result = append(result, s)
+        }
+    }
+    return result
+}

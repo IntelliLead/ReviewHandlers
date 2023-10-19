@@ -80,7 +80,11 @@ func handleGenerateAiReply(
     }
 
     // create AI generated result card
-    err = line.SendAiGeneratedReply(aiReply, *review, user.UserId)
+    generateAuthorName := user.LineUsername
+    if util.IsEmptyString(generateAuthorName) {
+        generateAuthorName = "您的同仁"
+    }
+    err = line.SendAiGeneratedReply(aiReply, *review, business.UserIds, generateAuthorName)
     if err != nil {
         log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
         return err

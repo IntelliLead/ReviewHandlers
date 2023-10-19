@@ -4,6 +4,7 @@ import (
     "context"
     "encoding/json"
     "errors"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
@@ -108,7 +109,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     review.ReviewId = &nextReviewId
 
-    log.Debugf("Assigned review id %s to new review", nextReviewId.String())
+    log.Infof("Assigned review id %s to new review", nextReviewId.String())
 
     err = reviewDao.CreateReview(review)
     if err != nil {
@@ -127,30 +128,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
     }
 
-    // TODO: [INT-94] Send to all users in the business instead of relying on the userId defined in Zapier (legacy)
-    // --------------------
-    // validate user exists
-    // --------------------
-    if user == nil {
-        log.Error("User does not exist: ", review.UserId)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
-    }
-
-    log.Debugf("User %s exists, proceeding", review.UserId)
-
     // --------------------------------
     // forward to LINE by calling LINE messaging API
     // --------------------------------
     line := lineUtil.NewLine(log)
 
-    err = line.SendNewReview(review, *user)
+    err = line.SendNewReview(review, *business)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", user.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
     }
+    log.Info("Successfully sent new review to all users belonging to business: ", business.BusinessId)
 
-    log.Debugf("Successfully sent new review to LINE user: '%s'", user.UserId)
-
+    // TODO: [INT-97] Remove this check when all users are backfilled with active business ID
     if user.ActiveBusinessId == nil {
         log.Errorf("User %s has no active business. Cannot perform auto reply", user.UserId)
         return events.LambdaFunctionURLResponse{Body: `{"message": "User has no active business. Cannot perform auto reply"}`, StatusCode: 200}, nil
@@ -163,20 +153,43 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         if quickReplyMessage == nil {
             log.Error("User has autoQuickReplyEnabled but no quickReplyMessage: %s", user.UserId)
             return events.LambdaFunctionURLResponse{
-                Body: `{"message": "Error getting quick reply message"}`, StatusCode: 501}, nil
+                Body: `{"message": "Error getting quick reply message"}`, StatusCode: 500}, nil
         }
 
-        lambdaReturn, err := lineEventProcessor.ReplyReview(
-            business.BusinessId,
-            user.UserId, nil, *quickReplyMessage, review, reviewDao, line, log, true)
+        err = lineEventProcessor.ReplyReview(business.BusinessId, user.UserId, *quickReplyMessage, review, reviewDao, log)
         if err != nil {
-            return lambdaReturn, err
+            log.Errorf("Error handling replying '%s' to review '%s' for user '%s' of business '%s': %v", *quickReplyMessage, review.ReviewId.String(), user.UserId, business.BusinessId, err)
+
+            _, notifyUserErr := line.ReplyUserReplyFailed(user.UserId, review.ReviewerName, false)
+            if notifyUserErr != nil {
+                log.Errorf("Error notifying user '%s' reply failed for review '%s': %v", user.UserId, review.ReviewId.String(), notifyUserErr)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to notify reply failure for user '%s' : %v. Reply Failure reason: %v"}`, user.UserId, notifyUserErr, err),
+                }, notifyUserErr
+            }
+
+            log.Infof("Successfully notified user '%s' of business '%s' reply to review '%s' failed: %v",
+                user.UserId, business.BusinessId, review.ReviewId.String(), err)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Reply failed: %s"}`, err),
+            }, err
         }
 
-        log.Infof("Successfully auto replied review for user ID '%s' for review ID '%s'",
-            user.UserId, review.ReviewId.String())
+        // send LINE message
+        // --------------------
+        err = line.NotifyReviewReplied(business.UserIds, nil, nil, review, *quickReplyMessage, "自動回覆", true)
+        if err != nil {
+            log.Errorf("Error sending review reply notification to all users of business '%s': %v", businessId, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to send review reply notification to all users of business '%s': %v"}`, businessId, err),
+            }, err
+        }
 
-        return lambdaReturn, nil
+        log.Infof("Successfully auto replied review for business '%s' for review '%s'", businessId, review.ReviewId.String())
     }
 
     log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))

@@ -1,6 +1,7 @@
 package postbackEvent
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
@@ -183,6 +184,12 @@ func ProcessPostbackEvent(
                         }, err
                     }
 
+                    // notify all other users of toggle (skip notifying self)
+                    err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+                    if err != nil {
+                        log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
+                    }
+
                 case "ServiceRecommendation":
                     user, err = handleServiceRecommendationToggle(user, userDao, log)
                     if err != nil {
@@ -212,6 +219,12 @@ func ProcessPostbackEvent(
                             StatusCode: 500,
                             Body:       fmt.Sprintf(`{"error": "Error handling keyword toggle: %s"}`, err),
                         }, err
+                    }
+
+                    // notify all other users of toggle (skip notifying self)
+                    err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+                    if err != nil {
+                        log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
                     }
 
                 }
@@ -310,7 +323,8 @@ func ProcessPostbackEvent(
 
             autoQuickReplyEnabled, quickReplyMessage, err := handleAutoQuickReplyToggle(user, business, businessDao)
             if err != nil {
-                if _, ok := err.(*exception.AutoQuickReplyConditionNotMetException); ok {
+                var autoQuickReplyConditionNotMetException *exception.AutoQuickReplyConditionNotMetException
+                if errors.As(err, &autoQuickReplyConditionNotMetException) {
                     log.Warnf("Auto reply condition not met for user '%s': %v", userId, err)
                     _, err := line.ReplyUser(event.ReplyToken, "請先填寫快速回覆訊息，才能開啟自動回覆功能")
                     if err != nil {
@@ -345,6 +359,12 @@ func ProcessPostbackEvent(
                 }, err
             }
 
+            // notify all other users of toggle (skip notifying self)
+            err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+            if err != nil {
+                log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
+            }
+
             err = line.ShowQuickReplySettings(event.ReplyToken, autoQuickReplyEnabled, quickReplyMessage)
             if err != nil {
                 log.Errorf("Error sending quick reply settings to user '%s': %v", userId, err)
@@ -356,7 +376,18 @@ func ProcessPostbackEvent(
 
         case "EditQuickReplyMessage":
             // /QuickReply/EditQuickReplyMessage
-            log.Info("/QuickReply/EditQuickReplyMessage postback event received. User is editing quick reply message")
+            log.Info("/QuickReply/EditQuickReplyMessage postback event received. User is editing quick reply message.")
+        }
+
+    case "Notification":
+        switch dataSlice[1] {
+
+        case "Replied":
+            switch dataSlice[2] {
+            case "Reply":
+                // /Notification/Replied/Reply
+                log.Info("/Notification/Replied/Reply postback event received. User is editing reply message to be resent.")
+            }
         }
 
     default:
