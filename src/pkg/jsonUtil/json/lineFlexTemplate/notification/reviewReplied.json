@@ -6,17 +6,10 @@
     "contents": [
       {
         "type": "text",
-        "text": "AI 生成結果",
+        "text": "評論回覆通知",
         "weight": "bold",
         "size": "xl",
         "margin": "md"
-      },
-      {
-        "type": "text",
-        "text": "運用GPT-4最新科技，為您一鍵生成個性化的生動回覆",
-        "size": "xs",
-        "color": "#aaaaaa",
-        "wrap": true
       },
       {
         "type": "box",
@@ -24,6 +17,28 @@
         "margin": "lg",
         "spacing": "sm",
         "contents": [
+          {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "評論：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "wrap": false,
+                "size": "sm",
+                "flex": 5,
+                "text": "{REVIEW}",
+                "margin": "md"
+              }
+            ]
+          },
           {
             "type": "box",
             "layout": "baseline",
@@ -46,20 +61,45 @@
             ]
           },
           {
+            "type": "separator"
+          },
+          {
             "type": "box",
             "layout": "vertical",
             "spacing": "sm",
             "contents": [
               {
                 "type": "text",
-                "text": "評論內容：",
+                "text": "回覆：",
                 "size": "sm",
                 "flex": 0,
                 "color": "#666666"
               },
               {
                 "type": "text",
-                "text": "{REVIEW}",
+                "text": "{REPLY}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5,
+                "margin": "md"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "回覆人：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REPLIER_NAME}",
                 "wrap": true,
                 "size": "sm",
                 "flex": 5
@@ -69,52 +109,12 @@
         ]
       },
       {
-        "type": "box",
-        "layout": "vertical",
-        "margin": "sm",
-        "spacing": "sm",
-        "contents": [
-          {
-            "type": "box",
-            "layout": "horizontal",
-            "margin": "xl",
-            "contents": [
-              {
-                "type": "text",
-                "text": "{AI_REPLY}",
-                "size": "md",
-                "color": "#555555",
-                "wrap": true
-              }
-            ],
-            "borderWidth": "none",
-            "backgroundColor": "#FFFFFF",
-            "cornerRadius": "md",
-            "paddingAll": "lg"
-          }
-        ],
-        "paddingBottom": "lg"
-      },
-      {
-        "type": "box",
-        "layout": "baseline",
-        "spacing": "sm",
-        "contents": [
-          {
-            "type": "text",
-            "text": "生成人：",
-            "size": "sm",
-            "flex": 0,
-            "color": "#666666"
-          },
-          {
-            "type": "text",
-            "text": "{GENERATE_AUTHOR_NAME}",
-            "wrap": true,
-            "size": "sm",
-            "flex": 5
-          }
-        ]
+        "type": "text",
+        "text": "小提示：可以重複回覆同一條評論，覆蓋上次回覆內容哦！",
+        "size": "xs",
+        "color": "#aaaaaa",
+        "wrap": true,
+        "margin": "lg"
       }
     ]
   },
@@ -126,19 +126,10 @@
         "type": "button",
         "action": {
           "type": "postback",
-          "label": "送出回覆",
+          "label": "修改回覆",
           "inputOption": "openKeyboard",
-          "data": "/AiReply/Reply",
-          "fillInText": "@{REVIEW_ID} {AI_REPLY}"
-        },
-        "color": "#445783"
-      },
-      {
-        "type": "button",
-        "action": {
-          "type": "postback",
-          "label": "換一個",
-          "data": "/AiReply/GenerateAiReply/{REVIEW_ID}"
+          "data": "/Notification/Replied/Reply",
+          "fillInText": "@{REVIEW_ID} {REPLY}"
         },
         "color": "#445783"
       }

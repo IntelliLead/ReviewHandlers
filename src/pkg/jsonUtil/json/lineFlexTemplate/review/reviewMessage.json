@@ -77,7 +77,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "評論者",
+                                "text": "評論人",
                                 "color": "#999999",
                                 "size": "sm",
                                 "flex": 0

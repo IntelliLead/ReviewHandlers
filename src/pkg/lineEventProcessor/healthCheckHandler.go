@@ -7,7 +7,7 @@ import (
 )
 
 /*
-ProcessHealthCheckCall - The LINE Platform may send an HTTP POST request that doesn't include a webhook event to confirm communication. In this case, send a 200 status code.
+HandleHealthCheck - The LINE Platform may send an HTTP POST request that doesn't include a webhook event to confirm communication. In this case, send a 200 status code.
 
 Parameters:
 
@@ -17,7 +17,7 @@ Returns:
 
 	bool - true if the request is a health check call and was handled, false otherwise
 */
-func ProcessHealthCheckCall(request events.LambdaFunctionURLRequest, log *zap.SugaredLogger) (bool, error) {
+func HandleHealthCheck(request events.LambdaFunctionURLRequest, log *zap.SugaredLogger) (bool, error) {
     var body map[string]interface{}
     err := json.Unmarshal([]byte(request.Body), &body)
     if err != nil {

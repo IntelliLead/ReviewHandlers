@@ -3,6 +3,7 @@ package model
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+    "strings"
     "time"
 )
 
@@ -47,4 +48,14 @@ func BuildDdbBusinessKey(userId string) map[string]types.AttributeValue {
         "businessId": &types.AttributeValueMemberS{Value: userId},
         "uniqueId":   &types.AttributeValueMemberS{Value: uniqueId},
     }
+}
+
+// GetFinalQuickReplyMessage returns the final quick reply message to be sent
+// It replaces the {評論者} placeholder with the reviewer's name.
+func (b Business) GetFinalQuickReplyMessage(review Review) string {
+    if util.IsEmptyStringPtr(b.QuickReplyMessage) {
+        return ""
+    }
+
+    return strings.ReplaceAll(*b.QuickReplyMessage, "{評論者}", review.ReviewerName)
 }

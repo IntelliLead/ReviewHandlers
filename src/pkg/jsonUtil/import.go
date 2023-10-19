@@ -24,6 +24,12 @@ type AuthLineFlexTemplateJsons struct {
     AuthRequest []byte
 }
 
+type NotificationLineFlexTemplateJsons struct {
+    AiReplySettingsUpdated    []byte
+    QuickReplySettingsUpdated []byte
+    ReviewReplied             []byte
+}
+
 //go:embed json/lineFlexTemplate/*
 var embeddedFileSystem embed.FS // import files at compile time
 
@@ -83,5 +89,26 @@ func LoadAuthLineFlexTemplateJsons() AuthLineFlexTemplateJsons {
 
     return AuthLineFlexTemplateJsons{
         authRequest,
+    }
+}
+
+func LoadNotificationLineFlexTemplateJsons() NotificationLineFlexTemplateJsons {
+    reviewReplied, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/notification/reviewReplied.json")
+    if err != nil {
+        log.Fatal("Error reading reviewReplied.json: ", err)
+    }
+    aiReplySettingsUpdated, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/notification/aiReplySettingsUpdated.json")
+    if err != nil {
+        log.Fatal("Error reading aiReplySettingsUpdated.json: ", err)
+    }
+    quickReplySettingsUpdated, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/notification/quickReplySettingsUpdated.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettingsUpdated.json: ", err)
+    }
+
+    return NotificationLineFlexTemplateJsons{
+        aiReplySettingsUpdated,
+        quickReplySettingsUpdated,
+        reviewReplied,
     }
 }

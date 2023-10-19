@@ -21,6 +21,7 @@ type Line struct {
     quickReplyJsons    jsonUtil.QuickReplySettingsLineFlexTemplateJsons
     aiReplyJsons       jsonUtil.AiReplyLineFlexTemplateJsons
     authJsons          jsonUtil.AuthLineFlexTemplateJsons
+    notificationJsons  jsonUtil.NotificationLineFlexTemplateJsons
 }
 
 func NewLine(logger *zap.SugaredLogger) *Line {
@@ -31,6 +32,7 @@ func NewLine(logger *zap.SugaredLogger) *Line {
         quickReplyJsons:    jsonUtil.LoadQuickReplySettingsLineFlexTemplateJsons(),
         aiReplyJsons:       jsonUtil.LoadAiReplyLineFlexTemplateJsons(),
         authJsons:          jsonUtil.LoadAuthLineFlexTemplateJsons(),
+        notificationJsons:  jsonUtil.LoadNotificationLineFlexTemplateJsons(),
     }
 }
 
@@ -65,19 +67,20 @@ func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
     return nil
 }
 
-func (l *Line) SendNewReview(review model.Review, user model.User) error {
-    flexMessage, err := l.buildReviewFlexMessage(review, user)
+func (l *Line) SendNewReview(review model.Review, business model.Business) error {
+    flexMessage, err := l.buildReviewFlexMessage(review, business)
     if err != nil {
         l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
-    if err != nil {
-        l.log.Error("Error sending lineTextMessage to line in SendNewReview: ", err)
-        return err
+    for _, userId := range business.UserIds {
+        _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+        if err != nil {
+            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
+            return err
+        }
+        l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
     }
-
-    l.log.Debugf("Successfully executed line.PushMessage in SendNewReview to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
 
     return nil
 }
@@ -116,19 +119,21 @@ func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business 
     return nil
 }
 
-func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, userId string) error {
-    flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply)
+func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, userIds []string, generateAuthorName string) error {
+    flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply, generateAuthorName)
     if err != nil {
         l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
     }
 
-    resp, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
-    if err != nil {
-        l.log.Error("Error sending message in SendAiGeneratedReply: ", err)
-        return err
-    }
+    for _, userId := range userIds {
+        _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
+        if err != nil {
+            l.log.Error("Error sending message in SendAiGeneratedReply: ", err)
+            return err
+        }
 
-    l.log.Debugf("Successfully executed PushMessage in SendAiGeneratedReply to %s: %s", userId, jsonUtil.AnyToJson(resp))
+        l.log.Infof("Successfully executed LINE.PushMessage in SendAiGeneratedReply to %s", userId)
+    }
 
     return nil
 }
@@ -179,31 +184,52 @@ func (l *Line) ReplyAuthRequest(replyToken string, userId string) error {
     return nil
 }
 
-func (l *Line) ReplyUserReplyProcessed(replyToken string, succeeded bool, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
-    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(buildReplyProcessedMessage(succeeded, reviewerName, isAutoReply))).Do()
+func (l *Line) ReplyUserReplyFailed(replyToken string, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
 }
 
-func (l *Line) NotifyUserReplyProcessed(userId string, succeeded bool, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
-    return l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyProcessedMessage(succeeded, reviewerName, isAutoReply))).Do()
+func (l *Line) NotifyUserReplyFailed(userId string, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
+    return l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
 }
 
-func buildReplyProcessedMessage(succeeded bool, reviewerName string, isAutoReply bool) string {
-    var text string
-    if succeeded {
-        if isAutoReply {
-            text = fmt.Sprintf("已使用快速回覆內容自動回覆 %s 的評論。感謝您使用智引力。", reviewerName)
-        } else {
-            text = fmt.Sprintf("已回覆 %s 的評論。感謝您使用智引力。", reviewerName)
-        }
+func buildReplyFailedMessage(reviewerName string, isAutoReply bool) string {
+    if isAutoReply {
+        return fmt.Sprintf("自動回覆 %s 的評論失敗。很抱歉為您造成不便。", reviewerName)
     } else {
-        if isAutoReply {
-            text = fmt.Sprintf("自動回覆 %s 的評論失敗。很抱歉為您造成不便。", reviewerName)
+        return fmt.Sprintf("回覆 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+    }
+}
+
+func (l *Line) NotifyReviewReplied(
+    userIds []string,
+    replyToken *string,
+    replyTokenOwnerUserId *string,
+    review model.Review,
+    reply string,
+    replierName string,
+    isAutoReply bool) error {
+    flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierName, isAutoReply)
+    if err != nil {
+        l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
+        return err
+    }
+
+    err = nil
+    for _, userId := range userIds {
+        if !util.IsEmptyStringPtr(replyToken) && !util.IsEmptyStringPtr(replyTokenOwnerUserId) && userId == *replyTokenOwnerUserId && *replyToken != util.TestReplyToken {
+            l.log.Debugf("Sending reply message to reply token owner user '%s'", *replyTokenOwnerUserId)
+            _, err = l.lineClient.ReplyMessage(*replyToken, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
         } else {
-            text = fmt.Sprintf("回覆 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+            _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
+        }
+        if err != nil {
+            l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v", userId, err)
+        } else {
+            l.log.Infof("Successfully executed line.PushMessage/ReplyMessage in NotifyReviewReplied to user '%s'", userId)
         }
     }
 
-    return text
+    return err
 }
 
 // NotifyUserUpdateFailed let user know that the update failed
@@ -281,4 +307,42 @@ func newLineClient(log *zap.SugaredLogger) *linebot.Client {
     }
 
     return lineClient
+}
+
+func (l *Line) NotifyQuickReplySettingsUpdated(userIds []string, updaterName string) error {
+    flexMessage, err := l.buildQuickReplySettingsUpdatedNotificationMessage(updaterName)
+    if err != nil {
+        l.log.Error("Error building flex message in NotifyQuickReplySettingsUpdated: ", err)
+        return err
+    }
+
+    for _, userId := range userIds {
+        _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("快速回覆設定更新通知", flexMessage)).Do()
+        if err != nil {
+            l.log.Errorf("Error sending message to '%s' in NotifyQuickReplySettingsUpdated: %v", userId, err)
+        } else {
+            l.log.Infof("Successfully executed line.PushMessage in NotifyQuickReplySettingsUpdated to user '%s'", userId)
+        }
+    }
+
+    return err
+}
+
+func (l *Line) NotifyAiReplySettingsUpdated(userIds []string, updaterName string) error {
+    flexMessage, err := l.buildAiReplySettingsUpdatedNotificationMessage(updaterName)
+    if err != nil {
+        l.log.Error("Error building flex message in NotifyAiReplySettingsUpdated: ", err)
+        return err
+    }
+
+    for _, userId := range userIds {
+        _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI回覆設定更新通知", flexMessage)).Do()
+        if err != nil {
+            l.log.Errorf("Error sending message to '%s' in NotifyAiReplySettingsUpdated: %v", userId, err)
+        } else {
+            l.log.Infof("Successfully executed line.PushMessage in NotifyAiReplySettingsUpdated to user '%s'", userId)
+        }
+    }
+
+    return err
 }

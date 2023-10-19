@@ -37,7 +37,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // Check if the request is a health check call
     // --------------------
-    isHealthCheckCall, err := lineEventProcessor.ProcessHealthCheckCall(request, log)
+    isHealthCheckCall, err := lineEventProcessor.HandleHealthCheck(request, log)
     if err != nil {
         log.Error("Error handling health check call:", err)
         return events.LambdaFunctionURLResponse{
@@ -75,7 +75,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
     if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
-        lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
+        lineEvents = lineEventsHandlerTestEvents.TestReplyEvent
     } else {
         err = nil
         lineEvents, err = line.ParseRequest(&request)

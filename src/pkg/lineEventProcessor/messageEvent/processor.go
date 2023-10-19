@@ -165,6 +165,13 @@ func ProcessMessageEvent(
                 Body:       fmt.Sprintf(`{"error": "Failed to update quick reply message: %s"}`, err),
             }, err
         }
+
+        // notify all other users of toggle (skip notifying self)
+        err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        if err != nil {
+            log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
+        }
+
         err = line.ShowQuickReplySettings(event.ReplyToken, autoQuickReplyEnabled, storedQuickReplyMessage)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
@@ -196,6 +203,12 @@ func ProcessMessageEvent(
                 }, err
             }
             log.Error("Successfully notified user of update signature failed")
+        }
+
+        // notify all other users of toggle (skip notifying self)
+        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        if err != nil {
+            log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
 
         err = line.ShowAiReplySettings(event.ReplyToken, possiblyUpdatedUser, updatedBusiness)
@@ -294,6 +307,12 @@ func ProcessMessageEvent(
             }, err
         }
 
+        // notify all other users of toggle (skip notifying self)
+        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        if err != nil {
+            log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
+        }
+
         err = line.ShowAiReplySettings(event.ReplyToken, user, updatedBusiness)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
@@ -339,6 +358,12 @@ func ProcessMessageEvent(
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update service recommendation: %s"}`, err),
             }, err
+        }
+
+        // notify all other users of toggle (skip notifying self)
+        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        if err != nil {
+            log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
 
         err = line.ShowAiReplySettings(event.ReplyToken, updatedUser, business)
