@@ -67,13 +67,33 @@ func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
     return nil
 }
 
-func (l *Line) SendNewReview(review model.Review, business model.Business) error {
-    flexMessage, err := l.buildReviewFlexMessage(review, business)
+// SendNewReview sends a new review to all the users of the business
+// TODO: [INT-97] Remove passing in user and change pass in business object when all users are backfilled with active business ID
+func (l *Line) SendNewReview(review model.Review, business *model.Business, user model.User) error {
+    quickReplyMessage := ""
+    if business == nil {
+        l.log.Warnf("Business is nil in SendNewReview for review '%s'. User has not completed auth.", review.ReviewId)
+        if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
+            quickReplyMessage = user.GetFinalQuickReplyMessage(review)
+        }
+    } else {
+        if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+            quickReplyMessage = business.GetFinalQuickReplyMessage(review)
+        }
+    }
+
+    flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage)
     if err != nil {
         l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    for _, userId := range business.UserIds {
+    var userIds []string
+    if business == nil {
+        userIds = append(userIds, user.UserId)
+    } else {
+        userIds = business.UserIds
+    }
+    for _, userId := range userIds {
         _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
         if err != nil {
             l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)

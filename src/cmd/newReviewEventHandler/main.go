@@ -133,7 +133,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     line := lineUtil.NewLine(log)
 
-    err = line.SendNewReview(review, *business)
+    // TODO: [INT-97] Remove passing in user and change pass in business object when all users are backfilled with active business ID
+    err = line.SendNewReview(review, business, *user)
     if err != nil {
         log.Errorf("Error sending new review to LINE user %s: %s", user.UserId, jsonUtil.AnyToJson(err))
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil

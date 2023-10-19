@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "github.com/line/line-bot-sdk-go/v7/linebot"
+    "strings"
     "time"
 )
 
@@ -58,4 +59,15 @@ func BuildDdbUserKey(userId string) map[string]types.AttributeValue {
         "userId":   &types.AttributeValueMemberS{Value: userId},
         "uniqueId": &types.AttributeValueMemberS{Value: uniqueId},
     }
+}
+
+// GetFinalQuickReplyMessage returns the final quick reply message to be sent to the user.
+// It replaces the {評論人} placeholder with the reviewer's name.
+// TODO: [INT-97] Remove this helper when all users are backfilled with active business ID
+func (u User) GetFinalQuickReplyMessage(review Review) string {
+    if util.IsEmptyStringPtr(u.QuickReplyMessage) {
+        return ""
+    }
+
+    return strings.ReplaceAll(*u.QuickReplyMessage, "{評論人}", review.ReviewerName)
 }

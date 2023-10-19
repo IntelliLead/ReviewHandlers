@@ -158,7 +158,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, qu
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review, business model.Business) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
@@ -252,17 +252,16 @@ func (l *Line) buildReviewFlexMessage(review model.Review, business model.Busine
 
     // update quick reply button
     // must be done LAST because it will remove the quick reply button if the quick reply message is empty
-    quickReplyMsg := business.GetFinalQuickReplyMessage(review)
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
-            if util.IsEmptyString(quickReplyMsg) {
+            if util.IsEmptyString(quickReplyMessage) {
                 // remove quick reply button
                 jsonMap["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
             } else {
                 // update quick reply message in button
                 jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].
                 (map[string]interface{})["action"].
-                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMsg
+                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMessage
             }
         }
     }
