@@ -156,12 +156,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
                 Body: `{"message": "Error getting quick reply message"}`, StatusCode: 500}, nil
         }
 
-        // lambdaReturn, err := lineEventProcessor.ReplyReview(
-        //     business.BusinessId,
-        //     user.UserId, nil, *quickReplyMessage, review, reviewDao, line, log, true)
-        // if err != nil {
-        //     return lambdaReturn, err
-        // }
         err = lineEventProcessor.ReplyReview(business.BusinessId, user.UserId, *quickReplyMessage, review, reviewDao, log)
         if err != nil {
             log.Errorf("Error handling replying '%s' to review '%s' for user '%s' of business '%s': %v", *quickReplyMessage, review.ReviewId.String(), user.UserId, business.BusinessId, err)

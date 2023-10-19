@@ -51,11 +51,11 @@ func BuildDdbBusinessKey(userId string) map[string]types.AttributeValue {
 }
 
 // GetFinalQuickReplyMessage returns the final quick reply message to be sent
-// It replaces the {評論者} placeholder with the reviewer's name.
+// It replaces the {評論人} placeholder with the reviewer's name.
 func (b Business) GetFinalQuickReplyMessage(review Review) string {
     if util.IsEmptyStringPtr(b.QuickReplyMessage) {
         return ""
     }
 
-    return strings.ReplaceAll(*b.QuickReplyMessage, "{評論者}", review.ReviewerName)
+    return strings.ReplaceAll(*b.QuickReplyMessage, "{評論人}", review.ReviewerName)
 }

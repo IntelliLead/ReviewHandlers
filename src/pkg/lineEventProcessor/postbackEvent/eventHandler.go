@@ -82,7 +82,7 @@ func handleGenerateAiReply(
     // create AI generated result card
     generateAuthorName := user.LineUsername
     if util.IsEmptyString(generateAuthorName) {
-        generateAuthorName = "您的同事"
+        generateAuthorName = "您的同仁"
     }
     err = line.SendAiGeneratedReply(aiReply, *review, business.UserIds, generateAuthorName)
     if err != nil {
