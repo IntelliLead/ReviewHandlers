@@ -87,21 +87,23 @@ func (l *Line) SendNewReview(review model.Review, business *model.Business, user
         l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    var userIds []string
     if business == nil {
-        userIds = append(userIds, user.UserId)
-    } else {
-        userIds = business.UserIds
-    }
-    for _, userId := range userIds {
-        _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+        _, err := l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
         if err != nil {
-            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
+            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", user.UserId, err)
             return err
         }
-        l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
+    } else {
+        for _, userId := range business.UserIds {
+            _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+            if err != nil {
+                l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
+                return err
+            }
+            l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
+        }
     }
-
+    
     return nil
 }
 
