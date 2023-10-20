@@ -103,7 +103,7 @@ func (l *Line) SendNewReview(review model.Review, business *model.Business, user
             l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
         }
     }
-    
+
     return nil
 }
 

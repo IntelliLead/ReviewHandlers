@@ -67,6 +67,11 @@ func ValidateUserAuthOrRequestAuth(
     return false, user, business, nil
 }
 
+// ValidateUserAuth checks if the user has completed oauth.
+// Returns: hasUserAuthed, user, business, error
+// if hasUserAuthed is true, user and business will not be nil
+// If user has not completed oauth, hasUserAuthed will be false, and business may be nil
+// If user is not found, hasUserAuthed will be false, and user will also be nil
 func ValidateUserAuth(
     userId string,
     userDao *ddbDao.UserDao,
