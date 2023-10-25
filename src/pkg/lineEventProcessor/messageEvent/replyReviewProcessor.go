@@ -47,10 +47,25 @@ func ProcessReviewReplyMessage(
     }
     if reviewPtr == nil {
         log.Errorf("Review for reviewId %s with businessId %s not found", reply.ReviewId, business.BusinessId)
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 404,
-            Body:       fmt.Sprintf(`{"error": "Review not found"}`),
-        }, nil
+
+        // TODO: [INT-91] remove this after all users have been backfilled
+        // try to find user with userID + reviewID
+        reviewPtr, err = reviewDao.GetReview(user.UserId, reply.ReviewId)
+        if err != nil {
+            log.Errorf("Error getting review %s with userId %s: %s", reply.ReviewId, user.UserId, jsonUtil.AnyToJson(err))
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
+            }, err
+        }
+        if reviewPtr == nil {
+            log.Errorf("Review for reviewId %s with userId %s not found", reply.ReviewId, user.UserId)
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 404,
+                Body:       fmt.Sprintf(`{"error": "Review not found"}`),
+            }, nil
+        }
     }
 
     review := *reviewPtr
