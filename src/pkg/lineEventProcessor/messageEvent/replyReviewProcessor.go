@@ -37,6 +37,8 @@ func ProcessReviewReplyMessage(
 
     // fetch review from DDB
     // --------------------
+    // TODO: [INT-91] remove this after all users have been backfilled
+    isUnbackfilledReview := false
     reviewPtr, err := reviewDao.GetReview(business.BusinessId, reply.ReviewId)
     if err != nil {
         log.Errorf("Error getting review %s with businessId %s: %s", reply.ReviewId, business.BusinessId, jsonUtil.AnyToJson(err))
@@ -66,6 +68,7 @@ func ProcessReviewReplyMessage(
                 Body:       fmt.Sprintf(`{"error": "Review not found"}`),
             }, nil
         }
+        isUnbackfilledReview = true
 
         log.Infof("Fallback: Found review for reviewId %s with userId %s", reply.ReviewId, user.UserId)
     }
@@ -94,7 +97,13 @@ func ProcessReviewReplyMessage(
         }, nil
     }
 
-    err = lineEventProcessor.ReplyReview(business.BusinessId, user.UserId, reply.Message, review, reviewDao, log)
+    // TODO: [INT-91] remove this after all users have been backfilled
+    if isUnbackfilledReview {
+        err = lineEventProcessor.ReplyReview(user.UserId, user.UserId, reply.Message, review, reviewDao, log)
+    } else {
+        err = lineEventProcessor.ReplyReview(business.BusinessId, user.UserId, reply.Message, review, reviewDao, log)
+
+    }
     if err != nil {
         log.Errorf("Error handling replying '%s' to review '%s' for user '%s' of business '%s': %v", jsonUtil.AnyToJson(reply.Message), review.ReviewId.String(), user.UserId, business.BusinessId, err)
 
