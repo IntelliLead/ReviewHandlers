@@ -3,6 +3,8 @@ package middleware
 import (
     "context"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -14,7 +16,7 @@ var (
     _log = logger.NewLogger()
 )
 
-func MetricMiddleware(handlerName string,
+func MetricMiddleware(handlerName enum.HandlerName,
     handler func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error)) func(context.Context, events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     return func(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
         var response events.LambdaFunctionURLResponse
@@ -25,15 +27,15 @@ func MetricMiddleware(handlerName string,
             r := recover()
             if r != nil {
                 _log.Infof("Emitting 5XXError metric due to panic")
-                emitMetric("5XXError", handlerName, 1.0)
+                EmitMetric(enum2.Metric5xxError, handlerName, 1.0)
                 panic(r)
             } else {
                 if response.StatusCode >= 400 && response.StatusCode < 500 {
                     _log.Infof("Emitting 4XXError metric")
-                    emitMetric("4XXError", handlerName, 1.0)
+                    EmitMetric(enum2.Metric4xxError, handlerName, 1.0)
                 } else if response.StatusCode >= 500 {
                     _log.Infof("Emitting 5XXError metric")
-                    emitMetric("5XXError", handlerName, 1.0)
+                    EmitMetric(enum2.Metric5xxError, handlerName, 1.0)
                 }
             }
         }()
@@ -43,7 +45,7 @@ func MetricMiddleware(handlerName string,
     }
 }
 
-func emitMetric(metricName string, handlerName string, value float64) {
+func EmitMetric(metricName enum2.Metric, handlerName enum.HandlerName, value float64) {
     cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
     if err != nil {
         _log.Error("Error loading AWS config: ", err)
@@ -53,11 +55,11 @@ func emitMetric(metricName string, handlerName string, value float64) {
         Namespace: aws.String("AWS/Lambda"),
         MetricData: []types.MetricDatum{
             {
-                MetricName: aws.String(metricName),
+                MetricName: aws.String(metricName.String()),
                 Dimensions: []types.Dimension{
                     {
                         Name:  aws.String("FunctionName"),
-                        Value: aws.String(handlerName),
+                        Value: aws.String(handlerName.String()),
                     },
                 },
                 Unit:  types.StandardUnitCount,

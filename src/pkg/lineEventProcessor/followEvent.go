@@ -5,6 +5,9 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -29,9 +32,11 @@ func ProcessFollowEvent(event *linebot.Event,
     err := slack.SendNewUserFollowedMessage(userId, event.Timestamp)
     if err != nil {
         log.Error("Error sending Slack message:", err)
-    } else {
-        log.Debug("Successfully notified Slack channel of new user follow event")
+        middleware.EmitMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1.0)
+
     }
+
+    log.Info("Successfully notified Slack channel of new user follow event")
 
     var hasUserAuthed bool
     hasUserAuthed, _, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)

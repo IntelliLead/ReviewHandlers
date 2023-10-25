@@ -26,7 +26,7 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameNewReviewEventHandler.String(), handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameNewReviewEventHandler, handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {

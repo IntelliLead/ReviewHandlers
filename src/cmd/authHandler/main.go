@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameAuthHandler.String(), handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameAuthHandler, handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
