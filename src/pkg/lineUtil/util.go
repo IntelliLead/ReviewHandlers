@@ -532,12 +532,16 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
     }
 
     // substitute review
+    reviewMessage := "（無文字內容）"
+    if util.IsEmptyStringPtr(review.Review) {
+        reviewMessage = *review.Review
+    }
     // body -> contents[1] -> contents[0] -> contents[1] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["text"] = review.Review
+    (map[string]interface{})["text"] = reviewMessage
 
     // substitute reviewer name
     // body -> contents[1] -> contents[1] -> contents[1] -> text
@@ -548,16 +552,12 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
     (map[string]interface{})["text"] = review.ReviewerName
 
     // substitute reply
-    replyMessage := reply
-    if util.IsEmptyString(reply) {
-        replyMessage = "（無文字內容）"
-    }
     // body -> contents[1] -> contents[3] -> contents[1] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["text"] = replyMessage
+    (map[string]interface{})["text"] = reply
 
     // substitute replier name
     // body -> contents[1] -> contents[4] -> contents[1] -> text
