@@ -32,7 +32,7 @@ func ProcessFollowEvent(event *linebot.Event,
     err := slack.SendNewUserFollowedMessage(userId, event.Timestamp)
     if err != nil {
         log.Error("Error sending Slack message:", err)
-        middleware.EmitMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1.0)
+        middleware.EmitMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler, 1.0)
 
     }
 
