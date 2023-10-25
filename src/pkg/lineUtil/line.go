@@ -245,7 +245,7 @@ func (l *Line) NotifyReviewReplied(
             _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
         }
         if err != nil {
-            l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v", userId, err)
+            l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
         } else {
             l.log.Infof("Successfully executed line.PushMessage/ReplyMessage in NotifyReviewReplied to user '%s'", userId)
         }

@@ -66,6 +66,8 @@ func ProcessReviewReplyMessage(
                 Body:       fmt.Sprintf(`{"error": "Review not found"}`),
             }, nil
         }
+
+        log.Infof("Fallback: Found review for reviewId %s with userId %s", reply.ReviewId, user.UserId)
     }
 
     review := *reviewPtr

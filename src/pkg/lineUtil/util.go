@@ -548,12 +548,16 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
     (map[string]interface{})["text"] = review.ReviewerName
 
     // substitute reply
+    replyMessage := reply
+    if util.IsEmptyString(reply) {
+        replyMessage = "（無文字內容）"
+    }
     // body -> contents[1] -> contents[3] -> contents[1] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["text"] = reply
+    (map[string]interface{})["text"] = replyMessage
 
     // substitute replier name
     // body -> contents[1] -> contents[4] -> contents[1] -> text
