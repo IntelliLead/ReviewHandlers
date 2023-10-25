@@ -75,7 +75,7 @@ func ProcessReviewReplyMessage(
     // validate message does not contain LINE emojis
     // --------------------------------
     if HasLineEmoji(textMessage) {
-        _, err := line.ReplyUserReviewReplyProcessedWithReason(event.ReplyToken, false, review.ReviewerName,
+        _, err := line.ReplyUserReviewReplyFailedWithReason(event.ReplyToken, review.ReviewerName,
             lineUtil.CannotUseLineEmojiMessage)
         if err != nil {
             log.Errorf("Error notifying reply failure for user '%s' for review '%s': %v",

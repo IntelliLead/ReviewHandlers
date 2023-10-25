@@ -82,7 +82,7 @@
                             "label": "編輯業務描述",
                             "data": "/AiReply/EditBusinessDescription",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/description 高端餐酒館…"
+                            "fillInText": "/description "
                         }
                     }
                 ]
@@ -295,7 +295,7 @@
                             "label": "編輯關鍵字",
                             "data": "/AiReply/EditKeywords",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/keywords 台北美食,…"
+                            "fillInText": "/keywords "
                         }
                     },
                     {

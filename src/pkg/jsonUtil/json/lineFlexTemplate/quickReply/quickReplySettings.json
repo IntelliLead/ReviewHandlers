@@ -62,7 +62,7 @@
                             "label": "編輯快速回覆內容",
                             "data": "/QuickReply/EditQuickReplyMessage",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/quickReply 感謝…"
+                            "fillInText": "/quickReply "
                         }
                     },
                     {

@@ -287,13 +287,9 @@ func (l *Line) ReplyUser(replyToken string, message string) (*linebot.BasicRespo
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(message)).Do()
 }
 
-func (l *Line) ReplyUserReviewReplyProcessedWithReason(replyToken string, succeeded bool, reviewerName string, reason string) (*linebot.BasicResponse, error) {
+func (l *Line) ReplyUserReviewReplyFailedWithReason(replyToken string, reviewerName string, reason string) (*linebot.BasicResponse, error) {
     var text string
-    if succeeded {
-        text = fmt.Sprintf("已回覆 %s 的評論。感謝您使用智引力。", reviewerName)
-    } else {
-        text = fmt.Sprintf("回覆 %s 的評論失敗。%s", reviewerName, reason)
-    }
+    text = fmt.Sprintf("回覆 %s 的評論失敗。%s", reviewerName, reason)
 
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }

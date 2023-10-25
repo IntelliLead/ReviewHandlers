@@ -226,12 +226,11 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update edit reply button
-    ReplyMessagePrefix := fmt.Sprintf("@%s ", review.ReviewId.String())
-    fillInText := ReplyMessagePrefix + "感謝…"
+    replyMessagePrefix := fmt.Sprintf("@%s ", review.ReviewId.String())
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
-                action.(map[string]interface{})["fillInText"] = fillInText
+                action.(map[string]interface{})["fillInText"] = replyMessagePrefix
             }
         }
     }
@@ -261,7 +260,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
                 // update quick reply message in button
                 jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[0].
                 (map[string]interface{})["action"].
-                (map[string]interface{})["fillInText"] = ReplyMessagePrefix + quickReplyMessage
+                (map[string]interface{})["fillInText"] = replyMessagePrefix + quickReplyMessage
             }
         }
     }
