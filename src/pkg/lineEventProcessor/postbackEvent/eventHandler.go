@@ -55,16 +55,28 @@ func handleGenerateAiReply(
         return err
     }
 
-    // get review
     review, err := reviewDao.GetReview(business.BusinessId, reviewId)
     if err != nil {
-        log.Errorf("Error getting review during handling generate AI reply: %s", err)
+        log.Errorf("Error getting review by businessId '%s' reviewId '%s' during handling generate AI reply: %s", business.BusinessId, reviewId.String(), err)
         return err
     }
     if review == nil {
         errStr := fmt.Sprintf("Review not found for businessId: %s ; ReviewId: %s", business.BusinessId, reviewId)
         log.Error(errStr)
-        return errors.New(errStr)
+
+        // TODO: [INT-91] remove this after all users have been backfilled
+        log.Infof("[Fallback] Trying to find review by userId '%s' reviewId '%s' during handling generate AI reply", userId, reviewId)
+
+        review, err = reviewDao.GetReview(user.UserId, reviewId)
+        if err != nil {
+            log.Errorf("Error getting review by userId '%s' reviewId '%s' during handling generate AI reply: %s", userId, reviewId.String(), err)
+            return err
+        }
+        if review == nil {
+            errStr := fmt.Sprintf("Review not found for userId: %s ; ReviewId: %s", userId, reviewId)
+            log.Error(errStr)
+            return errors.New(errStr)
+        }
     }
 
     // invoke gpt4
