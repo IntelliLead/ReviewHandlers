@@ -1,36 +1,47 @@
 {
     "version": "2.0",
     "rawPath": "/",
-    "rawQueryString": "",
+    "rawQueryString": "state=Ucc29292b212e271132cee980c58e94eb&code=4/0AfJohXm9ERGR5FLmjLnlK64ktIdnR2tQMoCgdORpNHAm0dg1Qpw9U2KG2-uWk0Pa-Auh_g&scope=email%20profile%20https://www.googleapis.com/auth/business.manage%20https://www.googleapis.com/auth/userinfo.profile%20https://www.googleapis.com/auth/userinfo.email%20openid&authuser=1&hd=tryintellilead.com&prompt=consent",
     "headers": {
-        "content-length": "327",
-        "content-type": "application/json; charset=utf-8",
-        "host": "qy3pbbsc3cyabkyiytmaylxcti0sqxan.lambda-url.ap-northeast-1.on.aws",
-        "user-agent": "LineBotWebhook/2.0",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-encoding": "gzip, deflate, br",
+        "accept-language": "en-US,en;q=0.9",
+        "host": "4sjyrwu46reezafho2wgvfgpsm0avskr.lambda-url.ap-northeast-1.on.aws",
+        "referer": "https://accounts.google.com/",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/118.0.5993.92 Mobile/15E148 Safari/604.1",
         "x-amzn-tls-cipher-suite": "ECDHE-RSA-AES128-GCM-SHA256",
         "x-amzn-tls-version": "TLSv1.2",
-        "x-amzn-trace-id": "Root=1-647572b0-40a718214efee35e4093d21d",
-        "x-forwarded-for": "147.92.149.167",
+        "x-amzn-trace-id": "Root=1-653a547b-6f3337fe02ba10836f01187f",
+        "x-forwarded-for": "125.228.216.59",
         "x-forwarded-port": "443",
-        "x-forwarded-proto": "https",
-        "x-line-signature": "FVHoA/jErHKH8FB4j2s40tGXQ/yf5nYKRqRvcfT7JpE="
+        "x-forwarded-proto": "https"
+    },
+    "queryStringParameters": {
+        "authuser": "1",
+        "code": "TST",
+        "hd": "tryintellilead.com",
+        "prompt": "consent",
+        "scope": "email profile https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid",
+        "state": "Ucc29292b212e271132cee980c58e94eb"
     },
     "requestContext": {
         "accountId": "anonymous",
-        "requestId": "1395916b-235a-4aa5-946b-8412f484cfe4",
-        "apiId": "qy3pbbsc3cyabkyiytmaylxcti0sqxan",
-        "domainName": "qy3pbbsc3cyabkyiytmaylxcti0sqxan.lambda-url.ap-northeast-1.on.aws",
-        "domainPrefix": "qy3pbbsc3cyabkyiytmaylxcti0sqxan",
-        "time": "30/May/2023:03:51:12 +0000",
-        "timeEpoch": 1685418672040,
+        "requestId": "a04ad7ec-8185-42ff-94f2-785c3e6274cb",
+        "apiId": "4sjyrwu46reezafho2wgvfgpsm0avskr",
+        "domainName": "4sjyrwu46reezafho2wgvfgpsm0avskr.lambda-url.ap-northeast-1.on.aws",
+        "domainPrefix": "4sjyrwu46reezafho2wgvfgpsm0avskr",
+        "time": "26/Oct/2023:11:58:51 +0000",
+        "timeEpoch": 1698321531976,
         "http": {
-            "method": "POST",
+            "method": "GET",
             "path": "/",
             "protocol": "HTTP/1.1",
-            "sourceIp": "147.92.149.167",
-            "userAgent": "LineBotWebhook/2.0"
+            "sourceIp": "125.228.216.59",
+            "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/118.0.5993.92 Mobile/15E148 Safari/604.1"
         }
     },
-    "body": "{\"destination\":\"Ueb37fe60d2febe8bdfe62d990cc28860\",\"events\":[{\"type\":\"follow\",\"webhookEventId\":\"01H1NCFZSJN1HAPFREM0193Y1Q\",\"deliveryContext\":{\"isRedelivery\":false},\"timestamp\":1685418671895,\"source\":{\"type\":\"user\",\"userId\":\"Ucc29292b212e271132cee980c58e94eb\"},\"replyToken\":\"36ffd31138354b2dbe94d1a7759fb9ab\",\"mode\":\"active\"}]}",
     "isBase64Encoded": false
 }

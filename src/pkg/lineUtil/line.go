@@ -46,6 +46,17 @@ func (l *Line) GetUser(userId string) (linebot.UserProfileResponse, error) {
     return *resp, nil
 }
 
+func (l *Line) SendMessage(userId string, message string) error {
+    resp, err := l.lineClient.PushMessage(userId, linebot.NewTextMessage(message)).Do()
+    if err != nil {
+        l.log.Errorf("Error sending message to '%s': %s", userId, err)
+        return err
+    }
+
+    l.log.Infof("Successfully sent message to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+    return nil
+}
+
 func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
     reviewMessage := fmt.Sprintf("對不起，我還不會處理您的訊息。如需幫助，請回覆\"/help\"")
 

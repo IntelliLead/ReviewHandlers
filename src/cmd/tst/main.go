@@ -2,8 +2,6 @@ package main
 
 import (
     "context"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -12,9 +10,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
 )
@@ -28,48 +23,102 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     stage := os.Getenv(util.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
-    const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
-    const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
-    // const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
+    // --------------------
+    // initialize resources
+    // --------------------
+    // DDB
+    // cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    // if err != nil {
+    //     log.Error("Error loading AWS config: ", err)
+    //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
+    // }
+    // businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    // userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    // reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
 
-    mySession := session.Must(session.NewSession())
-    userDao := ddbDao.NewUserDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    businessDao := ddbDao.NewBusinessDao(dynamodb.New(mySession, aws.NewConfig().WithRegion("ap-northeast-1")), log)
-    line := lineUtil.NewLine(log)
-    hasUserAuthed, user, business, err := auth.ValidateUserAuthOrRequestAuthTst(
-        sendingUserId,
-        userDao,
-        businessDao,
-        line,
-        log,
-    )
-    if err != nil {
-        log.Errorf("Failed to validate user auth: %s", err.Error())
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-            Body:       `{"error": "Failed to validate user auth"}`,
-        }, err
-    }
+    // --------------------
+    // Get all business locations
+    // --------------------
+    // businessId := "accounts/108369004405812112145/locations/14318252560721528455"
+    // business, err := businessDao.GetBusiness(businessId)
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    // if business == nil {
+    //     log.Errorf("Business %s does not exist", businessId)
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 400,
+    //     }, err
+    // }
+    //
+    // log.Infof("Business retrieved is: %s", jsonUtil.AnyToJson(business))
+    //
+    // googleClient, err := googleUtil.NewGoogleWithToken(log, googleUtil.GoogleToToken(*business.Google))
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    //
+    // accounts, err := googleClient.ListBusinessAccounts()
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    // locations, err := googleClient.ListBusinessLocations(accounts[0])
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    // log.Info("Locations retrieved: ", jsonUtil.AnyToJson(locations))
 
-    log.Infof("User authed: %t", hasUserAuthed)
-    log.Infof("User: %s", jsonUtil.AnyToJson(user))
-    log.Infof("Business: %s", jsonUtil.AnyToJson(business))
+    // --------------------
+    // Check auth
+    // --------------------
+    // const srcUserId = "U1de8edbae28c05ac8c7435bbd19485cb"     // 今遇良研
+    // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
+    // // const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
+    //
+    //
+    // line := lineUtil.NewLine(log)
+    // hasUserAuthed, user, business, err := auth.ValidateUserAuthOrRequestAuthTst(
+    //     sendingUserId,
+    //     userDao,
+    //     businessDao,
+    //     line,
+    //     log,
+    // )
+    // if err != nil {
+    //     log.Errorf("Failed to validate user auth: %s", err.Error())
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //         Body:       `{"error": "Failed to validate user auth"}`,
+    //     }, err
+    // }
+    //
+    // log.Infof("User authed: %t", hasUserAuthed)
+    // log.Infof("User: %s", jsonUtil.AnyToJson(user))
+    // log.Infof("Business: %s", jsonUtil.AnyToJson(business))
 
     // --------------------
     // Send Auth Request
     // --------------------
-    // line := lineUtil.NewLine(log)
-    //
-    // // send auth request
-    // // Supplied via tst SAM template
-    // authRedirectUrl := os.Getenv(util.AuthRedirectUrlEnvKey)
-    // err := line.RequestAuth(sendingUserId, authRedirectUrl)
-    // if err != nil {
-    //     return events.LambdaFunctionURLResponse{
-    //         StatusCode: 500,
-    //         Body:       `{"error": "Failed to send auth request"}`,
-    //     }, err
-    // }
+    line := lineUtil.NewLine(log)
+
+    // send auth request
+    // Supplied via tst SAM template
+    const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
+    err := line.SendAuthRequest(sendingUserId)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Failed to send auth request"}`,
+        }, err
+    }
 
     // --------------------
     // ???

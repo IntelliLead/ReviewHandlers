@@ -40,6 +40,8 @@ export class CloudwatchStack extends Stack {
         for (const [name, lambdaFn] of Object.entries(lambdaFunctions)) {
             this.addMetricAlarmsToDashboardForLambda(name, lambdaFn, alarmTopic, dashboard);
         }
+
+        this.addBusinessMetricAlarms(alarmTopic, dashboard);
     }
 
     private addMetricAlarmsToDashboardForLambda(
@@ -120,6 +122,60 @@ export class CloudwatchStack extends Stack {
             new GraphWidget({
                 title: `Latency`,
                 left: [metricLatency],
+                width: 6,
+            })
+        );
+    }
+
+    private addBusinessMetricAlarms(alarmTopic: Topic, dashboard: Dashboard) {
+        // MultipleBusinessAccounts
+        const metricMultipleBusinessAccounts = new Metric({
+            metricName: 'MultipleBusinessAccounts',
+            namespace: 'IntelliLeadAuth/Metrics',
+            statistic: 'Sum',
+            period: Duration.minutes(5),
+        });
+        metricMultipleBusinessAccounts
+            .createAlarm(this, `MultipleBusinessAccountsAlarm`, {
+                threshold: 1,
+                evaluationPeriods: 1,
+                treatMissingData: TreatMissingData.NOT_BREACHING,
+                actionsEnabled: true,
+            })
+            .addAlarmAction(new SnsAction(alarmTopic));
+
+        // MultipleBusinessLocations
+        const metricMultipleBusinessLocations = new Metric({
+            metricName: 'MultipleBusinessLocations',
+            namespace: 'IntelliLeadAuth/Metrics',
+            statistic: 'Sum',
+            period: Duration.minutes(5),
+        });
+        metricMultipleBusinessLocations
+            .createAlarm(this, `MultipleBusinessLocationsAlarm`, {
+                threshold: 1,
+                evaluationPeriods: 1,
+                treatMissingData: TreatMissingData.NOT_BREACHING,
+                actionsEnabled: true,
+            })
+            .addAlarmAction(new SnsAction(alarmTopic));
+
+        dashboard.addWidgets(
+            new TextWidget({
+                markdown: `## Google Business Metrics`,
+                width: 24,
+            })
+        );
+
+        dashboard.addWidgets(
+            new GraphWidget({
+                title: `Multiple Google Business Accounts`,
+                left: [metricMultipleBusinessAccounts],
+                width: 6,
+            }),
+            new GraphWidget({
+                title: `Multiple Google Business Locations`,
+                left: [metricMultipleBusinessLocations],
                 width: 6,
             })
         );

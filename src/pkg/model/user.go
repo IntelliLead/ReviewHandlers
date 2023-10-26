@@ -13,6 +13,7 @@ type User struct {
     UserId string `dynamodbav:"userId"` // partition key
     // TODO: [INT-91] Remove backfill logic once all users have been backfilled
     ActiveBusinessId             *string                `dynamodbav:"activeBusinessId,omitempty"`
+    BusinessIds                  []string               `dynamodbav:"businessIds,stringset,omitemptyelem" validate:"min=1"`
     CreatedAt                    time.Time              `dynamodbav:"createdAt,unixtime"`
     LineUsername                 string                 `dynamodbav:"lineUsername"`
     LineProfilePictureUrl        *string                `dynamodbav:"lineProfilePicture,omitempty" validate:"url"`
@@ -31,23 +32,27 @@ type User struct {
     ServiceRecommendation        *string                `dynamodbav:"serviceRecommendation,omitempty"`
     ServiceRecommendationEnabled bool                   `dynamodbav:"serviceRecommendationEnabled"` // FAC for serviceRecommendation
     AutoQuickReplyEnabled        *bool                  `dynamodbav:"autoQuickReplyEnabled"`        // FAC for auto quick reply // TODO: [INT-91] remove this field
+    Google                       Google                 `dynamodbav:"google,omitemptyelem"`
 }
 
 func NewUser(lineUserId string,
-    businessId string,
+    businessIds []string,
     lineUserProfile linebot.UserProfileResponse,
-    createdAt time.Time) User {
+    google Google,
+) User {
     user := User{
         UserId:                       lineUserId,
-        ActiveBusinessId:             &businessId,
+        ActiveBusinessId:             &businessIds[0],
+        BusinessIds:                  businessIds,
         LineUsername:                 lineUserProfile.DisplayName,
         LineProfilePictureUrl:        &lineUserProfile.PictureURL,
         Language:                     &lineUserProfile.Language,
-        CreatedAt:                    createdAt,
-        LastUpdated:                  createdAt,
+        CreatedAt:                    time.Now(),
+        LastUpdated:                  time.Now(),
         EmojiEnabled:                 false,
         SignatureEnabled:             false,
         ServiceRecommendationEnabled: false,
+        Google:                       google,
     }
 
     return user

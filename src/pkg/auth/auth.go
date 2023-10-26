@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
 
@@ -103,7 +104,8 @@ func ValidateUserAuth(
         return false, user, nil, errors.New("business with id " + *user.ActiveBusinessId + " does not exist")
     }
 
-    if business.Google == nil {
+    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+    if util.IsEmptyString(user.Google.RefreshToken) {
         return false, user, business, nil
     }
 

@@ -19,12 +19,10 @@ type Business struct {
     CreatedAt             time.Time `dynamodbav:"createdAt,unixtime"`
     LastUpdated           time.Time `dynamodbav:"lastUpdated,unixtime"`
     LastUpdatedBy         string    `dynamodbav:"lastUpdatedBy"`
-    Google                *Google   `dynamodbav:"google,omitemptyelem"`
 }
 
 func NewBusiness(businessId string,
     businessName string,
-    google Google,
     userId string) Business {
 
     return Business{
@@ -38,7 +36,6 @@ func NewBusiness(businessId string,
         CreatedAt:             time.Now(),
         LastUpdated:           time.Now(),
         LastUpdatedBy:         userId,
-        Google:                &google,
     }
 }
 
