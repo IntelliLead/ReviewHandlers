@@ -20,7 +20,7 @@ var TestReplyEvent = []*linebot.Event{
         },
         Message: &linebot.TextMessage{
             ID:   "14479352052004",
-            Text: "@0 my reply text 回復留言 *(U@#&*",
+            Text: "@0T yay",
         },
         ReplyToken: util.TestReplyToken,
         Mode:       linebot.EventModeActive,

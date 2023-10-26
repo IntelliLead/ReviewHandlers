@@ -533,7 +533,7 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
 
     // substitute review
     reviewMessage := "（無文字內容）"
-    if util.IsEmptyStringPtr(review.Review) {
+    if !util.IsEmptyStringPtr(review.Review) {
         reviewMessage = *review.Review
     }
     // body -> contents[1] -> contents[0] -> contents[1] -> text
