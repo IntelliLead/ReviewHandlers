@@ -56,6 +56,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // initialize resources
     // --------------------
+    line := lineUtil.NewLine(log)
     // DDB
     cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
     if err != nil {
@@ -69,7 +70,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // map to Review object
     // --------------------
-    hasUserCompletedOauth, userPtr, businessPtr, err := auth.ValidateUserAuth(event.UserId, userDao, businessDao, log)
+    hasUserCompletedOauth, userPtr, businessPtr, err := auth.ValidateUserAuth(event.UserId, userDao, businessDao, line, enum.HandlerNameNewReviewEventHandler, log)
     if err != nil {
         log.Errorf("Error checking if user %s has completed oauth: %s", event.UserId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user has completed oauth"}`, StatusCode: 500}, nil
@@ -131,8 +132,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------------------
     // forward to LINE by calling LINE messaging API
     // --------------------------------
-    line := lineUtil.NewLine(log)
-
     // TODO: [INT-97] Remove passing in user and change pass in business object when all users are backfilled with active business ID
     err = line.SendNewReview(review, businessPtr, *userPtr)
     if err != nil {

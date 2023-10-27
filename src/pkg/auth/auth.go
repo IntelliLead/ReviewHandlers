@@ -3,8 +3,15 @@ package auth
 import (
     "errors"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
+    enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
 
@@ -14,9 +21,10 @@ func ValidateUserAuthOrRequestAuthTst(
     userDao *ddbDao.UserDao,
     businessDao *ddbDao.BusinessDao,
     line *lineUtil.Line,
+    handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
 ) (bool, *model.User, *model.Business, error) {
-    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, businessDao, line, log)
+    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, businessDao, line, handlerName, log)
 }
 
 // ValidateUserAuthOrRequestAuth checks if the user has completed oauth.
@@ -31,9 +39,10 @@ func ValidateUserAuthOrRequestAuth(
     userDao *ddbDao.UserDao,
     businessDao *ddbDao.BusinessDao,
     line *lineUtil.Line,
+    handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
 ) (bool, *model.User, *model.Business, error) {
-    hasUserCompletedOauth, user, business, err := ValidateUserAuth(userId, userDao, businessDao, log)
+    hasUserCompletedOauth, user, business, err := ValidateUserAuth(userId, userDao, businessDao, line, handlerName, log)
     if err != nil {
         log.Errorf("Error checking if user %s has completed oauth: %s", userId, err)
         return false, user, business, err
@@ -67,6 +76,47 @@ func ValidateUserAuthOrRequestAuth(
     return false, user, business, nil
 }
 
+// TODO: [INT-91] remove this check after LINE user info backfilling is done
+func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineUtil.Line, handlerName enum2.HandlerName, log *zap.SugaredLogger) {
+    if util.IsEmptyString(user.LineUsername) || util.IsEmptyString(user.LineProfilePictureUrl) || util.IsEmptyString(user.Language) {
+        lineGetUserResp, err := line.GetUser(user.UserId)
+        if err != nil {
+            log.Errorf("Error getting user info from LINE: %s", err)
+            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            return // do not backfill
+        }
+
+        lineUserNameAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineUsername", lineGetUserResp.DisplayName)
+        if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
+            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            return // do not backfill
+        }
+        lineProfilePictureUrlAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineProfilePictureUrl", lineGetUserResp.PictureURL)
+        if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
+            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            return // do not backfill
+        }
+        languageAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "language", lineGetUserResp.Language)
+        if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
+            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            return // do not backfill
+        }
+
+        updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{lineUserNameAction, lineProfilePictureUrlAction, languageAction})
+        if err != nil {
+            log.Errorf("Error updating user info: %s", err)
+            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            return
+        }
+
+        *user = updatedUser
+        log.Info("Successfully backfilled user's line info: ", jsonUtil.AnyToJson(updatedUser))
+    }
+}
+
 // ValidateUserAuth checks if the user has completed oauth.
 // Returns: hasUserAuthed, user, business, error
 // if hasUserAuthed is true, user and business will not be nil
@@ -76,6 +126,8 @@ func ValidateUserAuth(
     userId string,
     userDao *ddbDao.UserDao,
     businessDao *ddbDao.BusinessDao,
+    line *lineUtil.Line,
+    handlerName enum2.HandlerName,
     logger *zap.SugaredLogger) (bool, *model.User, *model.Business, error) {
     user, err := userDao.GetUser(userId)
     if err != nil {
@@ -86,6 +138,8 @@ func ValidateUserAuth(
     if user == nil {
         return false, nil, nil, nil
     }
+
+    backfillLineUserInfo(user, userDao, line, handlerName, logger)
 
     // user not yet backfilled
     if user.ActiveBusinessId == nil {

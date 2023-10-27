@@ -6,6 +6,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -82,7 +83,7 @@ func ProcessMessageEvent(
     var user model.User
     if shouldAuth(message) {
         var hasUserAuthed bool
-        hasUserAuthed, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+        hasUserAuthed, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, enum.HandlerNameLineEventsHandler, log)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
