@@ -7,8 +7,8 @@ import (
     enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -82,33 +82,33 @@ func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineU
         lineGetUserResp, err := line.GetUser(user.UserId)
         if err != nil {
             log.Errorf("Error getting user info from LINE: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
 
         lineUserNameAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineUsername", lineGetUserResp.DisplayName)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
         lineProfilePictureUrlAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineProfilePictureUrl", lineGetUserResp.PictureURL)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
         languageAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "language", lineGetUserResp.Language)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
 
         updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{lineUserNameAction, lineProfilePictureUrlAction, languageAction})
         if err != nil {
             log.Errorf("Error updating user info: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return
         }
 

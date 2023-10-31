@@ -75,13 +75,35 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Errorf("Error checking if user %s has completed oauth: %s", event.UserId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user has completed oauth"}`, StatusCode: 500}, nil
     }
+    if userPtr == nil {
+        log.Errorf("User %s does not exist", event.UserId)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
+    }
+    user := *userPtr
 
-    businessId := event.UserId
+    var businessId string
     if hasUserCompletedOauth {
-        log.Infof("User %s has completed oauth. Assigning its businessId '%s' as review partition key", event.UserId, *userPtr.ActiveBusinessId)
-        businessId = *userPtr.ActiveBusinessId
+        switch len(user.BusinessIds) {
+        case 0:
+            log.Errorf("User '%s' has completed OAUTH but has no business", user.UserId)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "User has completed OAUTH but has no business"}`, StatusCode: 500}, nil
+        case 1:
+            businessId = user.BusinessIds[0]
+        default:
+            log.Infof("User '%s' has completed OAUTH but has multiple businesses. Referring to Zapier event to match.", user.UserId)
+            if util.IsEmptyStringPtr(event.BusinessId) {
+                log.Errorf("User '%s' has completed OAUTH but has multiple businesses. Zapier event does not contain businessId.", user.UserId)
+                return events.LambdaFunctionURLResponse{Body: `{"message": "User has completed OAUTH but has multiple businesses. Zapier event does not contain businessId"}`, StatusCode: 500}, nil
+            }
+            if !util.StringInSlice(*event.BusinessId, user.BusinessIds) {
+                log.Errorf("User '%s' has completed OAUTH but has multiple businesses. Zapier event businessId '%s' does not match any of the user's businessIds: %s", user.UserId, *event.BusinessId, jsonUtil.AnyToJson(user.BusinessIds))
+                return events.LambdaFunctionURLResponse{Body: `{"message": "User has completed OAUTH but has multiple businesses. Zapier event businessId does not match any of the user's businessIds"}`, StatusCode: 500}, nil
+            }
+            businessId = *event.BusinessId
+        }
     } else {
         log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", event.UserId)
+        businessId = event.UserId
     }
 
     reviewPtr, err := model.NewReview(businessId, event)
