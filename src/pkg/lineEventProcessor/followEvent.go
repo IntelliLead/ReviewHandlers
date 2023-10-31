@@ -39,7 +39,7 @@ func ProcessFollowEvent(event *linebot.Event,
     log.Info("Successfully notified Slack channel of new user follow event")
 
     var hasUserAuthed bool
-    hasUserAuthed, _, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+    hasUserAuthed, _, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, enum.HandlerNameLineEventsHandler, log)
     if err != nil {
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,

@@ -9,6 +9,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
@@ -45,7 +46,7 @@ func ProcessPostbackEvent(
     if shouldAuth(dataSlice) {
         var hasUserCompletedAuth bool
         var err error
-        hasUserCompletedAuth, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, log)
+        hasUserCompletedAuth, userPtr, businessPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, enum.HandlerNameLineEventsHandler, log)
         if err != nil {
             log.Errorf("Error validating user '%s' auth: %s", userId, err)
             return events.LambdaFunctionURLResponse{
