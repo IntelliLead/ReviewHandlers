@@ -196,7 +196,8 @@ func ProcessPostbackEvent(
                     if err != nil {
                         log.Errorf("Error handling service recommendation toggle: %s", err)
 
-                        if _, ok := err.(*exception.AutoQuickReplyConditionNotMetException); ok {
+                        var serviceRecommendationConditionNotMetException *exception.ServiceRecommendationConditionNotMetException
+                        if errors.As(err, &serviceRecommendationConditionNotMetException) {
                             _, err := line.ReplyUser(event.ReplyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
                             if err != nil {
                                 log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", user.UserId, err)
@@ -205,15 +206,11 @@ func ProcessPostbackEvent(
                                     Body:       fmt.Sprintf(`{"error": "Error replying service recommendation settings prompt message: %s"}`, err),
                                 }, err
                             }
-                        } else {
-                            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "推薦其他業務 AI 回覆")
-                            if err != nil {
-                                log.Errorf("Error notifying user '%s' of update service recommendation enabled failed: %v", user.UserId, err)
-                                return events.LambdaFunctionURLResponse{
-                                    StatusCode: 500,
-                                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update service recommendation enabled failed: %s"}`, err),
-                                }, err
-                            }
+
+                            return events.LambdaFunctionURLResponse{
+                                StatusCode: 200,
+                                Body:       fmt.Sprintf(`{"Rejected enabling service recommendation feature": "Please fill in service recommendation before enabling service recommendation"}`),
+                            }, nil
                         }
 
                         return events.LambdaFunctionURLResponse{
