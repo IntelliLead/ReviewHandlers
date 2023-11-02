@@ -86,3 +86,6 @@ For negative reviews:
 const TestReplyToken = "TST"
 const TestAuthCode = "TST"
 const TestZapierReplyWebhook = "https://TST/"
+
+// stub userId for auto reply author
+const AutoReplyUserId = "autoReply"

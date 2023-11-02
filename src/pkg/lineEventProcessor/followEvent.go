@@ -15,7 +15,6 @@ import (
 )
 
 func ProcessFollowEvent(event *linebot.Event,
-    businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     slack *slackUtil.Slack,
     line *lineUtil.Line,
@@ -39,7 +38,7 @@ func ProcessFollowEvent(event *linebot.Event,
     log.Info("Successfully notified Slack channel of new user follow event")
 
     var hasUserAuthed bool
-    hasUserAuthed, _, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, businessDao, line, enum.HandlerNameLineEventsHandler, log)
+    hasUserAuthed, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log)
     if err != nil {
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,

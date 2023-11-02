@@ -5,72 +5,12 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "net/url"
-    "strings"
-    "unicode"
 )
 
 const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。️很抱歉為您造成不便。"
-
-func IsReviewReplyMessage(message string) bool {
-    return strings.HasPrefix(message, "@")
-}
-
-// CommandMessage format: "/<command> <args>"
-// e.g., "/Help xxx"
-type CommandMessage struct {
-    Command string
-    Args    []string
-}
-
-// ParseCommandMessage parses a command message. Unless isMultiArgs is true, all the remaining text after the first command is treated as a single argument.
-func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
-    if !strings.HasPrefix(str, "/") {
-        return CommandMessage{}
-    }
-
-    // Find the first whitespace character after '/'
-    index := strings.IndexFunc(str[1:], isWhitespace)
-    if index == -1 {
-        return CommandMessage{Command: str[1:], Args: []string{""}} // Return the remaining text after '/' as command
-    }
-
-    cmd := str[1 : index+1]
-    trimmedCmd := strings.TrimSpace(str[index+2:])
-
-    var args []string
-    if isMultiArgs {
-        // Only return the first argument
-        args = strings.Fields(trimmedCmd)
-    } else {
-        args = []string{trimmedCmd}
-    }
-    return CommandMessage{Command: cmd, Args: args}
-}
-
-func ParseReplyMessage(str string) (model.Reply, error) {
-    if !strings.HasPrefix(str, "@") {
-        return model.Reply{}, fmt.Errorf("message is not a reply message: %s", str)
-    }
-
-    // Find the first whitespace character after '@'
-    index := strings.IndexFunc(str[1:], isWhitespace)
-    if index == -1 {
-        return model.NewReply(_type.NewReviewId(str[1:]), "") // Return the remaining text after '@' as ReviewId
-    }
-
-    reviewID := str[1 : index+1]
-    replyMsg := strings.TrimSpace(str[index+2:])
-
-    return model.NewReply(_type.NewReviewId(reviewID), replyMsg)
-}
-
-func isWhitespace(r rune) bool {
-    return unicode.IsSpace(r)
-}
 
 func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     // LINE Go SDK is bugged, this is the workaround
@@ -516,7 +456,7 @@ func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (lineb
     return flexContainer, nil
 }
 
-func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool, businessName *string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.ReviewReplied)
     if err != nil {
         l.log.Debug("Error unmarshalling ReviewReplied JSON: ", err)
@@ -525,10 +465,26 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
 
     // substitute title to whether it is auto-reply
     if isAutoReply {
-        // body -> contents[0] -> text
+        // body -> contents[0] -> contents[0] -> text
         jsonMap["body"].
         (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["contents"].([]interface{})[0].
         (map[string]interface{})["text"] = "評論自動回覆通知"
+    }
+
+    // substitute business name if available, otherwise omit the business name section
+    if !util.IsEmptyStringPtr(businessName) {
+        // body -> contents[0] -> contents[1] -> text
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["contents"].([]interface{})[1].
+        (map[string]interface{})["text"] = *businessName
+    } else {
+        jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["contents"] = jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["contents"].([]interface{})[:1]
     }
 
     // substitute review

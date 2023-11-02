@@ -17,6 +17,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -172,10 +173,24 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         metric.EmitMetric(enum3.MetricMultipleBusinessLocations, 1.0)
     }
 
-    var businessIdsToAssociateUser []string
+    var businessIdsToAssociateUser []bid.BusinessId
 
     for _, location := range businessLocations {
-        businessId := businessAccountId + "/" + location.Name
+        businessId, err := bid.NewBusinessId(businessAccountId + "/" + location.Name)
+        if err != nil {
+            log.Errorf("Error creating businessId from businessAccountId %s and location.Name %s: %s", businessAccountId, location.Name, err)
+            err := line.SendMessage(userId, "驗證失敗。系統錯誤。請聯繫智引力客服。很抱歉為您造成不便。")
+            if err != nil {
+                log.Errorf("Error sending LINE message to '%s': %s", userId, err)
+                metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+            }
+
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error creating businessId"}`,
+            }, err
+        }
+
         business, err := businessDao.GetBusiness(businessId)
         if err != nil {
             log.Errorf("Error retrieving business %s: %s", businessId, err)
@@ -198,7 +213,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
             // create business
             newBusiness := model.NewBusiness(
-                businessAccountId+"/"+location.Name,
+                businessId,
                 location.Title,
                 userId,
             )
@@ -305,9 +320,26 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             }, err
         }
 
-        newUser := model.NewUser(userId, googleUtil.MapBusinessIds(businessAccountId, businessLocations), lineGetUserResp, googleMetadata)
+        businessIds, err := googleUtil.MapBusinessIds(businessAccountId, businessLocations)
+        if err != nil {
+            log.Errorf("Error mapping businessIds with businessAccountId %s and businessLocations %s: %s", businessAccountId, businessLocations, err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error mapping businessIds with businessAccountId and businessLocations"}`,
+            }, err
+        }
+        newUser, err := model.NewUser(userId, businessIds, lineGetUserResp, googleMetadata)
+        if err != nil {
+            log.Errorf("Error creating new user object: %s", err)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       `{"error": "Error creating new user object"}`,
+            }, err
+        }
         err = userDao.CreateUser(newUser)
         if err != nil {
+            log.Errorf("Error creating user %v: %v", newUser, err)
+
             var userAlreadyExistException *exception.UserAlreadyExistException
             if errors.As(err, &userAlreadyExistException) {
                 log.Errorf("User %s already exists. Concurrency issue?", userId)
@@ -355,7 +387,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
 
         for _, businessId := range businessIdsToAssociateUser {
-            action, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId})
+            action, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId.String()})
             if err != nil {
                 err := line.SendMessage(userId, "驗證失敗。系統錯誤。請聯繫智引力客服。很抱歉為您造成不便。")
                 if err != nil {

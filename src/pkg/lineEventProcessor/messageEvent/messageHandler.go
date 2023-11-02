@@ -5,6 +5,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
@@ -30,41 +31,46 @@ func buildQuickReplyUpdateAttributeActions(quickReplyMessage string) ([]dbModel.
     }
 }
 
-// handleUpdateQuickReply handles the update of the quick reply message
+// handleUpdateQuickReplyMessage handles the update of the quick reply message
 // returns:
 // 1. bool: whether the quick reply is enabled
 // 2. string: the quick reply message
 // 3. error
-func handleUpdateQuickReply(
-    user model.User,
+func handleUpdateQuickReplyMessage(
+    businessId bid.BusinessId,
     quickReplyMessage string,
+    updatedByUserId string,
     businessDao *ddbDao.BusinessDao,
-    log *zap.SugaredLogger) (bool, *string, error) {
-    userId := user.UserId
+    log *zap.SugaredLogger) (model.Business, error) {
     actions, err := buildQuickReplyUpdateAttributeActions(quickReplyMessage)
     if err != nil {
-        return false, nil, err
+        log.Errorf("Error building quick reply message update attribute actions: %v", err)
+        return model.Business{}, err
     }
 
-    updatedBusiness, err := businessDao.UpdateAttributes(*user.ActiveBusinessId, actions, userId)
+    business, err := businessDao.UpdateAttributes(businessId, actions, updatedByUserId)
     if err != nil {
-        log.Errorf("Error updating quick reply message '%s' for business '%s': %v", quickReplyMessage, *user.ActiveBusinessId, err)
-        return false, nil, err
+        log.Errorf("Error updating quick reply message '%s' for business '%s': %v", quickReplyMessage, businessId, err)
+        return model.Business{}, err
     }
 
-    return updatedBusiness.AutoQuickReplyEnabled, updatedBusiness.QuickReplyMessage, nil
-
+    return business, nil
 }
 
-// handleUpdateKeywordEnabled handles the update of the keyword enabled
+// handleBusinessDescriptionUpdate handles the update of the business description.
+// returns:
+// 1. updated user (if there were no operation on user, it will be the same as the input)
+// 2. updated business
+// 3. error
 func handleBusinessDescriptionUpdate(
-    user model.User,
+    businessId bid.BusinessId,
     businessDescription string,
+    updateRequestUser model.User,
     userDao *ddbDao.UserDao,
     businessDao *ddbDao.BusinessDao,
     log *zap.SugaredLogger) (model.User, model.Business, error) {
-    userId := user.UserId
     var updatedBusiness model.Business
+    updatedUser := updateRequestUser
     if util.IsEmptyString(businessDescription) {
         removeBusinessDescriptionAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "businessDescription", nil)
         if err != nil {
@@ -81,21 +87,21 @@ func handleBusinessDescriptionUpdate(
             disableKeywordEnabledAction,
         }
 
-        updatedBusiness, err = businessDao.UpdateAttributes(*user.ActiveBusinessId, attributeActions, userId)
+        updatedBusiness, err = businessDao.UpdateAttributes(businessId, attributeActions, updateRequestUser.UserId)
         if err != nil {
-            log.Errorf("Error updating business description '%s' for business '%s': %v", businessDescription, *user.ActiveBusinessId, err)
+            log.Errorf("Error updating business description '%s' for business '%s': %v", businessDescription, businessId, err)
             return model.User{}, model.Business{}, err
         }
 
         // disable depending features
-        if !util.IsEmptyStringPtr(user.ServiceRecommendation) {
+        if updateRequestUser.ServiceRecommendationEnabled && util.IsEmptyStringPtr(updateRequestUser.ServiceRecommendation) {
             disableServiceRecommendationEnabledAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "serviceRecommendationEnabled", false)
             if err != nil {
                 return model.User{}, model.Business{}, err
             }
-            user, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{disableServiceRecommendationEnabledAction})
+            updatedUser, err = userDao.UpdateAttributes(updateRequestUser.UserId, []dbModel.AttributeAction{disableServiceRecommendationEnabledAction})
             if err != nil {
-                log.Errorf("Error disabling service recommendation enabled '%s' for user '%s': %v", businessDescription, userId, err)
+                log.Errorf("Error disabling service recommendation enabled '%s' for user '%s': %v", businessDescription, updateRequestUser.UserId, err)
                 return model.User{}, model.Business{}, err
             }
         }
@@ -105,16 +111,16 @@ func handleBusinessDescriptionUpdate(
             return model.User{}, model.Business{}, err
         }
 
-        updatedBusiness, err = businessDao.UpdateAttributes(*user.ActiveBusinessId, []dbModel.AttributeAction{attributeAction}, userId)
+        updatedBusiness, err = businessDao.UpdateAttributes(businessId, []dbModel.AttributeAction{attributeAction}, updateRequestUser.UserId)
         if err != nil {
-            log.Errorf("Error updating business description '%s' for business '%s': %v", businessDescription, *user.ActiveBusinessId, err)
+            log.Errorf("Error updating business description '%s' for business '%s': %v", businessDescription, businessId, err)
             return model.User{}, model.Business{}, err
         }
     }
 
-    log.Infof("Successfully processed update business description request for user '%s'", userId)
+    log.Infof("Successfully processed update business description request for business '%s' requested by user '%s'", businessId, updateRequestUser.UserId)
 
-    return user, updatedBusiness, nil
+    return updatedUser, updatedBusiness, nil
 }
 
 func handleUpdateSignature(
@@ -145,36 +151,40 @@ func handleUpdateSignature(
 }
 
 func handleUpdateKeywords(
-    user model.User,
+    businessId bid.BusinessId,
+    updateRequestUserId string,
     keywords string,
     businessDao *ddbDao.BusinessDao,
     log *zap.SugaredLogger) (model.Business, error) {
-    userId := user.UserId
-
     var updatedBusiness model.Business
     if util.IsEmptyString(keywords) {
         removeKeywordsAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "keywords", nil)
         if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
             return model.Business{}, err
         }
         // disable depending features
         disableKeywordEnabledAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "keywordEnabled", false)
         if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
             return model.Business{}, err
         }
 
-        updatedBusiness, err = businessDao.UpdateAttributes(*user.ActiveBusinessId, []dbModel.AttributeAction{removeKeywordsAction, disableKeywordEnabledAction}, userId)
+        updatedBusiness, err = businessDao.UpdateAttributes(businessId, []dbModel.AttributeAction{removeKeywordsAction, disableKeywordEnabledAction}, updateRequestUserId)
         if err != nil {
+            log.Errorf("Error updating keywords '%s' for business '%s': %v", keywords, businessId, err)
             return model.Business{}, err
         }
     } else {
         updateKeywordsAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "keywords", keywords)
         if err != nil {
+            log.Errorf("Error creating attribute action: %s", err)
             return model.Business{}, err
         }
 
-        updatedBusiness, err = businessDao.UpdateAttributes(*user.ActiveBusinessId, []dbModel.AttributeAction{updateKeywordsAction}, userId)
+        updatedBusiness, err = businessDao.UpdateAttributes(businessId, []dbModel.AttributeAction{updateKeywordsAction}, updateRequestUserId)
         if err != nil {
+            log.Errorf("Error updating keywords '%s' for business '%s': %v", keywords, businessId, err)
             return model.Business{}, err
         }
     }
@@ -183,11 +193,10 @@ func handleUpdateKeywords(
 }
 
 func handleUpdateServiceRecommendation(
-    user model.User,
+    userId string,
     serviceRecommendation string,
     userDao *ddbDao.UserDao,
 ) (model.User, error) {
-    userId := user.UserId
     var updatedUser model.User
     if util.IsEmptyString(serviceRecommendation) {
         removeRecommendationAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "serviceRecommendation", nil)

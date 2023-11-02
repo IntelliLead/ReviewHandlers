@@ -1,6 +1,7 @@
 package model
 
 import (
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "strings"
@@ -8,20 +9,20 @@ import (
 )
 
 type Business struct {
-    BusinessId            string    `dynamodbav:"businessId"` // partition key
-    BusinessName          string    `dynamodbav:"businessName"`
-    UserIds               []string  `dynamodbav:"userIds,stringset,omitemptyelem"`
-    BusinessDescription   *string   `dynamodbav:"businessDescription,omitempty"`
-    Keywords              *string   `dynamodbav:"keywords,omitempty"`
-    KeywordEnabled        bool      `dynamodbav:"keywordEnabled"` // FAC for keywords
-    QuickReplyMessage     *string   `dynamodbav:"quickReplyMessage,omitempty"`
-    AutoQuickReplyEnabled bool      `dynamodbav:"autoQuickReplyEnabled"` // FAC for auto quick reply
-    CreatedAt             time.Time `dynamodbav:"createdAt,unixtime"`
-    LastUpdated           time.Time `dynamodbav:"lastUpdated,unixtime"`
-    LastUpdatedBy         string    `dynamodbav:"lastUpdatedBy"`
+    BusinessId            bid.BusinessId `dynamodbav:"businessId"` // partition key
+    BusinessName          string         `dynamodbav:"businessName"`
+    UserIds               []string       `dynamodbav:"userIds,stringset,omitemptyelem"`
+    BusinessDescription   *string        `dynamodbav:"businessDescription,omitempty"`
+    Keywords              *string        `dynamodbav:"keywords,omitempty"`
+    KeywordEnabled        bool           `dynamodbav:"keywordEnabled"` // FAC for keywords
+    QuickReplyMessage     *string        `dynamodbav:"quickReplyMessage,omitempty"`
+    AutoQuickReplyEnabled bool           `dynamodbav:"autoQuickReplyEnabled"` // FAC for auto quick reply
+    CreatedAt             time.Time      `dynamodbav:"createdAt,unixtime"`
+    LastUpdated           time.Time      `dynamodbav:"lastUpdated,unixtime"`
+    LastUpdatedBy         string         `dynamodbav:"lastUpdatedBy"`
 }
 
-func NewBusiness(businessId string,
+func NewBusiness(businessId bid.BusinessId,
     businessName string,
     userId string) Business {
 
@@ -39,10 +40,10 @@ func NewBusiness(businessId string,
     }
 }
 
-func BuildDdbBusinessKey(userId string) map[string]types.AttributeValue {
+func BuildDdbBusinessKey(businessId bid.BusinessId) map[string]types.AttributeValue {
     uniqueId := util.DefaultUniqueId
     return map[string]types.AttributeValue{
-        "businessId": &types.AttributeValueMemberS{Value: userId},
+        "businessId": &types.AttributeValueMemberS{Value: businessId.String()},
         "uniqueId":   &types.AttributeValueMemberS{Value: uniqueId},
     }
 }

@@ -10,7 +10,8 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
@@ -19,84 +20,109 @@ import (
 // returns autoQuickReplyEnabled, quickReplyMessage ,error
 func handleAutoQuickReplyToggle(
     user model.User,
-    business model.Business,
+    businessId bid.BusinessId,
     businessDao *ddbDao.BusinessDao,
-) (bool, *string, error) {
+    log *zap.SugaredLogger,
+) (model.Business, error) {
     userId := user.UserId
+
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        log.Errorf("Error getting business by businessId '%s' during handling auto quick reply toggle: %s", businessId, err)
+        return model.Business{}, err
+    }
+    if businessPtr == nil {
+        errStr := fmt.Sprintf("Business not found for businessId: %s", businessId)
+        log.Error(errStr)
+        return model.Business{}, errors.New(errStr)
+    }
+    business := *businessPtr
+
     if !business.AutoQuickReplyEnabled && (util.IsEmptyStringPtr(business.QuickReplyMessage)) {
-        return false, nil, exception.NewAutoQuickReplyConditionNotMetException("Please fill in quick reply message before enabling auto quick reply")
+        return business, exception.NewAutoQuickReplyConditionNotMetException("Please fill in quick reply message before enabling auto quick reply")
     }
 
     attributeAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "autoQuickReplyEnabled", !business.AutoQuickReplyEnabled)
     if err != nil {
-        return false, nil, err
+        return business, err
     }
     updatedBusiness, err := businessDao.UpdateAttributes(business.BusinessId, []dbModel.AttributeAction{attributeAction}, userId)
     if err != nil {
-        return false, nil, err
+        return business, err
     }
-    return updatedBusiness.AutoQuickReplyEnabled, updatedBusiness.QuickReplyMessage, nil
 
+    return updatedBusiness, nil
 }
 
 func handleGenerateAiReply(
     replyToken string,
     user model.User,
-    business model.Business,
-    reviewId _type.ReviewId,
+    businessId bid.BusinessId,
+    reviewId rid.ReviewId,
+    businessDao *ddbDao.BusinessDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
     log *zap.SugaredLogger) error {
     userId := user.UserId
+
+    // --------------------
+    // Get business and review and perform validation
+    // --------------------
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        log.Errorf("Error getting business by businessId '%s' during handling generate AI reply: %s", businessId, err)
+        return err
+    }
+    if businessPtr == nil {
+        errStr := fmt.Sprintf("Business not found for businessId: %s", businessId)
+        log.Error(errStr)
+        return errors.New(errStr)
+    }
+    business := *businessPtr
+
+    reviewPtr, err := reviewDao.GetReview(businessId.String(), reviewId)
+    if err != nil {
+        log.Errorf("Error getting review by businessId '%s' reviewId '%s' during handling generate AI reply: %s", businessId, reviewId.String(), err)
+        return err
+    }
+    if reviewPtr == nil {
+        errStr := fmt.Sprintf("Review not found for businessId: %s ; UserReviewId: %s", businessId, reviewId)
+        log.Error(errStr)
+        return errors.New(errStr)
+    }
+    review := *reviewPtr
+    if util.IsEmptyStringPtr(review.Review) {
+        errStr := fmt.Sprintf("Review is empty. Cannot generate AI reply. userId: %s ; UserReviewId: %s", userId, reviewId)
+        log.Error(errStr)
+        return errors.New(errStr)
+    }
+
+    // --------------------
     // Notify user that AI is generating reply
-    _, err := line.NotifyUserAiReplyGenerationInProgress(replyToken)
+    // --------------------
+    _, err = line.NotifyUserAiReplyGenerationInProgress(replyToken)
     if err != nil {
         log.Errorf("Error notifying user '%s' that AI is generating reply. Porceeding: %v", userId, err)
         return err
     }
 
-    review, err := reviewDao.GetReview(business.BusinessId, reviewId)
-    if err != nil {
-        log.Errorf("Error getting review by businessId '%s' reviewId '%s' during handling generate AI reply: %s", business.BusinessId, reviewId.String(), err)
-        return err
-    }
-    if review == nil {
-        errStr := fmt.Sprintf("Review not found for businessId: %s ; ReviewId: %s", business.BusinessId, reviewId)
-        log.Error(errStr)
-
-        // TODO: [INT-91] remove this after all users have been backfilled
-        log.Infof("[Fallback] Trying to find review by userId '%s' reviewId '%s' during handling generate AI reply", userId, reviewId)
-
-        review, err = reviewDao.GetReview(user.UserId, reviewId)
-        if err != nil {
-            log.Errorf("Error getting review by userId '%s' reviewId '%s' during handling generate AI reply: %s", userId, reviewId.String(), err)
-            return err
-        }
-        if review == nil {
-            errStr := fmt.Sprintf("Review not found for userId: %s ; ReviewId: %s", userId, reviewId)
-            log.Error(errStr)
-            return errors.New(errStr)
-        }
-    }
-
+    // --------------------
     // invoke gpt4
-    if util.IsEmptyStringPtr(review.Review) {
-        errStr := fmt.Sprintf("Review is empty. Cannot generate AI reply. userId: %s ; ReviewId: %s", userId, reviewId)
-        log.Error(errStr)
-        return errors.New(errStr)
-    }
+    // --------------------
     aiReply, err := aiUtil.NewAi(log).GenerateReply(*review.Review, business, user)
     if err != nil {
         log.Errorf("Error invoking GPT to generate AI reply: %v", err)
         return err
     }
 
+    // --------------------
     // create AI generated result card
+    // --------------------
     generateAuthorName := user.LineUsername
     if util.IsEmptyString(generateAuthorName) {
         generateAuthorName = "您的同仁"
     }
-    err = line.SendAiGeneratedReply(aiReply, *review, business.UserIds, generateAuthorName)
+    err = line.SendAiGeneratedReply(aiReply, review, business.UserIds, generateAuthorName)
     if err != nil {
         log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
         return err

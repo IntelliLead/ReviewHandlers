@@ -1,26 +1,30 @@
 package model
 
 import (
+    "errors"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+    "github.com/go-playground/validator/v10"
     "github.com/line/line-bot-sdk-go/v7/linebot"
+    "sort"
     "strings"
     "time"
 )
 
 type User struct {
-    UserId string `dynamodbav:"userId"` // partition key
-    // TODO: [INT-91] Remove backfill logic once all users have been backfilled
-    ActiveBusinessId             *string                `dynamodbav:"activeBusinessId,omitempty"`
-    BusinessIds                  []string               `dynamodbav:"businessIds,stringset,omitemptyelem" validate:"min=1"`
-    CreatedAt                    time.Time              `dynamodbav:"createdAt,unixtime"`
-    LineUsername                 string                 `dynamodbav:"lineUsername"`
-    LineProfilePictureUrl        string                 `dynamodbav:"lineProfilePicture" validate:"url"`
-    Language                     string                 `dynamodbav:"language"`
+    UserId                       string                 `dynamodbav:"userId" validate:"required"`            // partition key
+    ActiveBusinessId             bid.BusinessId         `dynamodbav:"activeBusinessId"  validate:"required"` // active business is the business that the user is currently managing. if len(BusinessIds) == 1, this field is BusinessIds[0]
+    BusinessIds                  []bid.BusinessId       `dynamodbav:"businessIds,stringset,omitemptyelem" validate:"required,min=1"`
+    CreatedAt                    time.Time              `dynamodbav:"createdAt,unixtime"  validate:"required"`
+    LineUsername                 string                 `dynamodbav:"lineUsername"  validate:"required"`
+    LineProfilePictureUrl        string                 `dynamodbav:"lineProfilePicture" validate:"required,url"`
+    Language                     string                 `dynamodbav:"language"  validate:"required"`
     SubscriptionTier             *enum.SubscriptionTier `dynamodbav:"subscriptionTier,omitempty"`
     ExpireAt                     *time.Time             `dynamodbav:"expireAt,omitempty,unixtime"`
-    LastUpdated                  time.Time              `dynamodbav:"lastUpdated,unixtime"`
+    LastUpdated                  time.Time              `dynamodbav:"lastUpdated,unixtime"  validate:"required"`
     QuickReplyMessage            *string                `dynamodbav:"quickReplyMessage,omitempty"`
     BusinessDescription          *string                `dynamodbav:"businessDescription,omitempty"` // TODO: [INT-91] remove this field
     EmojiEnabled                 bool                   `dynamodbav:"emojiEnabled"`                  // FAC for emoji
@@ -34,14 +38,23 @@ type User struct {
     Google                       Google                 `dynamodbav:"google,omitemptyelem"`
 }
 
+var validate *validator.Validate
+
+func init() {
+    validate = validator.New(validator.WithRequiredStructEnabled())
+}
+
 func NewUser(lineUserId string,
-    businessIds []string,
+    businessIds []bid.BusinessId,
     lineUserProfile linebot.UserProfileResponse,
     google Google,
-) User {
+) (User, error) {
+    if len(businessIds) == 0 {
+        return User{}, errors.New("businessIds must not be empty")
+    }
     user := User{
         UserId:                       lineUserId,
-        ActiveBusinessId:             &businessIds[0],
+        ActiveBusinessId:             businessIds[0],
         BusinessIds:                  businessIds,
         LineUsername:                 lineUserProfile.DisplayName,
         LineProfilePictureUrl:        lineUserProfile.PictureURL,
@@ -54,7 +67,12 @@ func NewUser(lineUserId string,
         Google:                       google,
     }
 
-    return user
+    err := validate.Struct(user)
+    if err != nil {
+        return User{}, errors.New("invalid user: " + err.Error())
+    }
+
+    return user, nil
 }
 
 func BuildDdbUserKey(userId string) map[string]types.AttributeValue {
@@ -74,4 +92,16 @@ func (u User) GetFinalQuickReplyMessage(review Review) string {
     }
 
     return strings.ReplaceAll(*u.QuickReplyMessage, "{評論人}", review.ReviewerName)
+}
+
+func (u User) GetBusinessIdFromIndex(businessIdIndex int) (bid.BusinessId, error) {
+    if businessIdIndex < 0 || businessIdIndex >= len(u.BusinessIds) {
+        return "", fmt.Errorf("invalid businessIdIndex: %d", businessIdIndex)
+    }
+
+    sort.Slice(u.BusinessIds, func(i, j int) bool {
+        return u.BusinessIds[i].String() < u.BusinessIds[j].String()
+    })
+
+    return u.BusinessIds[businessIdIndex], nil
 }

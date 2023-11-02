@@ -1,10 +1,13 @@
 package lineUtil
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -79,18 +82,10 @@ func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
 }
 
 // SendNewReview sends a new review to all the users of the business
-// TODO: [INT-97] Remove passing in user and change pass in business object when all users are backfilled with active business ID
-func (l *Line) SendNewReview(review model.Review, business *model.Business, user model.User) error {
+func (l *Line) SendNewReview(review model.Review, business model.Business) error {
     quickReplyMessage := ""
-    if business == nil {
-        l.log.Warnf("Business is nil in SendNewReview for review '%s'. User has not completed auth.", review.ReviewId)
-        if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
-            quickReplyMessage = user.GetFinalQuickReplyMessage(review)
-        }
-    } else {
-        if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
-            quickReplyMessage = business.GetFinalQuickReplyMessage(review)
-        }
+    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+        quickReplyMessage = business.GetFinalQuickReplyMessage(review)
     }
 
     flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage)
@@ -98,24 +93,53 @@ func (l *Line) SendNewReview(review model.Review, business *model.Business, user
         l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    if business == nil {
-        _, err := l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+    for _, userId := range business.UserIds {
+        _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
         if err != nil {
-            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", user.UserId, err)
+            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
             return err
         }
-    } else {
-        for _, userId := range business.UserIds {
-            _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
-            if err != nil {
-                l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
-                return err
-            }
-            l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
-        }
+        l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
     }
 
     return nil
+}
+
+// SendNewReview sends a new review to all the users of the business
+// TODO: [INT-97] Remove this method when all users are backfilled with business IDs
+func (l *Line) SendNewReviewToUser(review model.Review, user model.User) error {
+    quickReplyMessage := ""
+    if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
+        quickReplyMessage = user.GetFinalQuickReplyMessage(review)
+    }
+
+    flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage)
+    if err != nil {
+        l.log.Error("Error building flex message in SendNewReview: ", err)
+    }
+
+    _, err = l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+    if err != nil {
+        l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", user.UserId, err)
+        return err
+    }
+
+    return nil
+}
+
+func (l *Line) ShowQuickReplySettingsByBusinessGet(replyToken string, businessId bid.BusinessId, businessDao *ddbDao.BusinessDao) error {
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        l.log.Error("Error getting business in ShowQuickReplySettings: ", err)
+        return err
+    }
+    if businessPtr == nil {
+        l.log.Errorf("Business '%s' not found", businessId)
+        return errors.New(fmt.Sprintf("Business '%s' not found", businessId))
+    }
+    business := *businessPtr
+
+    return l.ShowQuickReplySettings(replyToken, business.AutoQuickReplyEnabled, business.QuickReplyMessage)
 }
 
 func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled bool, quickReplyMessage *string) error {
@@ -133,6 +157,22 @@ func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled b
     l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings: %s", jsonUtil.AnyToJson(resp))
 
     return nil
+}
+
+func (l *Line) ShowAiReplySettingsByBusinessGet(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
+    businessId := user.ActiveBusinessId
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        l.log.Error("Error getting business in ShowAiReplySettingsByBusinessGet: ", err)
+        return err
+    }
+    if businessPtr == nil {
+        l.log.Errorf("Business '%s' not found", businessId)
+        return errors.New(fmt.Sprintf("Business '%s' not found", businessId))
+    }
+    business := *businessPtr
+
+    return l.ShowAiReplySettings(replyToken, user, business)
 }
 
 func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business model.Business) error {
@@ -240,8 +280,9 @@ func (l *Line) NotifyReviewReplied(
     review model.Review,
     reply string,
     replierName string,
-    isAutoReply bool) error {
-    flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierName, isAutoReply)
+    isAutoReply bool,
+    businessName *string) error {
+    flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierName, isAutoReply, businessName)
     if err != nil {
         l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
         return err

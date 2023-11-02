@@ -2,6 +2,7 @@ package googleUtil
 
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "golang.org/x/oauth2"
     "google.golang.org/api/mybusinessbusinessinformation/v1"
 )
@@ -27,11 +28,15 @@ func FilterOpenBusinessLocations(businessLocations []mybusinessbusinessinformati
     return openBusinessLocations
 }
 
-func MapBusinessIds(accountId string, businessLocations []mybusinessbusinessinformation.Location) []string {
-    businessIds := make([]string, 0, len(businessLocations))
+func MapBusinessIds(accountId string, businessLocations []mybusinessbusinessinformation.Location) ([]bid.BusinessId, error) {
+    businessIds := make([]bid.BusinessId, 0, len(businessLocations))
     for _, location := range businessLocations {
-        businessIds = append(businessIds, accountId+"/"+location.Name)
+        businessId, err := bid.NewBusinessId(accountId + "/" + location.Name)
+        if err != nil {
+            return []bid.BusinessId{}, err
+        }
+        businessIds = append(businessIds, businessId)
     }
 
-    return businessIds
+    return businessIds, nil
 }

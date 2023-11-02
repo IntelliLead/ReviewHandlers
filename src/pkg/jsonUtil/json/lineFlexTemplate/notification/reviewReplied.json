@@ -5,11 +5,27 @@
     "layout": "vertical",
     "contents": [
       {
-        "type": "text",
-        "text": "評論回覆通知",
-        "weight": "bold",
-        "size": "xl",
-        "margin": "md"
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "評論回覆通知",
+            "weight": "bold",
+            "size": "xl",
+            "margin": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "{BUSINESS_NAME}",
+            "weight": "regular",
+            "size": "lg",
+            "margin": "none",
+            "wrap": true,
+            "style": "italic"
+          }
+        ]
       },
       {
         "type": "box",

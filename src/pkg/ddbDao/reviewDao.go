@@ -9,7 +9,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -32,10 +32,8 @@ func NewReviewDao(client *dynamodb.Client, logger *zap.SugaredLogger) *ReviewDao
     }
 }
 
-// TODO: Remove userId field after [INT-97] is done
-func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (_type.ReviewId, error) {
-
-    // Define the expression to retrieve the largest ReviewId for the given BusinessId
+// TODO: Remove userId field and constrain businessId type to bid.BusinessId, after [INT-97] is done
+func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.ReviewId, error) {
     expr, err := expression.NewBuilder().
         WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(businessId))).
         Build()
@@ -58,7 +56,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (_type.Rev
         return "", err
     }
 
-    // If there are no existing reviews, start with ReviewId 0
+    // If there are no existing reviews, check if the partition key is user id. If found, return the next review id for that user as the business ID
     if len(result.Items) == 0 {
         expr, err := expression.NewBuilder().
             WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
@@ -83,22 +81,24 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (_type.Rev
         }
 
         if len(result.Items) == 0 {
-            return _type.NewReviewId("0"), nil
+            reviewId, err := rid.NewReviewId("0")
+            if err != nil {
+                return "", err
+            }
+            return reviewId, nil
         }
 
-        // Extract the current largest ReviewId
+        // Extract the current largest reviewId for the user
         var review model.Review
         err = attributevalue.UnmarshalMap(result.Items[0], &review)
         if err != nil {
             d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
             return "", err
         }
-        return (*review.ReviewId).GetNext(), nil
-
-        // return _type.NewReviewId("0"), nil
+        return review.ReviewId.GetNext(), nil
     }
 
-    // Extract the current largest ReviewId
+    // Extract the current largest reviewId
     var review model.Review
     err = attributevalue.UnmarshalMap(result.Items[0], &review)
     if err != nil {
@@ -106,7 +106,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (_type.Rev
         return "", err
     }
 
-    return (*review.ReviewId).GetNext(), nil
+    return review.ReviewId.GetNext(), nil
 }
 
 // CreateReview creates a new review in DynamoDB
@@ -174,12 +174,12 @@ func (d *ReviewDao) CreateReview(review model.Review) error {
 }
 
 type UpdateReviewInput struct {
-    BusinessId  string         `dynamodbav:"userId"`
-    ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
-    LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
-    LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
-    Reply       string         `dynamodbav:"reply"`
-    RepliedBy   string         `dynamodbav:"repliedBy"` // userId
+    BusinessId  string       `dynamodbav:"userId"`
+    ReviewId    rid.ReviewId `dynamodbav:"uniqueId"`
+    LastUpdated time.Time    `dynamodbav:"lastUpdated"` // unixtime does not work
+    LastReplied time.Time    `dynamodbav:"lastReplied"` // unixtime does not work
+    Reply       string       `dynamodbav:"reply"`
+    RepliedBy   string       `dynamodbav:"repliedBy"` // userId
 }
 
 func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
@@ -249,7 +249,7 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     return nil
 }
 
-func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (*model.Review, error) {
+func (d *ReviewDao) GetReview(businessId string, reviewId rid.ReviewId) (*model.Review, error) {
     // Create the key for the GetItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
         util.ReviewTablePartitionKey: businessId,
