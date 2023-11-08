@@ -68,14 +68,17 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // LINE
     line := lineUtil.NewLine(log)
 
+    // --------------------
     // parse message to LINE events
+    // --------------------
     var lineEvents []*linebot.Event
 
     // This is useful for local development, where we can't/won't generate a new request with valid signature.
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
     if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
-        lineEvents = lineEventsHandlerTestEvents.TestReplyEvent
+        // lineEvents = message.TestRealReplyEvent
+        lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
     } else {
         err = nil
         lineEvents, err = line.ParseRequest(&request)

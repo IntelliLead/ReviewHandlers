@@ -18,6 +18,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -33,7 +34,8 @@ func main() {
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
-    stage := os.Getenv(util.StageEnvKey)
+    stageStr := os.Getenv(util.StageEnvKey)
+    stage := enum2.StringToStage(stageStr) // panic if invalid stage
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // ----
@@ -174,7 +176,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     }
 
     var businessIdsToAssociateUser []bid.BusinessId
-
     for _, location := range businessLocations {
         businessId, err := bid.NewBusinessId(businessAccountId + "/" + location.Name)
         if err != nil {
@@ -267,9 +268,18 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
     }
 
-    // ----
+    // ----------------
+    // Notify Slack channel of new business creation
+    // ----------------
+    err = slackUtil.NewSlack(log, stage).SendNewUserAssociatedWithBusinessesMessage(userId, businessIdsToAssociateUser)
+    if err != nil {
+        log.Errorf("Error sending Slack message: %s", err)
+        metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+    }
+
+    // ----------------
     // 4. Update user
-    // ----
+    // ----------------
     // get user info from Google
     googleUserInfo, err := google.GetGoogleUserInfo()
     if err != nil {

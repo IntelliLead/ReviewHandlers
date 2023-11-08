@@ -17,13 +17,17 @@ import (
 )
 
 func shouldAuth(message string) bool {
+    if lineEventProcessor.IsReviewReplyMessage(message) {
+        return true
+    }
+
     cmd, err := lineEventProcessor.ParseCommandMessage(message)
     if err != nil {
         return false
     }
 
     firstCmdArg := cmd.Command[0]
-    return lineEventProcessor.IsReviewReplyMessage(message) || (firstCmdArg != "h" && firstCmdArg != "Help" && firstCmdArg != "help" && firstCmdArg != "幫助")
+    return firstCmdArg != "h" && firstCmdArg != "Help" && firstCmdArg != "help" && firstCmdArg != "幫助"
 }
 
 // ProcessMessageEvent processes a message event from LINE
@@ -37,7 +41,8 @@ func ProcessMessageEvent(
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
-    // validate is message from user
+    // --------------------------------
+    // validate is text message from user
     // --------------------------------
     isMessageFromUser := lineUtil.IsMessageFromUser(event)
     if !isMessageFromUser {
@@ -48,8 +53,6 @@ func ProcessMessageEvent(
         }, nil
     }
 
-    // validate is text message from user
-    // --------------------------------
     isTextMessageFromUser, err := lineUtil.IsTextMessage(event)
     if err != nil {
         log.Error("Error checking if event is text message from user:", err)
@@ -81,13 +84,15 @@ func ProcessMessageEvent(
     message := lineTextMessage.Text
     log.Infof("Received text message from user '%s': %s", userId, message)
 
-    // process review reply request
     // --------------------------------
-    // user can be empty if event does not require auth
-    // WARN: ensure event handlers that require auth are added to shouldAuth() list
+    // auth if required
+    // --------------------------------
+    // Auth retrieves user object, so user can be empty if event does not require auth
     var user model.User
-    // var activeBusiness model.Business
+    // WARN: ensure event handlers that require auth are added to shouldAuth() list
     if shouldAuth(message) {
+        log.Infof("Event requires auth. Validating user auth for user '%s'", userId)
+
         var hasUserAuthed bool
         hasUserAuthed, userPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log)
         if err != nil {
@@ -104,29 +109,18 @@ func ProcessMessageEvent(
         }
 
         user = *userPtr
-        // businessPtr, err := businessDao.GetBusiness(user.ActiveBusinessId)
-        // if err != nil {
-        //     log.Errorf("Error getting business '%s' for user '%s': %v", user.ActiveBusinessId, userId, err)
-        //     return events.LambdaFunctionURLResponse{
-        //         StatusCode: 500,
-        //         Body:       fmt.Sprintf(`{"error": "Failed to get business: %s"}`, err),
-        //     }, err
-        // }
-        // if businessPtr == nil {
-        //     log.Errorf("Business '%s' for user '%s' does not exist", user.ActiveBusinessId, userId)
-        //     return events.LambdaFunctionURLResponse{
-        //         StatusCode: 500,
-        //         Body:       fmt.Sprintf(`{"error": "Business does not exist"}`),
-        //     }, nil
-        // }
-        // activeBusiness = *businessPtr
     }
 
+    // --------------------------------
+    // process review reply request
+    // --------------------------------
     if lineEventProcessor.IsReviewReplyMessage(message) {
-        return ProcessReviewReplyMessage(user, event, reviewDao, businessDao, line, log)
+        return ProcessReviewReplyMessage(user, event, reviewDao, businessDao, userDao, line, log)
     }
 
-    // process command requests
+    // --------------------------------
+    // parse command requests
+    // --------------------------------
     cmd, err := lineEventProcessor.ParseCommandMessage(message)
     if err != nil {
         log.Errorf("Error parsing command message '%s' from user '%s': %v", message, userId, err)
@@ -168,6 +162,9 @@ func ProcessMessageEvent(
         }
     }
 
+    // --------------------------------
+    // Handle message commands
+    // --------------------------------
     switch cmd.Command[0] {
     case "h", "Help", "help", "幫助", "協助":
         _, err := line.ReplyHelpMessage(event.ReplyToken)
@@ -224,12 +221,12 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of update (skip notifying self)
-        err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
         }
 
-        err = line.ShowQuickReplySettings(event.ReplyToken, business.AutoQuickReplyEnabled, business.QuickReplyMessage)
+        err = line.ShowQuickReplySettings(event.ReplyToken, user, business, businessDao)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -261,12 +258,12 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of toggle (skip notifying self)
-        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername)
+        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, user, business)
+        err = line.ShowAiReplySettings(event.ReplyToken, user, business, businessDao)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
@@ -315,12 +312,12 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of toggle (skip notifying self)
-        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(updatedBusiness.UserIds, userId), user.LineUsername)
+        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(updatedBusiness.UserIds, userId), user.LineUsername, updatedBusiness.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
 
-        err = line.ShowAiReplySettings(event.ReplyToken, user, updatedBusiness)
+        err = line.ShowAiReplySettings(event.ReplyToken, user, updatedBusiness, businessDao)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
@@ -367,7 +364,7 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettingsByBusinessGet(event.ReplyToken, updatedUser, businessDao)
+        err = line.ShowAiReplySettingsByUser(event.ReplyToken, updatedUser, businessDao)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
@@ -414,7 +411,7 @@ func ProcessMessageEvent(
             }, err
         }
 
-        err = line.ShowAiReplySettingsByBusinessGet(event.ReplyToken, updatedUser, businessDao)
+        err = line.ShowAiReplySettingsByUser(event.ReplyToken, updatedUser, businessDao)
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 

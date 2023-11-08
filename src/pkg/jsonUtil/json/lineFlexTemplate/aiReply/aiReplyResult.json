@@ -128,8 +128,8 @@
           "type": "postback",
           "label": "送出回覆",
           "inputOption": "openKeyboard",
-          "data": "/AiReply/Reply",
-          "fillInText": "@{REVIEW_ID} {AI_REPLY}"
+          "data": "/AiReply/{BUSINESS_ID}/EditReply",
+          "fillInText": "@{BUSINESS_ID_INDEX}|{REVIEW_ID} {AI_REPLY}"
         },
         "color": "#445783"
       },
@@ -138,7 +138,7 @@
         "action": {
           "type": "postback",
           "label": "換一個",
-          "data": "/AiReply/GenerateAiReply/{REVIEW_ID}"
+          "data": "/AiReply/GenerateAiReply/{BUSINESS_ID}/{REVIEW_ID}"
         },
         "color": "#445783"
       }

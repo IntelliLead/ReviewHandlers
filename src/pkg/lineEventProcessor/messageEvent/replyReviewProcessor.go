@@ -6,13 +6,13 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
-    "strings"
 )
 
 // ProcessReviewReplyMessage performs validation of a review reply request and invokes the reply review handler to process the request
@@ -21,12 +21,14 @@ func ProcessReviewReplyMessage(
     event *linebot.Event,
     reviewDao *ddbDao.ReviewDao,
     businessDao *ddbDao.BusinessDao,
+    userDao *ddbDao.UserDao,
     line *lineUtil.Line,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
     textMessage := event.Message.(*linebot.TextMessage)
     message := textMessage.Text
 
+    // --------------------------------
     // parse reply message
     // --------------------------------
     reply, err := lineEventProcessor.ParseReplyMessage(message)
@@ -38,82 +40,51 @@ func ProcessReviewReplyMessage(
         }, err
     }
 
+    var businessIdIndex int
+    if reply.UserReviewId.BusinessIdIndex == nil {
+        log.Warn("Error parsing reply message: businessIdIndex is nil. Replying to review without businessIdIndex is not supported")
+        // TODO: return error instead once all new reviews should have businessIdIndex - 2 weeks after Nov 7, 2023
+        log.Warn("Attempting to continue assuming index is 0")
+        businessIdIndex = 0
+        metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameLineEventsHandler, 1)
+    } else {
+        businessIdIndex = *reply.UserReviewId.BusinessIdIndex
+    }
+
+    businessId, err := user.GetBusinessIdFromIndex(businessIdIndex)
+    if err != nil {
+        log.Errorf("Error getting businessId from index %d: %v", *reply.UserReviewId.BusinessIdIndex, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to get businessId from index %d: %v"}`, *reply.UserReviewId.BusinessIdIndex, err),
+        }, err
+    }
+    reviewId := reply.UserReviewId.ReviewId
+
+    // --------------------------------
     // fetch review from DDB
     // --------------------
-    // TODO: [INT-91] remove this after all users have been backfilled
-    isUnbackfilledReview := false
-    var review model.Review
-    var businessId bid.BusinessId
-    // check if there is '|', indicating both businessId index and reviewId are provided
-    if strings.Contains(reply.UserReviewId.String(), "|") {
-        businessIdIndex, rid, err := reply.UserReviewId.Decode()
-        if err != nil {
-            log.Errorf("Error decoding userReviewId '%s': %v", reply.UserReviewId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to parse userReviewId '%s': %v"}`, reply.UserReviewId, err),
-            }, err
-        }
-
-        businessId, err := user.GetBusinessIdFromIndex(businessIdIndex)
-        if err != nil {
-            log.Errorf("Error getting businessId from index %d: %v", businessIdIndex, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get businessId from index %d: %v"}`, businessIdIndex, err),
-            }, err
-        }
-
-        reviewPtr, err := reviewDao.GetReview(businessId.String(), rid)
-        if err != nil {
-            log.Errorf("Error getting review %s with businessId %s: %s", reply.UserReviewId, businessId, jsonUtil.AnyToJson(err))
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
-            }, err
-        }
-        if reviewPtr == nil {
-            log.Errorf("Review for reviewId %s with businessId %s not found", reply.UserReviewId, businessId)
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Review not found"}`),
-            }, nil
-        }
-
-        review = *reviewPtr
-    } else {
-        // try to find user with userID + reviewID
-        reviewId, err := rid.NewReviewId(reply.UserReviewId.String())
-        if err != nil {
-            log.Errorf("Error decoding userReviewId '%s': %v", reply.UserReviewId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to parse userReviewId '%s': %v"}`, reply.UserReviewId, err),
-            }, err
-        }
-        reviewPtr, err := reviewDao.GetReview(user.UserId, reviewId)
-        if err != nil {
-            log.Errorf("Error getting review %s with userId %s: %s", reply.UserReviewId, user.UserId, jsonUtil.AnyToJson(err))
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
-            }, err
-        }
-        if reviewPtr == nil {
-            log.Errorf("Review for reviewId %s with userId %s not found", reply.UserReviewId, user.UserId)
-
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Review not found"}`),
-            }, nil
-        }
-        isUnbackfilledReview = true
-        review = *reviewPtr
+    reviewPtr, err := reviewDao.GetReview(businessId.String(), reviewId)
+    if err != nil {
+        log.Errorf("Error getting review %s with businessId %s: %s", reply.UserReviewId, businessId, jsonUtil.AnyToJson(err))
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to get review: %s"}`, err),
+        }, err
     }
+    if reviewPtr == nil {
+        log.Errorf("Review for reviewId %s with businessId %s not found", reply.UserReviewId, businessId)
+
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Review not found"}`),
+        }, nil
+    }
+    review := *reviewPtr
 
     log.Info("Processing reply for review: ", jsonUtil.AnyToJson(review))
 
+    // --------------------------------
     // validate message does not contain LINE emojis
     // --------------------------------
     if HasLineEmoji(textMessage) {
@@ -134,6 +105,9 @@ func ProcessReviewReplyMessage(
         }, nil
     }
 
+    // --------------------------------
+    // process reply message
+    // --------------------------------
     err = lineEventProcessor.ReplyReview(user.UserId, reply.Message, review, reviewDao, log)
     if err != nil {
         log.Errorf("Error handling replying '%s' to review '%s' for user '%s' business '%s': %v", jsonUtil.AnyToJson(reply.Message), review.ReviewId.String(), user.UserId, businessId, err)
@@ -156,35 +130,32 @@ func ProcessReviewReplyMessage(
         }, err
     }
 
+    // --------------------------------
     // Notify review replied on LINE
     // --------------------
-    // TODO: [INT-91] remove this after all users have been backfilled
-    if isUnbackfilledReview {
-        err = line.NotifyReviewReplied([]string{user.UserId}, &event.ReplyToken, &user.UserId, review, reply.Message, user.LineUsername, false, nil)
-        if err != nil {
-            log.Errorf("Error sending review reply notification to user '%s' for review '%s': %v", user.UserId, review.ReviewId.String(), err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to send review reply notification to user '%s' for review '%s': %v"}`, user.UserId, review.ReviewId.String(), err),
-            }, err
-        }
-    } else {
-        business, err := businessDao.GetBusiness(businessId)
-        if err != nil {
-            log.Errorf("Error getting business '%s': %v", businessId, err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to get business '%s': %v"}`, businessId, err),
-            }, err
-        }
-        err = line.NotifyReviewReplied(business.UserIds, &event.ReplyToken, &user.UserId, review, reply.Message, user.LineUsername, false, &business.BusinessName)
-        if err != nil {
-            log.Errorf("Error sending review reply notification to users '%s' of business '%s' for review '%s': %v", business.UserIds, businessId, review.ReviewId.String(), err)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-                Body:       fmt.Sprintf(`{"error": "Failed to send review reply notification to users '%s' of business '%s' for review '%s': %v"}`, business.UserIds, businessId, review.ReviewId.String(), err),
-            }, err
-        }
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        log.Errorf("Error getting business '%s': %v", businessId, err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to get business '%s': %v"}`, businessId, err),
+        }, err
+    }
+    if businessPtr == nil {
+        log.Errorf("Business '%s' not found", businessId)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Business '%s' not found"}`, businessId),
+        }, nil
+    }
+    business := *businessPtr
+    err = line.NotifyReviewReplied(event.ReplyToken, review, reply.Message, business, user, userDao)
+    if err != nil {
+        log.Errorf("Error sending review reply notification to users '%s' of business '%s' for review '%s': %v", business.UserIds, businessId, review.ReviewId.String(), err)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       fmt.Sprintf(`{"error": "Failed to send review reply notification to users '%s' of business '%s' for review '%s': %v"}`, business.UserIds, businessId, review.ReviewId.String(), err),
+        }, err
     }
 
     log.Infof("Successfully handled review reply event to review '%s' for user '%s' with business '%s'", review.ReviewId.String(), user.UserId, businessId)
@@ -192,5 +163,4 @@ func ProcessReviewReplyMessage(
         StatusCode: 200,
         Body:       fmt.Sprintf(`{"message": "Successfully handled review reply event for user ID '%s'"}`, user.UserId),
     }, nil
-
 }

@@ -60,6 +60,7 @@ func handleGenerateAiReply(
     businessId bid.BusinessId,
     reviewId rid.ReviewId,
     businessDao *ddbDao.BusinessDao,
+    userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
     log *zap.SugaredLogger) error {
@@ -122,7 +123,7 @@ func handleGenerateAiReply(
     if util.IsEmptyString(generateAuthorName) {
         generateAuthorName = "您的同仁"
     }
-    err = line.SendAiGeneratedReply(aiReply, review, business.UserIds, generateAuthorName)
+    err = line.SendAiGeneratedReply(aiReply, review, generateAuthorName, business, user, userDao)
     if err != nil {
         log.Errorf("Error sending AI generated reply to user '%s': %v", userId, err)
         return err

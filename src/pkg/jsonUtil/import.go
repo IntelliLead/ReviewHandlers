@@ -12,12 +12,14 @@ type ReviewMessageLineFlexTemplateJsons struct {
 }
 
 type QuickReplySettingsLineFlexTemplateJsons struct {
-    QuickReplySettings []byte
+    QuickReplySettings              []byte
+    QuickReplySettingsMultiBusiness []byte
 }
 
 type AiReplyLineFlexTemplateJsons struct {
-    AiReplyResult   []byte
-    AiReplySettings []byte
+    AiReplyResult                []byte
+    AiReplySettings              []byte
+    AiReplySettingsMultiBusiness []byte
 }
 
 type AuthLineFlexTemplateJsons struct {
@@ -60,8 +62,14 @@ func LoadQuickReplySettingsLineFlexTemplateJsons() QuickReplySettingsLineFlexTem
         log.Fatal("Error reading quickReplySettings.json: ", err)
     }
 
+    quickReplySettingsMultiBusiness, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/quickReply/quickReplySettingsMultiBusiness.json")
+    if err != nil {
+        log.Fatal("Error reading quickReplySettings.json: ", err)
+    }
+
     return QuickReplySettingsLineFlexTemplateJsons{
-        QuickReplySettings: quickReplySettings,
+        QuickReplySettings:              quickReplySettings,
+        QuickReplySettingsMultiBusiness: quickReplySettingsMultiBusiness,
     }
 }
 
@@ -74,10 +82,15 @@ func LoadAiReplyLineFlexTemplateJsons() AiReplyLineFlexTemplateJsons {
     if err != nil {
         log.Fatal("Error reading aiReplySettings.json: ", err)
     }
+    aiReplySettingsMultiBusiness, err := embeddedFileSystem.ReadFile("json/lineFlexTemplate/aiReply/aiReplySettingsMultiBusiness.json")
+    if err != nil {
+        log.Fatal("Error reading aiReplySettings.json: ", err)
+    }
 
     return AiReplyLineFlexTemplateJsons{
         aiReplyResult,
         aiReplySettings,
+        aiReplySettingsMultiBusiness,
     }
 }
 

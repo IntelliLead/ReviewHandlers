@@ -106,6 +106,51 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
         return "", err
     }
 
+    d.log.Debug("GetNextReviewID: ", jsonUtil.AnyToJson(review))
+
+    return review.ReviewId.GetNext(), nil
+}
+
+// TODO: Remove function, after [INT-97] is done
+func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error) {
+    expr, err := expression.NewBuilder().
+        WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
+        Build()
+    if err != nil {
+        d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
+        return "", err
+    }
+
+    result, err := d.client.Query(context.TODO(), &dynamodb.QueryInput{
+        TableName:                 aws.String(enum.TableReview.String()),
+        IndexName:                 aws.String(ReviewIndexCreatedAtLsi.String()),
+        KeyConditionExpression:    expr.KeyCondition(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ScanIndexForward:          aws.Bool(false), // get largest
+        Limit:                     aws.Int32(1),
+    })
+    if err != nil {
+        d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
+        return "", err
+    }
+
+    if len(result.Items) == 0 {
+        reviewId, err := rid.NewReviewId("0")
+        if err != nil {
+            return "", err
+        }
+        return reviewId, nil
+    }
+
+    // Extract the current largest reviewId
+    var review model.Review
+    err = attributevalue.UnmarshalMap(result.Items[0], &review)
+    if err != nil {
+        d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
+        return "", err
+    }
+
     return review.ReviewId.GetNext(), nil
 }
 

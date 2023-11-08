@@ -4,7 +4,6 @@ import (
     "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    uri "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/urid"
     "regexp"
     "strings"
     "unicode"
@@ -95,13 +94,22 @@ func ParseReplyMessage(str string) (model.Reply, error) {
     // Find the first whitespace character after '@'
     index := strings.IndexFunc(str[1:], isWhitespace)
     if index == -1 {
-        return model.NewReply(uri.UserReviewId(str[1:]), "") // Return the remaining text after '@' as UserReviewId
+        userReviewId, err := model.ParseUserReviewId(str[1:])
+        if err != nil {
+            return model.Reply{}, err
+        }
+
+        return model.NewReply(userReviewId, "") // Return the remaining text after '@' as UserReviewId
     }
 
-    userReviewID := str[1 : index+1]
+    userReviewId, err := model.ParseUserReviewId(str[1 : index+1])
+    if err != nil {
+        return model.Reply{}, err
+    }
+
     replyMsg := strings.TrimSpace(str[index+2:])
 
-    return model.NewReply(uri.UserReviewId(userReviewID), replyMsg)
+    return model.NewReply(userReviewId, replyMsg)
 }
 
 func isWhitespace(r rune) bool {

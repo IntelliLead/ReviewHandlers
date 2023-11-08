@@ -1,4 +1,4 @@
-package lineEventsHandlerTestEvents
+package message
 
 import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"

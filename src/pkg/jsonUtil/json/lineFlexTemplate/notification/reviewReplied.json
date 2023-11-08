@@ -1,5 +1,23 @@
 {
   "type": "bubble",
+  "hero": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "{BUSINESS_NAME}",
+        "size": "lg",
+        "wrap": true,
+        "margin": "lg",
+        "style": "normal",
+        "align": "center",
+        "color": "#FFFFFFFF",
+        "offsetBottom": "sm"
+      }
+    ],
+    "backgroundColor": "#5e6fbd"
+  },
   "body": {
     "type": "box",
     "layout": "vertical",
@@ -15,15 +33,6 @@
             "size": "xl",
             "margin": "md",
             "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "{BUSINESS_NAME}",
-            "weight": "regular",
-            "size": "lg",
-            "margin": "none",
-            "wrap": true,
-            "style": "italic"
           }
         ]
       },
@@ -145,7 +154,7 @@
           "label": "修改回覆",
           "inputOption": "openKeyboard",
           "data": "/Notification/Replied/Reply",
-          "fillInText": "@{REVIEW_ID} {REPLY}"
+          "fillInText": "@{BUSINESS_ID_INDEX}|{REVIEW_ID} {REPLY}"
         },
         "color": "#445783"
       }

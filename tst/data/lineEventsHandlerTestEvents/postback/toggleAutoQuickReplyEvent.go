@@ -1,24 +1,24 @@
-package lineEventsHandlerTestEvents
+package postback
 
 import (
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "time"
 )
 
-var TestRichMenuQuickReplySettingsEvent = []*linebot.Event{
+var TestToggleAutoQuickReplyEvent = []*linebot.Event{
     {
         Type:           linebot.EventTypePostback,
-        WebhookEventID: "01H39TXHY0CR820VK6527WW2QN",
+        WebhookEventID: "01H1NCFZSJN1HAPFREM0193Y1Q",
         DeliveryContext: linebot.DeliveryContext{
             IsRedelivery: false,
         },
-        Timestamp: time.UnixMilli(1687178626854),
+        Timestamp: time.UnixMilli(1687226076325),
         Source: &linebot.EventSource{
             Type:   linebot.EventSourceTypeUser,
             UserID: "Ucc29292b212e271132cee980c58e94eb",
         },
         Postback: &linebot.Postback{
-            Data: "/RichMenu/QuickReplySettings",
+            Data: "/QuickReply/accounts/106775638291982182570/locations/12251512170589559833/Toggle/AutoReply",
         },
         ReplyToken: "TST",
         Mode:       linebot.EventModeActive,

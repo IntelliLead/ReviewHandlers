@@ -105,3 +105,26 @@ func (u User) GetBusinessIdFromIndex(businessIdIndex int) (bid.BusinessId, error
 
     return u.BusinessIds[businessIdIndex], nil
 }
+
+func (u User) GetBusinessIdIndex(businessId bid.BusinessId) (int, error) {
+    sort.Slice(u.BusinessIds, func(i, j int) bool {
+        return u.BusinessIds[i].String() < u.BusinessIds[j].String()
+    })
+
+    idx := util.FindStringIndex(bid.BusinessIdsToStringSlice(u.BusinessIds), businessId.String())
+    if idx == -1 {
+        return -1, fmt.Errorf("businessId %s not found in user %s", businessId, u.UserId)
+    }
+
+    return idx, nil
+}
+
+// GetSortedBusinessIds returns the sorted businessIds of a user.
+// businessIdIndex is reflected in the order of the returned businessIds.
+func (u User) GetSortedBusinessIds() []bid.BusinessId {
+    sort.Slice(u.BusinessIds, func(i, j int) bool {
+        return u.BusinessIds[i].String() < u.BusinessIds[j].String()
+    })
+
+    return u.BusinessIds
+}

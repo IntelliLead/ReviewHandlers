@@ -10,8 +10,8 @@ import (
 
 type Review struct {
     BusinessId           string `dynamodbav:"userId"` // partition key. It used to be userId, but we have since changed it to businessId without modifying the DDB table. See here for why: https://linear.app/intellilead/issue/INT-86/refactor-and-backfill-review-table
-    UserId               string
-    ReviewId             rid.ReviewId       `dynamodbav:"uniqueId" validate:"reviewIdValidation"` // sort key
+    UserId               *string
+    ReviewId             rid.ReviewId       `dynamodbav:"uniqueId"` // sort key
     ZapierReplyWebhook   string             `dynamodbav:"zapierReplyWebhook" validate:"url"`
     VendorReviewId       string             `dynamodbav:"vendorReviewId"` // the businessId encoded here is from onboarding@tryintellilead.com, which is different from the one in the partition key (obtained via OAUTH)
     VendorEventId        string             `dynamodbav:"vendorEventId"`
@@ -27,13 +27,11 @@ type Review struct {
     Vendor               enum.Vendor        `dynamodbav:"vendor"`
 }
 
-var reviewIdValidate *validator.Validate
+var reviewValidate *validator.Validate
 
 func init() {
     // Initialize the validator instance
-    reviewIdValidate = validator.New(validator.WithRequiredStructEnabled())
-    // Register custom validations if needed
-    _ = reviewIdValidate.RegisterValidation("reviewIdValidation", rid.ReviewIdPtrNumericValidation)
+    reviewValidate = validator.New(validator.WithRequiredStructEnabled())
 }
 
 func NewReview(businessId string,
@@ -41,12 +39,14 @@ func NewReview(businessId string,
     event ZapierNewReviewEvent) (Review, error) {
     var replyCopy *string = nil
     if event.Reply != nil {
-        *replyCopy = *event.Reply
+        reply := *event.Reply
+        replyCopy = &reply
     }
 
     var lastRepliedCopy *time.Time = nil
     if event.LastReplied != nil {
-        *lastRepliedCopy = *event.LastReplied
+        lastReplied := *event.LastReplied
+        lastRepliedCopy = &lastReplied
     }
 
     review := Review{
@@ -68,7 +68,7 @@ func NewReview(businessId string,
         ZapierReplyWebhook:   event.ZapierReplyWebhook,
     }
 
-    err := reviewIdValidate.Struct(review)
+    err := reviewValidate.Struct(review)
     if err != nil {
         return Review{}, err
     }
@@ -77,5 +77,5 @@ func NewReview(businessId string,
 }
 
 func ValidateReview(review *Review) error {
-    return reviewIdValidate.Struct(review)
+    return reviewValidate.Struct(review)
 }

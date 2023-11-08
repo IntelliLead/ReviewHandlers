@@ -95,7 +95,7 @@ func getNextAsciiCode(lastAsciiCode int) (int, bool) {
 func ReviewIdPtrNumericValidation(fl validator.FieldLevel) bool {
     reviewId := fl.Field().Interface().(*ReviewId)
 
-    // Check if UserReviewId is nil
+    // Check if ReviewId is nil
     if reviewId == nil {
         return true
     }
@@ -115,7 +115,7 @@ func ReviewIdPtrNumericValidation(fl validator.FieldLevel) bool {
 func ReviewIdNumericValidation(fl validator.FieldLevel) bool {
     reviewId := fl.Field().Interface().(ReviewId)
 
-    // Check if UserReviewId is a numbers-only string
+    // Check if ReviewId is a numbers-only string
     if !isNumbersOnly(string(reviewId)) {
         return false
     }
