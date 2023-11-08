@@ -1,0 +1,238 @@
+{
+    "type": "carousel",
+    "contents": [
+        {
+            "type": "bubble",
+            "hero": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "{BUSINESS_NAME_0}",
+                        "size": "lg",
+                        "wrap": true,
+                        "margin": "lg",
+                        "style": "normal",
+                        "align": "center",
+                        "color": "#FFFFFFFF",
+                        "offsetBottom": "sm"
+                    }
+                ],
+                "backgroundColor": "#5e6fbd"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "快速回覆設定",
+                        "weight": "bold",
+                        "size": "xl",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "預先設定好回覆內容，新評論進來時即可一鍵回覆",
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "xxl",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "已儲存回覆",
+                                        "size": "md",
+                                        "color": "#555555",
+                                        "flex": 0,
+                                        "weight": "bold",
+                                        "style": "normal"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "margin": "xl",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "{QUICK_REPLY_MESSAGE}",
+                                        "size": "md",
+                                        "color": "#555555",
+                                        "wrap": true
+                                    }
+                                ],
+                                "borderWidth": "none",
+                                "backgroundColor": "#FFFFFF",
+                                "cornerRadius": "md",
+                                "paddingAll": "lg",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "編輯快速回覆內容",
+                                    "data": "/QuickReply/{BusinessID}/EditQuickReplyMessage",
+                                    "inputOption": "openKeyboard",
+                                    "fillInText": "/quickReply/{BUSINESS_ID_INDEX} "
+                                }
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "size": "xs",
+                                        "contents": [
+                                            {
+                                                "type": "span",
+                                                "text": "在回覆內容中使用"
+                                            },
+                                            {
+                                                "type": "span",
+                                                "text": " {評論人} ",
+                                                "color": "#808080"
+                                            },
+                                            {
+                                                "type": "span",
+                                                "text": "即可替換評論人名字。\n例如：若快速回覆設定為“"
+                                            },
+                                            {
+                                                "type": "span",
+                                                "text": "{評論人}",
+                                                "color": "#808080"
+                                            },
+                                            {
+                                                "type": "span",
+                                                "text": "，謝謝您的鼓勵”，則來自“蔡康永”的評論快速回覆內容為“蔡康永，謝謝您的鼓勵”"
+                                            }
+                                        ],
+                                        "wrap": true,
+                                        "color": "#aaaaaa"
+                                    }
+                                ],
+                                "margin": "xs",
+                                "spacing": "md",
+                                "offsetTop": "md",
+                                "paddingBottom": "lg"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "xxl",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": "自動回覆五星好評",
+                                        "size": "md",
+                                        "color": "#555555",
+                                        "flex": 4,
+                                        "weight": "bold",
+                                        "style": "normal",
+                                        "gravity": "center"
+                                    },
+                                    {
+                                        "type": "image",
+                                        "url": "https://i.imgur.com/kVS4YbE.png",
+                                        "size": "xxs",
+                                        "align": "end",
+                                        "gravity": "center",
+                                        "action": {
+                                            "type": "postback",
+                                            "label": "AutoReplyToggle",
+                                            "data": "/QuickReply/{BUSINESS_ID}/Toggle/AutoReply"
+                                        },
+                                        "flex": 1
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "text",
+                                "text": "自動回覆無文字內容的五星評論，讓您的顧客瞬間感受到您的關懷，提升 SEO 好方便。",
+                                "size": "xs",
+                                "color": "#aaaaaa",
+                                "wrap": true,
+                                "contents": []
+                            }
+                        ]
+                    }
+                ],
+                "paddingBottom": "xxl"
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5"
+                },
+                "footer": {
+                    "separator": true,
+                    "backgroundColor": "#8fa6cc"
+                }
+            }
+        },
+        {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "BUSINESS_NAME_1",
+                        "size": "xl",
+                        "style": "italic",
+                        "wrap": true
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "height": "sm",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "切換管理",
+                                    "data": "/QuickReply/{BUSINESS_ID}/UpdateActiveBusiness"
+                                },
+                                "adjustMode": "shrink-to-fit",
+                                "color": "#445783"
+                            }
+                        ],
+                        "flex": 0,
+                        "cornerRadius": "none",
+                        "backgroundColor": "#8fa6cc",
+                        "margin": "xl"
+                    }
+                ],
+                "justifyContent": "center"
+            },
+            "styles": {
+                "body": {
+                    "backgroundColor": "#F5F5F5",
+                    "separator": false
+                },
+                "footer": {
+                    "backgroundColor": "#8fa6cc",
+                    "separator": false
+                }
+            }
+        }
+    ]
+}

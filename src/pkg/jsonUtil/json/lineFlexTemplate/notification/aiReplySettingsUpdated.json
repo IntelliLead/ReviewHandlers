@@ -1,5 +1,23 @@
 {
     "type": "bubble",
+    "hero": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "{BUSINESS_NAME}",
+                "size": "lg",
+                "wrap": true,
+                "margin": "lg",
+                "style": "normal",
+                "align": "center",
+                "color": "#FFFFFFFF",
+                "offsetBottom": "sm"
+            }
+        ],
+        "backgroundColor": "#5e6fbd"
+    },
     "body": {
         "type": "box",
         "layout": "vertical",

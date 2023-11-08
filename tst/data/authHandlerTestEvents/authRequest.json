@@ -1,0 +1,47 @@
+{
+    "version": "2.0",
+    "rawPath": "/",
+    "rawQueryString": "state=Ucc29292b212e271132cee980c58e94eb&code=4/0AfJohXm9ERGR5FLmjLnlK64ktIdnR2tQMoCgdORpNHAm0dg1Qpw9U2KG2-uWk0Pa-Auh_g&scope=email%20profile%20https://www.googleapis.com/auth/business.manage%20https://www.googleapis.com/auth/userinfo.profile%20https://www.googleapis.com/auth/userinfo.email%20openid&authuser=1&hd=tryintellilead.com&prompt=consent",
+    "headers": {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-encoding": "gzip, deflate, br",
+        "accept-language": "en-US,en;q=0.9",
+        "host": "4sjyrwu46reezafho2wgvfgpsm0avskr.lambda-url.ap-northeast-1.on.aws",
+        "referer": "https://accounts.google.com/",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/118.0.5993.92 Mobile/15E148 Safari/604.1",
+        "x-amzn-tls-cipher-suite": "ECDHE-RSA-AES128-GCM-SHA256",
+        "x-amzn-tls-version": "TLSv1.2",
+        "x-amzn-trace-id": "Root=1-653a547b-6f3337fe02ba10836f01187f",
+        "x-forwarded-for": "125.228.216.59",
+        "x-forwarded-port": "443",
+        "x-forwarded-proto": "https"
+    },
+    "queryStringParameters": {
+        "authuser": "1",
+        "code": "TST",
+        "hd": "tryintellilead.com",
+        "prompt": "consent",
+        "scope": "email profile https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid",
+        "state": "Ucc29292b212e271132cee980c58e94eb"
+    },
+    "requestContext": {
+        "accountId": "anonymous",
+        "requestId": "a04ad7ec-8185-42ff-94f2-785c3e6274cb",
+        "apiId": "4sjyrwu46reezafho2wgvfgpsm0avskr",
+        "domainName": "4sjyrwu46reezafho2wgvfgpsm0avskr.lambda-url.ap-northeast-1.on.aws",
+        "domainPrefix": "4sjyrwu46reezafho2wgvfgpsm0avskr",
+        "time": "26/Oct/2023:11:58:51 +0000",
+        "timeEpoch": 1698321531976,
+        "http": {
+            "method": "GET",
+            "path": "/",
+            "protocol": "HTTP/1.1",
+            "sourceIp": "125.228.216.59",
+            "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/118.0.5993.92 Mobile/15E148 Safari/604.1"
+        }
+    },
+    "isBase64Encoded": false
+}

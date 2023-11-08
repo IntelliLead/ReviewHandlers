@@ -1,4 +1,4 @@
-package _type
+package rid
 
 import (
     "fmt"
@@ -10,13 +10,23 @@ import (
 // https://www.notion.so/Engineering-Low-Level-Design-1f52a247123e4e42824482d7ab6de831?pvs=4#c993f9741b414db990b23f09cf2699e8
 type ReviewId string
 
-func NewReviewId(alphanumeric string) ReviewId {
+var validate *validator.Validate
+
+func init() {
+    validate = validator.New(validator.WithRequiredStructEnabled())
+}
+
+func NewReviewId(alphanumeric string) (ReviewId, error) {
+    if err := validate.Var(alphanumeric, "alphanum"); err != nil {
+        return "", err
+    }
+
     var idStr string
     for _, char := range alphanumeric {
         idStr += fmt.Sprintf("%03s", strconv.Itoa(int(char)))
     }
 
-    return ReviewId(idStr)
+    return ReviewId(idStr), nil
 }
 
 // String returns the string representation of a ReviewId
@@ -82,7 +92,7 @@ func getNextAsciiCode(lastAsciiCode int) (int, bool) {
     return nextAsciiCode, false
 }
 
-func ReviewIdPtrValidation(fl validator.FieldLevel) bool {
+func ReviewIdPtrNumericValidation(fl validator.FieldLevel) bool {
     reviewId := fl.Field().Interface().(*ReviewId)
 
     // Check if ReviewId is nil
@@ -90,19 +100,19 @@ func ReviewIdPtrValidation(fl validator.FieldLevel) bool {
         return true
     }
 
-    // Check if ReviewId is a numbers-only string
+    // Check if UserReviewId is a numbers-only string
     if !isNumbersOnly(string(*reviewId)) {
         return false
     }
 
-    // Check if ReviewId length is divisible by 3
+    // Check if UserReviewId length is divisible by 3
     if len(*reviewId)%3 != 0 {
         return false
     }
 
     return true
 }
-func ReviewIdValidation(fl validator.FieldLevel) bool {
+func ReviewIdNumericValidation(fl validator.FieldLevel) bool {
     reviewId := fl.Field().Interface().(ReviewId)
 
     // Check if ReviewId is a numbers-only string
@@ -110,7 +120,7 @@ func ReviewIdValidation(fl validator.FieldLevel) bool {
         return false
     }
 
-    // Check if ReviewId length is divisible by 3
+    // Check if UserReviewId length is divisible by 3
     if len(reviewId)%3 != 0 {
         return false
     }

@@ -47,7 +47,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "{CANNED_REPLY}",
+                                "text": "{QUICK_REPLY_MESSAGE}",
                                 "size": "md",
                                 "color": "#555555",
                                 "wrap": true
@@ -60,9 +60,9 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯快速回覆內容",
-                            "data": "/QuickReply/EditQuickReplyMessage",
+                            "data": "/QuickReply/{BusinessID}/EditQuickReplyMessage",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/quickReply "
+                            "fillInText": "/quickReply/{BUSINESS_ID_INDEX} "
                         }
                     },
                     {
@@ -135,8 +135,8 @@
                                 "gravity": "center",
                                 "action": {
                                     "type": "postback",
-                                    "label": "KeywordToggle",
-                                    "data": "/QuickReply/Toggle/AutoReply"
+                                    "label": "AutoReplyToggle",
+                                    "data": "/QuickReply/{BUSINESS_ID}/Toggle/AutoReply"
                                 },
                                 "flex": 1
                             }

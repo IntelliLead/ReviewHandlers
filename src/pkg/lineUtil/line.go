@@ -1,10 +1,16 @@
 package lineUtil
 
 import (
+    "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -46,6 +52,17 @@ func (l *Line) GetUser(userId string) (linebot.UserProfileResponse, error) {
     return *resp, nil
 }
 
+func (l *Line) SendMessage(userId string, message string) error {
+    resp, err := l.lineClient.PushMessage(userId, linebot.NewTextMessage(message)).Do()
+    if err != nil {
+        l.log.Errorf("Error sending message to '%s': %s", userId, err)
+        return err
+    }
+
+    l.log.Infof("Successfully sent message to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+    return nil
+}
+
 func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
     reviewMessage := fmt.Sprintf("對不起，我還不會處理您的訊息。如需幫助，請回覆\"/help\"")
 
@@ -68,52 +85,129 @@ func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
 }
 
 // SendNewReview sends a new review to all the users of the business
-// TODO: [INT-97] Remove passing in user and change pass in business object when all users are backfilled with active business ID
-func (l *Line) SendNewReview(review model.Review, business *model.Business, user model.User) error {
+func (l *Line) SendNewReview(review model.Review, business model.Business, userDao *ddbDao.UserDao) error {
     quickReplyMessage := ""
-    if business == nil {
-        l.log.Warnf("Business is nil in SendNewReview for review '%s'. User has not completed auth.", review.ReviewId)
-        if !util.IsEmptyStringPtr(user.QuickReplyMessage) {
-            quickReplyMessage = user.GetFinalQuickReplyMessage(review)
-        }
-    } else {
-        if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
-            quickReplyMessage = business.GetFinalQuickReplyMessage(review)
-        }
+    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+        quickReplyMessage = business.GetFinalQuickReplyMessage(review)
     }
 
-    flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage)
-    if err != nil {
-        l.log.Error("Error building flex message in SendNewReview: ", err)
-    }
-
-    if business == nil {
-        _, err := l.lineClient.PushMessage(user.UserId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+    for _, userId := range business.UserIds {
+        // get the businessID for each user
+        userPtr, err := userDao.GetUser(userId)
         if err != nil {
-            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", user.UserId, err)
+            l.log.Error("Error getting user in SendNewReview: ", err)
             return err
         }
-    } else {
-        for _, userId := range business.UserIds {
-            _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
-            if err != nil {
-                l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
-                return err
-            }
-            l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
+        if userPtr == nil {
+            l.log.Errorf("User '%s' not found", userId)
+            return errors.New(fmt.Sprintf("User '%s' not found", userId))
         }
+
+        businessIdIndex := util.FindStringIndex(bid.BusinessIdsToStringSlice(userPtr.BusinessIds), business.BusinessId.String())
+        if businessIdIndex == -1 {
+            l.log.Errorf("Business '%s' not found in user '%s'", business.BusinessId, userId)
+            return errors.New(fmt.Sprintf("Business '%s' not found in user '%s'", business.BusinessId, userId))
+        }
+
+        // send the message to each user
+        flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage, business.BusinessId, businessIdIndex)
+        if err != nil {
+            l.log.Error("Error building flex message in SendNewReview: ", err)
+        }
+
+        _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+        if err != nil {
+            l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
+            return err
+        }
+        l.log.Infof("Successfully executed line.PushMessage to send review '%s' to business '%s' user '%s'.", review.ReviewId, business.BusinessId, userId)
     }
 
     return nil
 }
 
-func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled bool, quickReplyMessage *string) error {
-    flexMessage, err := l.buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled, quickReplyMessage)
+// SendNewReview sends a new review to all the users of the business
+// TODO: [INT-97] Remove this method when all users are backfilled with business IDs
+func (l *Line) SendNewReviewToUser(review model.Review, userId string) error {
+    flexMessage, err := l.buildReviewFlexMessageForUnauthedUser(review)
     if err != nil {
-        l.log.Error("Error building flex message in ShowQuickReplySettings: ", err)
+        l.log.Error("Error building flex message in SendNewReview: ", err)
     }
 
-    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("設定快速回覆", flexMessage)).Do()
+    _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("您有新的Google Map 評論！", flexMessage)).Do()
+    if err != nil {
+        l.log.Errorf("Error sending lineTextMessage to LINE user %s in SendNewReview: %v", userId, err)
+        return err
+    }
+
+    return nil
+}
+
+func (l *Line) ShowQuickReplySettingsByUser(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
+    businessPtr, err := businessDao.GetBusiness(user.ActiveBusinessId)
+    if err != nil {
+        l.log.Error("Error getting business in ShowQuickReplySettingsByUser: ", err)
+        return err
+    }
+    if businessPtr == nil {
+        l.log.Errorf("Business '%s' not found", user.ActiveBusinessId)
+        return errors.New(fmt.Sprintf("Business '%s' not found", user.ActiveBusinessId))
+    }
+    activeBusiness := *businessPtr
+
+    return l.ShowQuickReplySettings(replyToken, user, activeBusiness, businessDao)
+}
+
+func (l *Line) ShowQuickReplySettings(
+    replyToken string,
+    user model.User,
+    activeBusiness model.Business,
+    businessDao *ddbDao.BusinessDao,
+) error {
+    if len(user.BusinessIds) > 1 {
+        orderedBusinesses := make([]model.Business, len(user.BusinessIds))
+        for i, id := range user.GetSortedBusinessIds() {
+            b, err := businessDao.GetBusiness(id)
+            if err != nil {
+                l.log.Errorf("Error getting business '%s' for user '%s': %v", id, user.UserId, err)
+                return err
+            }
+            if b == nil {
+                l.log.Errorf("Business '%s' does not exist for user '%s'", id, user.UserId)
+                return fmt.Errorf("business '%s' does not exist for user '%s'", id, user.UserId)
+            }
+            orderedBusinesses[i] = *b
+        }
+        if user.ActiveBusinessId != activeBusiness.BusinessId {
+            l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+        }
+
+        return l.showQuickReplySettingsForMultiBusiness(replyToken, orderedBusinesses, activeBusiness.BusinessId)
+    }
+
+    return l.showQuickReplySettingsForSingleBusiness(replyToken, activeBusiness)
+}
+
+func (l *Line) showQuickReplySettingsForMultiBusiness(
+    replyToken string,
+    orderedBusinesses []model.Business,
+    activeBusinessId bid.BusinessId,
+) error {
+    flexMessage, err := l.buildQuickReplySettingsFlexMessageForMultiBusiness(
+        orderedBusinesses,
+        activeBusinessId,
+    )
+    if err != nil {
+        l.log.Error("Error building flex message in showQuickReplySettingsForMultiBusiness: ", err)
+    }
+
+    var resp *linebot.BasicResponse
+    if replyToken == util.TestReplyToken {
+        resp, err = l.lineClient.PushMessage("Ucc29292b212e271132cee980c58e94eb", linebot.NewFlexMessage("設定快速回覆", flexMessage)).Do()
+    } else {
+        resp, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("設定快速回覆", flexMessage)).Do()
+    }
     if err != nil {
         l.log.Error("Error replying message in ShowQuickReplySettings: ", err)
         return err
@@ -124,31 +218,156 @@ func (l *Line) ShowQuickReplySettings(replyToken string, autoQuickReplyEnabled b
     return nil
 }
 
-func (l *Line) ShowAiReplySettings(replyToken string, user model.User, business model.Business) error {
-    flexMessage, err := l.buildAiReplySettingsFlexMessage(user, business)
+func (l *Line) showQuickReplySettingsForSingleBusiness(replyToken string, business model.Business) error {
+    flexMessage, err := l.buildQuickReplySettingsFlexMessage(business)
     if err != nil {
-        l.log.Error("Error building flex message in ShowAiReplySettings: ", err)
+        l.log.Error("Error building flex message in showQuickReplySettingsForSingleBusiness: ", err)
     }
 
-    resp, err := l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("AI 回覆設定", flexMessage)).Do()
+    var resp *linebot.BasicResponse
+    if replyToken == util.TestReplyToken {
+        resp, err = l.lineClient.PushMessage("Ucc29292b212e271132cee980c58e94eb", linebot.NewFlexMessage("設定快速回覆", flexMessage)).Do()
+    } else {
+        resp, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("設定快速回覆", flexMessage)).Do()
+    }
     if err != nil {
-        l.log.Error("Error replying message in ShowAiReplySettings: ", err)
+        l.log.Error("Error replying message in showQuickReplySettingsForSingleBusiness: ", err)
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in ShowAiReplySettings to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in showQuickReplySettingsForSingleBusiness: %s", jsonUtil.AnyToJson(resp))
 
     return nil
 }
 
-func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, userIds []string, generateAuthorName string) error {
-    flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply, generateAuthorName)
+func (l *Line) ShowAiReplySettingsByUser(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
+    businessId := user.ActiveBusinessId
+    businessPtr, err := businessDao.GetBusiness(businessId)
     if err != nil {
-        l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
+        l.log.Error("Error getting business in ShowAiReplySettingsByUser: ", err)
+        return err
+    }
+    if businessPtr == nil {
+        l.log.Errorf("Business '%s' not found", businessId)
+        return errors.New(fmt.Sprintf("Business '%s' not found", businessId))
+    }
+    business := *businessPtr
+
+    return l.ShowAiReplySettings(replyToken, user, business, businessDao)
+}
+
+func (l *Line) ShowAiReplySettings(
+    replyToken string,
+    user model.User,
+    activeBusiness model.Business,
+    businessDao *ddbDao.BusinessDao) error {
+    if len(user.BusinessIds) > 1 {
+        orderedBusinesses := make([]model.Business, len(user.BusinessIds))
+        for i, id := range user.GetSortedBusinessIds() {
+            b, err := businessDao.GetBusiness(id)
+            if err != nil {
+                l.log.Errorf("Error getting business '%s' for user '%s': %v", id, user.UserId, err)
+                return err
+            }
+            if b == nil {
+                l.log.Errorf("Business '%s' does not exist for user '%s'", id, user.UserId)
+                return fmt.Errorf("business '%s' does not exist for user '%s'", id, user.UserId)
+            }
+            orderedBusinesses[i] = *b
+        }
+        if user.ActiveBusinessId != activeBusiness.BusinessId {
+            l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+        }
+        return l.showAiReplySettingsForMultiBusiness(replyToken, user, orderedBusinesses, activeBusiness.BusinessId)
     }
 
-    for _, userId := range userIds {
-        _, err := l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
+    return l.showAiReplySettingsForSingleBusiness(replyToken, user, activeBusiness)
+}
+
+func (l *Line) showAiReplySettingsForSingleBusiness(replyToken string, user model.User, business model.Business) error {
+    flexMessage, err := l.buildAiReplySettingsFlexMessageForSingleBusiness(user, business)
+    if err != nil {
+        l.log.Error("Error building flex message in showAiReplySettingsForSingleBusiness: ", err)
+    }
+
+    var resp *linebot.BasicResponse
+    if replyToken == util.TestReplyToken {
+        resp, err = l.lineClient.PushMessage("Ucc29292b212e271132cee980c58e94eb", linebot.NewFlexMessage("AI 回覆設定", flexMessage)).Do()
+    } else {
+        resp, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("AI 回覆設定", flexMessage)).Do()
+    }
+    if err != nil {
+        l.log.Error("Error replying message in showAiReplySettingsForSingleBusiness: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForSingleBusiness to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
+func (l *Line) showAiReplySettingsForMultiBusiness(replyToken string, user model.User, orderedBusinesses []model.Business, activeBusinessId bid.BusinessId) error {
+    flexMessage, err := l.buildAiReplySettingsFlexMessageForMultiBusiness(user, orderedBusinesses, activeBusinessId)
+    if err != nil {
+        l.log.Error("Error building flex message in buildAiReplySettingsFlexMessageForMultiBusiness: ", err)
+    }
+
+    var resp *linebot.BasicResponse
+    if replyToken == util.TestReplyToken {
+        resp, err = l.lineClient.PushMessage("Ucc29292b212e271132cee980c58e94eb", linebot.NewFlexMessage("AI 回覆設定", flexMessage)).Do()
+    } else {
+        resp, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("AI 回覆設定", flexMessage)).Do()
+    }
+    if err != nil {
+        l.log.Error("Error replying message in showAiReplySettingsForMultiBusiness: ", err)
+        return err
+    }
+
+    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForMultiBusiness to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+
+    return nil
+}
+
+func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, generateAuthorName string, business model.Business, user model.User, userDao *ddbDao.UserDao) error {
+    // for each user of the business, retrieve businessId Index for the user, and send the message
+    for _, userId := range business.UserIds {
+        var businessIdIndex int
+        var err error
+        // user already retrieved
+        if userId == user.UserId {
+            businessIdIndex, err = user.GetBusinessIdIndex(business.BusinessId)
+            if err != nil {
+                l.log.Errorf("Error getting businessIdIndex for business '%s' in SendAiGeneratedReply: %v", business.BusinessId, err)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+        } else {
+            sendingUser, err := userDao.GetUser(userId)
+            if err != nil {
+                l.log.Errorf("Error getting user '%s' in SendAiGeneratedReply: %v", userId, err)
+                return err
+            }
+            if sendingUser == nil {
+                l.log.Errorf("User '%s' not found in SendAiGeneratedReply. Inconsistent userIds in business '%s'", userId, business.BusinessId)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+            businessIdIndex, err = sendingUser.GetBusinessIdIndex(business.BusinessId)
+            if err != nil {
+                l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during SendAiGeneratedReply: %v", business.BusinessId, sendingUser.UserId, err)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+        }
+        flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply, generateAuthorName, business.BusinessId, businessIdIndex)
+        if err != nil {
+            l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            continue
+        }
+
+        _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("AI 回覆生成結果", flexMessage)).Do()
         if err != nil {
             l.log.Error("Error sending message in SendAiGeneratedReply: ", err)
             return err
@@ -222,36 +441,122 @@ func buildReplyFailedMessage(reviewerName string, isAutoReply bool) string {
     }
 }
 
-func (l *Line) NotifyReviewReplied(
-    userIds []string,
-    replyToken *string,
-    replyTokenOwnerUserId *string,
+// NotifyReviewAutoReplied notifies all users of the business that owns the review that the review has been replied to
+// param review: the review that was replied to
+// param reply: the reply to the review
+// param business: the business that owns the review
+// param userDao: the userDao
+func (l *Line) NotifyReviewAutoReplied(
     review model.Review,
     reply string,
-    replierName string,
-    isAutoReply bool) error {
-    flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierName, isAutoReply)
-    if err != nil {
-        l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
-        return err
-    }
-
-    err = nil
-    for _, userId := range userIds {
-        if !util.IsEmptyStringPtr(replyToken) && !util.IsEmptyStringPtr(replyTokenOwnerUserId) && userId == *replyTokenOwnerUserId && *replyToken != util.TestReplyToken {
-            l.log.Debugf("Sending reply message to reply token owner user '%s'", *replyTokenOwnerUserId)
-            _, err = l.lineClient.ReplyMessage(*replyToken, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
-        } else {
-            _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
+    business model.Business,
+    userDao *ddbDao.UserDao,
+) error {
+    for _, userId := range business.UserIds {
+        sendingUser, err := userDao.GetUser(userId)
+        if err != nil {
+            l.log.Errorf("Error getting user '%s' in NotifyReviewReplied: %v", userId, err)
+            return err
         }
+        if sendingUser == nil {
+            l.log.Errorf("User '%s' not found in NotifyReviewReplied. Inconsistent userIds in business '%s'", userId, business.BusinessId)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            continue
+        }
+        businessIdIndex, err := sendingUser.GetBusinessIdIndex(business.BusinessId)
+        if err != nil {
+            l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during NotifyReviewReplied: %v", business.BusinessId, sendingUser.UserId, err)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            continue
+        }
+
+        flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, "自動回覆", true, business.BusinessName, businessIdIndex)
+        if err != nil {
+            l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
+            return err
+        }
+
+        _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
         if err != nil {
             l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
-        } else {
-            l.log.Infof("Successfully executed line.PushMessage/ReplyMessage in NotifyReviewReplied to user '%s'", userId)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            continue
         }
+
+        l.log.Infof("Successfully executed line.PushMessage/ReplyMessage in NotifyReviewReplied to user '%s'", userId)
     }
 
-    return err
+    return nil
+}
+
+// NotifyReviewReplied notifies all users of the business that owns the review that the review has been replied to
+// param replyToken: the reply token of the user who replied to the review
+// param replyTokenOwnerUserId: the userId of the user who replied to the review
+// param review: the review that was replied to
+// param business: the business that owns the review
+// param replierUser: the user who replied to the review
+// param userDao: the userDao
+func (l *Line) NotifyReviewReplied(
+    replyToken string,
+    review model.Review,
+    reply string,
+    business model.Business,
+    replierUser model.User,
+    userDao *ddbDao.UserDao,
+) error {
+    for _, userId := range business.UserIds {
+        if !util.IsEmptyString(replyToken) && userId == replierUser.UserId && replyToken != util.TestReplyToken {
+            l.log.Debugf("Sending reply message to reply token owner user '%s'", replierUser.UserId)
+            businessIdIndex, err := replierUser.GetBusinessIdIndex(business.BusinessId)
+            if err != nil {
+                l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during NotifyReviewReplied: %v", business.BusinessId, replierUser.UserId, err)
+                return err
+            }
+            flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierUser.LineUsername, false, business.BusinessName, businessIdIndex)
+            if err != nil {
+                l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
+                return err
+            }
+            _, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
+            if err != nil {
+                l.log.Errorf("Error replying to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
+            }
+        } else {
+            sendingUser, err := userDao.GetUser(userId)
+            if err != nil {
+                l.log.Errorf("Error getting user '%s' in NotifyReviewReplied: %v", userId, err)
+                return err
+            }
+            if sendingUser == nil {
+                l.log.Errorf("User '%s' not found in NotifyReviewReplied. Inconsistent userIds in business '%s'", userId, business.BusinessId)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+            businessIdIndex, err := sendingUser.GetBusinessIdIndex(business.BusinessId)
+            if err != nil {
+                l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during NotifyReviewReplied: %v", business.BusinessId, sendingUser.UserId, err)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+
+            flexMessage, err := l.buildReviewRepliedNotificationMessage(review, reply, replierUser.LineUsername, false, business.BusinessName, businessIdIndex)
+            if err != nil {
+                l.log.Error("Error building flex message in NotifyReviewReplied: ", err)
+                return err
+            }
+
+            _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
+            if err != nil {
+                l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                continue
+            }
+        }
+
+        l.log.Infof("Successfully executed line.PushMessage/ReplyMessage in NotifyReviewReplied to user '%s'", userId)
+    }
+
+    return nil
 }
 
 // NotifyUserUpdateFailed let user know that the update failed
@@ -327,8 +632,8 @@ func newLineClient(log *zap.SugaredLogger) *linebot.Client {
     return lineClient
 }
 
-func (l *Line) NotifyQuickReplySettingsUpdated(userIds []string, updaterName string) error {
-    flexMessage, err := l.buildQuickReplySettingsUpdatedNotificationMessage(updaterName)
+func (l *Line) NotifyQuickReplySettingsUpdated(userIds []string, updaterName string, businessName string) error {
+    flexMessage, err := l.buildQuickReplySettingsUpdatedNotificationMessage(updaterName, businessName)
     if err != nil {
         l.log.Error("Error building flex message in NotifyQuickReplySettingsUpdated: ", err)
         return err
@@ -346,8 +651,8 @@ func (l *Line) NotifyQuickReplySettingsUpdated(userIds []string, updaterName str
     return err
 }
 
-func (l *Line) NotifyAiReplySettingsUpdated(userIds []string, updaterName string) error {
-    flexMessage, err := l.buildAiReplySettingsUpdatedNotificationMessage(updaterName)
+func (l *Line) NotifyAiReplySettingsUpdated(userIds []string, updaterName string, businessName string) error {
+    flexMessage, err := l.buildAiReplySettingsUpdatedNotificationMessage(updaterName, businessName)
     if err != nil {
         l.log.Error("Error building flex message in NotifyAiReplySettingsUpdated: ", err)
         return err

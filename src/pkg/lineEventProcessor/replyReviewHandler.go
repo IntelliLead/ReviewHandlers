@@ -12,14 +12,13 @@ import (
 )
 
 func ReplyReview(
-    businessId string,
-    userId string,
+    repliedByUserId string,
     replyMessage string,
     review model.Review,
     reviewDao *ddbDao.ReviewDao,
     log *zap.SugaredLogger) error {
     if review.ZapierReplyWebhook == util.TestZapierReplyWebhook {
-        log.Infof("Skipping reply event to Zapier for review %s from user '%s' of business '%s' because it is a test webhook", replyMessage, userId, businessId)
+        log.Infof("Skipping reply event to Zapier for review %s from user '%s' of business '%s' because it is a test webhook", replyMessage, repliedByUserId, review.BusinessId)
     } else {
         // post reply to zapier
         // --------------------
@@ -31,25 +30,25 @@ func ReplyReview(
 
         err := zapier.SendReplyEvent(review.ZapierReplyWebhook, zapierEvent)
         if err != nil {
-            log.Errorf("Error sending reply event to Zapier for review %s from user '%s' of business '%s': %v", replyMessage, userId, businessId, err)
+            log.Errorf("Error sending reply event to Zapier for review %s from user '%s' of business '%s': %v", replyMessage, repliedByUserId, review.BusinessId, err)
             return err
         }
 
-        log.Infof("Sent reply event '%s' to Zapier from user '%s' of business '%s'", jsonUtil.AnyToJson(zapierEvent), userId, businessId)
+        log.Infof("Sent reply event '%s' to Zapier from user '%s' of business '%s'", jsonUtil.AnyToJson(zapierEvent), repliedByUserId, review.BusinessId)
     }
 
     // update DDB
     // --------------------
     err := reviewDao.UpdateReview(ddbDao.UpdateReviewInput{
-        BusinessId:  businessId,
-        ReviewId:    *review.ReviewId,
+        BusinessId:  review.BusinessId,
+        ReviewId:    review.ReviewId,
         LastUpdated: time.Now(),
         LastReplied: time.Now(),
         Reply:       replyMessage,
-        RepliedBy:   userId,
+        RepliedBy:   repliedByUserId,
     })
     if err != nil {
-        log.Errorf("Error updating review '%s' from user '%s': %v", review.ReviewId, userId, err)
+        log.Errorf("Error updating review '%s' from user '%s': %v", review.ReviewId, repliedByUserId, err)
         return err
     }
 

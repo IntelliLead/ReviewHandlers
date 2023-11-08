@@ -1,20 +1,25 @@
-package _type
+package rid
 
 import (
     "testing"
 )
 
 func TestNewReviewId(t *testing.T) {
-    id := NewReviewId("az")
+    id, _ := NewReviewId("az")
     expected := "097122"
 
     if id.NumericString() != expected {
         t.Errorf("Expected %s, but got %s", expected, id)
     }
+
+    id, err := NewReviewId("@a")
+    if err == nil {
+        t.Errorf("Expected error, but got %s", id)
+    }
 }
 
 func TestReviewId_String(t *testing.T) {
-    id := NewReviewId("az")
+    id, _ := NewReviewId("az")
     expected := "az"
     result := id.String()
 
@@ -24,7 +29,7 @@ func TestReviewId_String(t *testing.T) {
 }
 
 func TestReviewId_NumericString(t *testing.T) {
-    id := NewReviewId("az")
+    id, _ := NewReviewId("az")
     expected := "097122"
     result := id.NumericString()
 
@@ -34,7 +39,7 @@ func TestReviewId_NumericString(t *testing.T) {
 }
 
 func TestReviewId_Numeric(t *testing.T) {
-    id := NewReviewId("az")
+    id, _ := NewReviewId("az")
     expected := 97122
     result, _ := id.Numeric()
 
@@ -63,7 +68,7 @@ func TestReviewId_GetNext(t *testing.T) {
     }
 
     for _, tc := range testCases {
-        id := NewReviewId(tc.input)
+        id, _ := NewReviewId(tc.input)
         result := id.GetNext().String()
 
         if result != tc.expected {

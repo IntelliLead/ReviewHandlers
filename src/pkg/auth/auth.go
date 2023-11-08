@@ -2,13 +2,15 @@ package auth
 
 import (
     "errors"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -19,12 +21,11 @@ import (
 func ValidateUserAuthOrRequestAuthTst(
     userId string,
     userDao *ddbDao.UserDao,
-    businessDao *ddbDao.BusinessDao,
     line *lineUtil.Line,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
-) (bool, *model.User, *model.Business, error) {
-    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, businessDao, line, handlerName, log)
+) (bool, *model.User, error) {
+    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, line, handlerName, log)
 }
 
 // ValidateUserAuthOrRequestAuth checks if the user has completed oauth.
@@ -37,31 +38,46 @@ func ValidateUserAuthOrRequestAuth(
     replyToken string,
     userId string,
     userDao *ddbDao.UserDao,
-    businessDao *ddbDao.BusinessDao,
     line *lineUtil.Line,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
-) (bool, *model.User, *model.Business, error) {
-    hasUserCompletedOauth, user, business, err := ValidateUserAuth(userId, userDao, businessDao, line, handlerName, log)
+) (bool, *model.User, error) {
+    hasUserCompletedOauth, user, err := ValidateUserAuth(userId, userDao, line, handlerName, log)
     if err != nil {
-        log.Errorf("Error checking if user %s has completed oauth: %s", userId, err)
-        return false, user, business, err
+        var userDoesNotExistException *exception.UserDoesNotExistException
+        if errors.As(err, &userDoesNotExistException) {
+            err = requestAuth(replyToken, userId, line, log)
+            if err != nil {
+                metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            }
+            return false, nil, nil
+        }
+
+        log.Errorf("Error checking if user %s has completed OAUTH: %s", userId, err)
+        return false, nil, err
     }
 
-    if hasUserCompletedOauth {
-        log.Infof("User %s has completed oauth", userId)
-        return true, user, business, nil
+    if !hasUserCompletedOauth {
+        log.Info("User ", userId, " has not completed OAUTH. Sending auth request.")
+        err = requestAuth(replyToken, userId, line, log)
+        if err != nil {
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+        }
+    } else {
+        log.Info("User ", userId, " has completed OAUTH.")
     }
 
-    if user == nil {
-        log.Info("User with id " + userId + " does not exist. Requesting auth")
-    } else if business == nil {
-        log.Info("Business does not exist. User '%s' has not been backfilled. Requesting auth", userId)
-    } else if !hasUserCompletedOauth {
-        log.Info("User %s has associated business %s, but has not completed oauth. Requesting auth", userId, business.BusinessId)
-    }
+    return hasUserCompletedOauth, &user, nil
+}
 
+func requestAuth(
+    replyToken string,
+    userId string,
+    line *lineUtil.Line,
+    log *zap.SugaredLogger,
+) error {
     // when testing in local, there is no replyToken, send to user instead of replying
+    var err error
     if replyToken == "TST" {
         err = line.SendAuthRequest(userId)
     } else {
@@ -69,11 +85,11 @@ func ValidateUserAuthOrRequestAuth(
     }
     if err != nil {
         log.Errorf("Error replying auth request: %s", err)
-        return false, user, business, err
+        return err
     }
     log.Info("Sent auth request to user ", userId)
 
-    return false, user, business, nil
+    return nil
 }
 
 // TODO: [INT-91] remove this check after LINE user info backfilling is done
@@ -82,33 +98,33 @@ func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineU
         lineGetUserResp, err := line.GetUser(user.UserId)
         if err != nil {
             log.Errorf("Error getting user info from LINE: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
 
         lineUserNameAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineUsername", lineGetUserResp.DisplayName)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
         lineProfilePictureUrlAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineProfilePictureUrl", lineGetUserResp.PictureURL)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
         languageAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "language", lineGetUserResp.Language)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return // do not backfill
         }
 
         updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{lineUserNameAction, lineProfilePictureUrlAction, languageAction})
         if err != nil {
             log.Errorf("Error updating user info: %s", err)
-            middleware.EmitMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
             return
         }
 
@@ -125,41 +141,27 @@ func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineU
 func ValidateUserAuth(
     userId string,
     userDao *ddbDao.UserDao,
-    businessDao *ddbDao.BusinessDao,
     line *lineUtil.Line,
     handlerName enum2.HandlerName,
-    logger *zap.SugaredLogger) (bool, *model.User, *model.Business, error) {
-    user, err := userDao.GetUser(userId)
+    logger *zap.SugaredLogger) (bool, model.User, error) {
+    userPtr, err := userDao.GetUser(userId)
     if err != nil {
         logger.Error("Error getting user: ", err)
-        return false, nil, nil, err
+        return false, model.User{}, err
     }
 
-    if user == nil {
-        return false, nil, nil, nil
+    if userPtr == nil {
+        return false, model.User{}, exception.NewUserDoesNotExistException(fmt.Sprintf("User with id %s does not exist", userId), nil)
     }
 
-    backfillLineUserInfo(user, userDao, line, handlerName, logger)
+    backfillLineUserInfo(userPtr, userDao, line, handlerName, logger)
 
-    // user not yet backfilled
-    if user.ActiveBusinessId == nil {
-        return false, user, nil, nil
+    user := *userPtr
+
+    // either conditions work, checking both for robustness
+    if len(user.BusinessIds) == 0 || util.IsEmptyString(user.Google.RefreshToken) {
+        return false, user, nil
     }
 
-    business, err := businessDao.GetBusiness(*user.ActiveBusinessId)
-    if err != nil {
-        logger.Errorf("Error getting business with %s for user %s: %s", *user.ActiveBusinessId, userId, err)
-        return false, user, nil, err
-    }
-
-    if business == nil {
-        logger.Errorf("Business with id %s does not exist", *user.ActiveBusinessId)
-        return false, user, nil, errors.New("business with id " + *user.ActiveBusinessId + " does not exist")
-    }
-
-    if business.Google == nil {
-        return false, user, business, nil
-    }
-
-    return true, user, business, nil
+    return true, user, nil
 }

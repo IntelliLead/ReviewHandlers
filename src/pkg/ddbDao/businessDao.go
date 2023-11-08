@@ -9,6 +9,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
@@ -63,14 +64,14 @@ func (b *BusinessDao) CreateBusiness(Business model.Business) error {
 
 // GetBusiness gets a Business with the given BusinessId from the Business table
 // If the Business does not exist, returns nil, nil
-func (b *BusinessDao) GetBusiness(BusinessId string) (*model.Business, error) {
+func (b *BusinessDao) GetBusiness(businessId bid.BusinessId) (*model.Business, error) {
     response, err := b.client.GetItem(context.TODO(), &dynamodb.GetItemInput{
         TableName: aws.String(enum.TableBusiness.String()),
-        Key:       model.BuildDdbBusinessKey(BusinessId),
+        Key:       model.BuildDdbBusinessKey(businessId),
     })
     if err != nil {
-        b.log.Errorf("Unable to get item with BusinessId '%s' in GetBusiness: %v", BusinessId, err)
-        return nil, exception.NewUnknownDDBException(fmt.Sprintf("GetBusiness failed for BusinessId '%s' with unknown error: ", BusinessId), err)
+        b.log.Errorf("Unable to get item with BusinessId '%s' in GetBusiness: %v", businessId, err)
+        return nil, exception.NewUnknownDDBException(fmt.Sprintf("GetBusiness failed for business '%s' with unknown error: ", businessId), err)
     }
 
     if response.Item == nil {
@@ -116,7 +117,7 @@ func (b *BusinessDao) marshalMap(Business model.Business) (map[string]types.Attr
 //         Value:  []string{"keyword1", "keyword2"},
 //     }
 // }    )
-func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.AttributeAction, updatedByUserId string) (model.Business, error) {
+func (b *BusinessDao) UpdateAttributes(businessId bid.BusinessId, actions []dbModel.AttributeAction, updatedByUserId string) (model.Business, error) {
     err := dbModel.ValidateUniqueAttributeNames(actions)
     if err != nil {
         return model.Business{}, err
@@ -154,7 +155,7 @@ func (b *BusinessDao) UpdateAttributes(BusinessId string, actions []dbModel.Attr
 
     ddbInput := &dynamodb.UpdateItemInput{
         TableName:                 aws.String(enum.TableBusiness.String()),
-        Key:                       model.BuildDdbBusinessKey(BusinessId),
+        Key:                       model.BuildDdbBusinessKey(businessId),
         UpdateExpression:          expr.Update(),
         ExpressionAttributeNames:  expr.Names(),
         ExpressionAttributeValues: expr.Values(),

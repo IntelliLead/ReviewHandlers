@@ -5,72 +5,13 @@ import (
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "net/url"
-    "strings"
-    "unicode"
 )
 
 const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。️很抱歉為您造成不便。"
-
-func IsReviewReplyMessage(message string) bool {
-    return strings.HasPrefix(message, "@")
-}
-
-// CommandMessage format: "/<command> <args>"
-// e.g., "/Help xxx"
-type CommandMessage struct {
-    Command string
-    Args    []string
-}
-
-// ParseCommandMessage parses a command message. Unless isMultiArgs is true, all the remaining text after the first command is treated as a single argument.
-func ParseCommandMessage(str string, isMultiArgs bool) CommandMessage {
-    if !strings.HasPrefix(str, "/") {
-        return CommandMessage{}
-    }
-
-    // Find the first whitespace character after '/'
-    index := strings.IndexFunc(str[1:], isWhitespace)
-    if index == -1 {
-        return CommandMessage{Command: str[1:], Args: []string{""}} // Return the remaining text after '/' as command
-    }
-
-    cmd := str[1 : index+1]
-    trimmedCmd := strings.TrimSpace(str[index+2:])
-
-    var args []string
-    if isMultiArgs {
-        // Only return the first argument
-        args = strings.Fields(trimmedCmd)
-    } else {
-        args = []string{trimmedCmd}
-    }
-    return CommandMessage{Command: cmd, Args: args}
-}
-
-func ParseReplyMessage(str string) (model.Reply, error) {
-    if !strings.HasPrefix(str, "@") {
-        return model.Reply{}, fmt.Errorf("message is not a reply message: %s", str)
-    }
-
-    // Find the first whitespace character after '@'
-    index := strings.IndexFunc(str[1:], isWhitespace)
-    if index == -1 {
-        return model.NewReply(_type.NewReviewId(str[1:]), "") // Return the remaining text after '@' as ReviewId
-    }
-
-    reviewID := str[1 : index+1]
-    replyMsg := strings.TrimSpace(str[index+2:])
-
-    return model.NewReply(_type.NewReviewId(reviewID), replyMsg)
-}
-
-func isWhitespace(r rune) bool {
-    return unicode.IsSpace(r)
-}
 
 func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     // LINE Go SDK is bugged, this is the workaround
@@ -122,17 +63,140 @@ type message struct {
     Type linebot.MessageType `json:"type"`
 }
 
-func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, quickReplyMessage *string) (linebot.FlexContainer, error) {
+// buildQuickReplySettingsFlexMessageForMultiBusiness builds a LINE flex message for quick reply settings for multi-business
+// orderedBusinesses must be sorted by businessIdIndex (i.e., the order as appear in sorted user.BusinessIds)
+// activeBusinessId must be in orderedBusinesses
+func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
+    orderedBusinesses []model.Business,
+    activeBusinessId bid.BusinessId,
+) (linebot.FlexContainer, error) {
+    jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettingsMultiBusiness)
+    if err != nil {
+        l.log.Error("Error unmarshalling QuickReplySettingsMultiBusiness JSON: ", err)
+        return nil, err
+    }
+
+    // find index of active business
+    activeBusinessIndex := -1
+    for i, business := range orderedBusinesses {
+        if business.BusinessId == activeBusinessId {
+            activeBusinessIndex = i
+            break
+        }
+    }
+    if activeBusinessIndex == -1 {
+        l.log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
+        return nil, fmt.Errorf("activeBusinessId is not in orderedBusinesses: %s", activeBusinessId)
+    }
+
+    business := orderedBusinesses[activeBusinessIndex]
+
+    // update business name for first bubble
+    // contents[0] -> hero -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["hero"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = business.BusinessName
+
+    // update quick reply message text box
+    quickReplyMessageDisplayed := " "
+    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+        quickReplyMessageDisplayed = *business.QuickReplyMessage
+    }
+    // contents[0] -> body -> contents[2] -> contents[1] -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = quickReplyMessageDisplayed
+
+    // update quick reply message button
+    quickReplyPostbackData := fmt.Sprintf("/QuickReply/%s/EditQuickReplyMessage", business.BusinessId)
+    quickReplyFillInText := fmt.Sprintf("/%s/%d %s", util.UpdateQuickReplyMessageCmd, activeBusinessIndex, quickReplyMessageDisplayed)
+    // contents[0] -> body -> contents[2] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = quickReplyPostbackData
+    // contents[0] -> body -> contents[2] -> contents[1] -> action -> fillInText
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = quickReplyFillInText
+
+    // update auto quick reply toggle
+    autoQuickReplyTogglePostbackData := fmt.Sprintf("/QuickReply/%s/Toggle/AutoReply", business.BusinessId)
+    // contents[0] -> body -> contents[3] -> contents[0] -> contents[1] -> url
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(business.AutoQuickReplyEnabled)
+    // contents[0] -> body -> contents[3] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = autoQuickReplyTogglePostbackData
+
+    // update other business bubbles
+    otherBusinessBubbleTemplate, err := util.DeepCopy(jsonMap["contents"].([]interface{})[1])
+    if err != nil {
+        l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
+        return nil, err
+    }
+    // remove template as 2nd bubble
+    jsonMap["contents"] = jsonMap["contents"].([]interface{})[:1]
+    for businessIndex, business := range orderedBusinesses {
+        if businessIndex == activeBusinessIndex {
+            continue
+        }
+
+        otherBusinessJsonMap, _ := util.DeepCopy(otherBusinessBubbleTemplate)
+
+        // update business name
+        // otherBusinessJsonMap -> body -> contents[0] -> text
+        otherBusinessJsonMap.(map[string]interface{})["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["text"] = business.BusinessName
+
+        // update switch business button
+        // otherBusinessJsonMap -> body -> contents[1] -> contents[0] -> action -> data
+        otherBusinessJsonMap.(map[string]interface{})["body"].
+        (map[string]interface{})["contents"].([]interface{})[1].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["data"] = fmt.Sprintf("/QuickReply/%s/UpdateActiveBusiness", business.BusinessId)
+
+        jsonMap["contents"] = append(jsonMap["contents"].([]interface{}), otherBusinessJsonMap)
+    }
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+// buildQuickReplySettingsFlexMessage builds a LINE flex message for quick reply settings
+func (l *Line) buildQuickReplySettingsFlexMessage(business model.Business) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
     if err != nil {
         l.log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
         return nil, err
     }
 
+    // true for single business
+    businessIdIndex := 0
+
     // update quick reply message text box
     quickReplyMessageDisplayed := " "
-    if !util.IsEmptyStringPtr(quickReplyMessage) {
-        quickReplyMessageDisplayed = *quickReplyMessage
+    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+        quickReplyMessageDisplayed = *business.QuickReplyMessage
     }
     // body -> contents[2] -> contents[1] -> contents[0] -> text
     jsonMap["body"].
@@ -140,25 +204,43 @@ func (l *Line) buildQuickReplySettingsFlexMessage(autoQuickReplyEnabled bool, qu
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = quickReplyMessageDisplayed
+
+    // update quick reply message button
+    quickReplyPostbackData := fmt.Sprintf("/QuickReply/%s/EditQuickReplyMessage", business.BusinessId)
+    quickReplyFillInText := fmt.Sprintf("/%s/%d %s", util.UpdateQuickReplyMessageCmd, businessIdIndex, quickReplyMessageDisplayed)
+    // body -> contents[2] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = quickReplyPostbackData
     // body -> contents[2] -> contents[1] -> action -> fillInText
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["action"].
-    (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateQuickReplyMessageCmd) + quickReplyMessageDisplayed
+    (map[string]interface{})["fillInText"] = quickReplyFillInText
 
     // update auto quick reply toggle
+    autoQuickReplyTogglePostbackData := fmt.Sprintf("/QuickReply/%s/Toggle/AutoReply", business.BusinessId)
     // body -> contents[3] -> contents[0] -> contents[1] -> url
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[3].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
-    (map[string]interface{})["url"] = util.GetToggleUrl(autoQuickReplyEnabled)
+    (map[string]interface{})["url"] = util.GetToggleUrl(business.AutoQuickReplyEnabled)
+    // body -> contents[3] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = autoQuickReplyTogglePostbackData
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
@@ -226,7 +308,12 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update edit reply button
-    replyMessagePrefix := fmt.Sprintf("@%s ", review.ReviewId.String())
+    urid, err := model.NewUserReviewId(&businessIdIndex, review.ReviewId)
+    if err != nil {
+        l.log.Error("Error creating UserReviewId: ", err)
+        return nil, err
+    }
+    replyMessagePrefix := fmt.Sprintf("@%s ", urid.String())
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             if action, ok := contentsArr[1].(map[string]interface{})["action"]; ok {
@@ -246,7 +333,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     } else {
         jsonMap["footer"].(map[string]interface{})["contents"].([]interface{})[2].
         (map[string]interface{})["action"].
-        (map[string]interface{})["data"] = "/NewReview/GenerateAiReply/" + review.ReviewId.String()
+        (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/GenerateAiReply/%s/%s", businessId, review.ReviewId.String())
     }
 
     // update quick reply button
@@ -269,7 +356,85 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (linebot.FlexContainer, error) {
+    // Convert the original JSON to a map[string]interface{}
+    jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
+    if err != nil {
+        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
+        return nil, err
+    }
+
+    // update review message
+    var reviewMessage string
+    isEmptyReview := util.IsEmptyStringPtr(review.Review)
+    if isEmptyReview {
+        reviewMessage = "（無文字內容）"
+    } else {
+        reviewMessage = *review.Review
+    }
+
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[3].(map[string]interface{})["text"] = reviewMessage
+        }
+    }
+
+    // update stars
+    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
+    if err != nil {
+        l.log.Error("Error creating starRating JSON: ", err)
+        return nil, err
+    }
+
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
+        }
+    }
+
+    // update review time
+    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    if err != nil {
+        l.log.Error("Error converting review timestamp to readable format: ", err)
+        return nil, err
+    }
+
+    // Modify reviewer and timestamp
+    if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
+        if contentsArr, ok := contents.([]interface{}); ok {
+            if subContents, ok := contentsArr[2].(map[string]interface{})["contents"]; ok {
+                if subContentsArr, ok := subContents.([]interface{}); ok {
+                    // modify review timestamp
+                    if subSubContents, ok := subContentsArr[0].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = readableReviewTimestamp
+                        }
+                    }
+
+                    // modify reviewer
+                    if subSubContents, ok := subContentsArr[1].(map[string]interface{})["contents"]; ok {
+                        if subSubContentsArr, ok := subSubContents.([]interface{}); ok {
+                            subSubContentsArr[1].(map[string]interface{})["text"] = review.ReviewerName
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    // remove all buttons - non-interactive review
+    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
+        if _, ok := contents.([]interface{}); ok {
+            jsonMap["footer"].(map[string]interface{})["contents"] = []interface{}{}
+        }
+    }
+
+    // Convert the map to LINE flex message
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplyResult)
     if err != nil {
         l.log.Debug("Error unmarshalling AiReplyResult JSON: ", err)
@@ -307,28 +472,55 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["text"] = generateAuthorName
 
-    // update buttons
+    // update 送出回覆 button
     // footer -> contents[0] -> action -> fillInText
     jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["action"].
-    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%s %s", review.ReviewId.String(), aiReply)
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%d|%s %s", businessIdIndex, review.ReviewId.String(), aiReply)
+    // footer -> contents[0] -> action -> data
+    jsonMap["footer"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditReply", businessId)
 
     // footer -> contents[1] -> action -> data
     jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["action"].
-    (map[string]interface{})["data"] = "/AiReply/GenerateAiReply/" + review.ReviewId.String()
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/GenerateAiReply/%s/%s", businessId, review.ReviewId.String())
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.Business) (linebot.FlexContainer, error) {
+func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, orderedBusinesses []model.Business, activeBusinessId bid.BusinessId) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
-    jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
+    jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettingsMultiBusiness)
     if err != nil {
-        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+        l.log.Fatal("Error unmarshalling AiReplySettingsMultiBusiness JSON: ", err)
     }
+
+    // find index of active business
+    activeBusinessIndex := -1
+    for i, business := range orderedBusinesses {
+        if business.BusinessId == activeBusinessId {
+            activeBusinessIndex = i
+            break
+        }
+    }
+    if activeBusinessIndex == -1 {
+        l.log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
+        return nil, fmt.Errorf("activeBusinessId is not in orderedBusinesses: %s", activeBusinessId)
+    }
+
+    business := orderedBusinesses[activeBusinessIndex]
+
+    // update business name for first bubble
+    // contents[0] -> hero -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["hero"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = business.BusinessName
 
     // substitute business description
     var businessDescription string
@@ -336,21 +528,257 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
         businessDescription = " "
     } else {
         businessDescription = *business.BusinessDescription
-
-        // update fillInText
-        // body -> contents[2] -> contents[2] -> action -> fillInText
-        jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[2].
-        (map[string]interface{})["contents"].([]interface{})[2].
-        (map[string]interface{})["action"].
-        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateBusinessDescriptionMessageCmd) + businessDescription
     }
+    // contents[0] -> body -> contents[2] -> contents[2] -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = businessDescription
+    // update fillInText
+    // contents[0] -> body -> contents[2] -> contents[2] -> action -> fillInText
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateBusinessDescriptionMessageCmd, activeBusinessIndex, businessDescription)
+    // contents[0] -> body -> contents[2] -> contents[2] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditBusinessDescription", business.BusinessId)
+
+    // substitute emoji toggle
+    // contents[0] -> body -> contents[3] -> contents[0] -> contents[1] -> url
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.EmojiEnabled)
+    // contents[0] -> body -> contents[3] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Emoji", business.BusinessId)
+
+    // substitute signature toggle
+    // contents[0] -> body -> contents[4] -> contents[0] -> contents[1] -> url
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.SignatureEnabled)
+    // contents[0] -> body -> contents[4] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Signature", business.BusinessId)
+
+    // substitute signature
+    var signature string
+    if util.IsEmptyStringPtr(user.Signature) {
+        signature = " "
+    } else {
+        signature = *user.Signature
+    }
+    // update fillInText
+    // contents[0] -> body -> contents[4] -> contents[3] -> action -> fillInText
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateSignatureMessageCmd, activeBusinessIndex, signature)
+    // contents[0] -> body -> contents[4] -> contents[3] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditSignature", business.BusinessId)
+    // contents[0] -> body -> contents[4] -> contents[3] -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = signature
+
+    // substitute keyword toggle
+    // contents[0] -> body -> contents[5] -> contents[0] -> contents[1] -> url
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(business.KeywordEnabled)
+    // contents[0] -> body -> contents[5] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Keyword", business.BusinessId)
+
+    // substitute keywords
+    var keywords string
+    if util.IsEmptyStringPtr(business.Keywords) {
+        keywords = " "
+    } else {
+        keywords = *business.Keywords
+    }
+    // contents[0] -> body -> contents[5] -> contents[3] -> action -> fillInText
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateKeywordsMessageCmd, activeBusinessIndex, keywords)
+    // contents[0] -> body -> contents[5] -> contents[3] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditKeywords", business.BusinessId)
+    // contents[0] -> body -> contents[5] -> contents[3] -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = keywords
+
+    // substitute service recommendation toggle
+    // contents[0] -> body -> contents[6] -> contents[0] -> contents[1] -> url
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["url"] = util.GetToggleUrl(user.ServiceRecommendationEnabled)
+    // contents[0] -> body -> contents[6] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/ServiceRecommendation", business.BusinessId)
+
+    // substitute service recommendation
+    var serviceRecommendation string
+    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+        serviceRecommendation = " "
+    } else {
+        serviceRecommendation = *user.ServiceRecommendation
+    }
+    // contents[0] -> body -> contents[6] -> contents[3] -> action -> fillInText
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateRecommendationMessageCmd, activeBusinessIndex, serviceRecommendation)
+    // contents[0] -> body -> contents[6] -> contents[3] -> action -> data
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditServiceRecommendations", business.BusinessId)
+    // contents[0] -> body -> contents[5] -> contents[3] -> contents[0] -> text
+    jsonMap["contents"].([]interface{})[0].
+    (map[string]interface{})["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = serviceRecommendation
+
+    // update other business bubbles
+    otherBusinessBubbleTemplate, err := util.DeepCopy(jsonMap["contents"].([]interface{})[1])
+    if err != nil {
+        l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
+        return nil, err
+    }
+    // remove template as 2nd bubble
+    jsonMap["contents"] = jsonMap["contents"].([]interface{})[:1]
+    for businessIndex, business := range orderedBusinesses {
+        if businessIndex == activeBusinessIndex {
+            continue
+        }
+
+        otherBusinessJsonMap, _ := util.DeepCopy(otherBusinessBubbleTemplate)
+
+        // update business name
+        // otherBusinessJsonMap -> body -> contents[0] -> text
+        otherBusinessJsonMap.(map[string]interface{})["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["text"] = business.BusinessName
+
+        // update switch business button
+        // otherBusinessJsonMap -> body -> contents[1] -> contents[0] -> action -> data
+        otherBusinessJsonMap.(map[string]interface{})["body"].
+        (map[string]interface{})["contents"].([]interface{})[1].
+        (map[string]interface{})["contents"].([]interface{})[0].
+        (map[string]interface{})["action"].
+        (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/UpdateActiveBusiness", business.BusinessId)
+
+        jsonMap["contents"] = append(jsonMap["contents"].([]interface{}), otherBusinessJsonMap)
+    }
+
+    return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User, business model.Business) (linebot.FlexContainer, error) {
+    // Convert the original JSON to a map[string]interface{}
+    jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
+    if err != nil {
+        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+    }
+
+    // true for single business
+    activeBusinessIndex := 0
+
+    // substitute business description
+    var businessDescription string
+    if util.IsEmptyStringPtr(business.BusinessDescription) {
+        businessDescription = " "
+    } else {
+        businessDescription = *business.BusinessDescription
+    }
+    // update fillInText
+    // body -> contents[2] -> contents[2] -> action -> fillInText
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateBusinessDescriptionMessageCmd, activeBusinessIndex, businessDescription)
     // body -> contents[2] -> contents[2] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[2].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = businessDescription
+    // body -> contents[2] -> contents[2] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["contents"].([]interface{})[2].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditBusinessDescription", business.BusinessId)
 
     // substitute emoji toggle
     // body -> contents[3] -> contents[0] -> contents[1] -> url
@@ -359,6 +787,13 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(user.EmojiEnabled)
+    // body -> contents[3] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Emoji", business.BusinessId)
 
     // substitute signature toggle
     // body -> contents[4] -> contents[0] -> contents[1] -> url
@@ -367,6 +802,13 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(user.SignatureEnabled)
+    // body -> contents[4] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Signature", business.BusinessId)
 
     // substitute signature
     var signature string
@@ -374,15 +816,20 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
         signature = " "
     } else {
         signature = *user.Signature
-
-        // update fillInText
-        // body -> contents[4] -> contents[3] -> action -> fillInText
-        jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[4].
-        (map[string]interface{})["contents"].([]interface{})[3].
-        (map[string]interface{})["action"].
-        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateSignatureMessageCmd) + signature
     }
+    // update fillInText
+    // body -> contents[4] -> contents[3] -> action -> fillInText
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateSignatureMessageCmd, activeBusinessIndex, signature)
+    // body -> contents[4] -> contents[3] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[4].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditSignature", business.BusinessId)
     // body -> contents[4] -> contents[3] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[4].
@@ -397,6 +844,13 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(business.KeywordEnabled)
+    // body -> contents[5] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/Keyword", business.BusinessId)
 
     // substitute keywords
     var keywords string
@@ -404,14 +858,19 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
         keywords = " "
     } else {
         keywords = *business.Keywords
-
-        // body -> contents[5] -> contents[3] -> action -> fillInText
-        jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[5].
-        (map[string]interface{})["contents"].([]interface{})[3].
-        (map[string]interface{})["action"].
-        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateKeywordsMessageCmd) + keywords
     }
+    // body -> contents[5] -> contents[3] -> action -> fillInText
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateKeywordsMessageCmd, activeBusinessIndex, keywords)
+    // body -> contents[5] -> contents[3] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[5].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditKeywords", business.BusinessId)
     // body -> contents[5] -> contents[3] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[5].
@@ -426,6 +885,13 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["url"] = util.GetToggleUrl(user.ServiceRecommendationEnabled)
+    // body -> contents[6] -> contents[0] -> contents[1] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["contents"].([]interface{})[1].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/Toggle/ServiceRecommendation", business.BusinessId)
 
     // substitute service recommendation
     var serviceRecommendation string
@@ -433,14 +899,19 @@ func (l *Line) buildAiReplySettingsFlexMessage(user model.User, business model.B
         serviceRecommendation = " "
     } else {
         serviceRecommendation = *user.ServiceRecommendation
-
-        // body -> contents[6] -> contents[3] -> action -> fillInText
-        jsonMap["body"].
-        (map[string]interface{})["contents"].([]interface{})[6].
-        (map[string]interface{})["contents"].([]interface{})[3].
-        (map[string]interface{})["action"].
-        (map[string]interface{})["fillInText"] = util.BuildMessageCmdPrefix(util.UpdateRecommendationMessageCmd) + serviceRecommendation
     }
+    // body -> contents[6] -> contents[3] -> action -> fillInText
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("/%s/%d %s", util.UpdateRecommendationMessageCmd, activeBusinessIndex, serviceRecommendation)
+    // body -> contents[6] -> contents[3] -> action -> data
+    jsonMap["body"].
+    (map[string]interface{})["contents"].([]interface{})[6].
+    (map[string]interface{})["contents"].([]interface{})[3].
+    (map[string]interface{})["action"].
+    (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/%s/EditServiceRecommendations", business.BusinessId)
     // body -> contents[5] -> contents[3] -> contents[0] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[6].
@@ -516,7 +987,7 @@ func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (lineb
     return flexContainer, nil
 }
 
-func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool, businessName string, businessIdIndex int) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.ReviewReplied)
     if err != nil {
         l.log.Debug("Error unmarshalling ReviewReplied JSON: ", err)
@@ -525,11 +996,18 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
 
     // substitute title to whether it is auto-reply
     if isAutoReply {
-        // body -> contents[0] -> text
+        // body -> contents[0] -> contents[0] -> text
         jsonMap["body"].
+        (map[string]interface{})["contents"].([]interface{})[0].
         (map[string]interface{})["contents"].([]interface{})[0].
         (map[string]interface{})["text"] = "評論自動回覆通知"
     }
+
+    // substitute business name
+    // hero -> contents[0] -> text
+    jsonMap["hero"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = businessName
 
     // substitute review
     reviewMessage := "（無文字內容）"
@@ -572,17 +1050,27 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
     jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["action"].
-    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%s %s", review.ReviewId.String(), reply)
+    (map[string]interface{})["fillInText"] = fmt.Sprintf("@%d|%s %s", businessIdIndex, review.ReviewId.String(), reply)
 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string) (linebot.FlexContainer, error) {
+func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.QuickReplySettingsUpdated)
     if err != nil {
         l.log.Debug("Error unmarshalling QuickReplySettingsUpdated JSON: ", err)
         return nil, err
     }
+
+    // substitute business name
+    // if util.IsEmptyStringPtr(businessName) {
+    //     // remove hero section
+    //     jsonMap["hero"] = map[string]interface{}{}
+    // } else {
+    // hero -> contents[0] -> text
+    jsonMap["hero"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = businessName
 
     // substitute updater name
     // body -> contents[1] -> contents[0] -> contents[1] -> text
@@ -595,12 +1083,22 @@ func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string) (linebot.FlexContainer, error) {
+func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.AiReplySettingsUpdated)
     if err != nil {
         l.log.Debug("Error unmarshalling AiReplySettingsUpdated JSON: ", err)
         return nil, err
     }
+
+    // substitute business name
+    // if util.IsEmptyStringPtr(businessName) {
+    //     // remove hero section
+    //     jsonMap["hero"] = map[string]interface{}{}
+    // } else {
+    // hero -> contents[0] -> text
+    jsonMap["hero"].
+    (map[string]interface{})["contents"].([]interface{})[0].
+    (map[string]interface{})["text"] = businessName
 
     // substitute updater name
     // body -> contents[1] -> contents[0] -> contents[1] -> text
