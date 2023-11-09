@@ -367,13 +367,11 @@ func ProcessPostbackEvent(
             switch {
             case bid.IsValidBusinessId(dataSlice[1]):
                 businessId := bid.BusinessId(dataSlice[1])
-                if !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
-                    log.Errorf("Business ID '%s' does not belong to user '%s'", businessId, userId)
 
-                    // DEBUG
-                    for _, businessId := range user.BusinessIds {
-                        log.Debugf("User's Business IDs: %s", businessId.String())
-                    }
+                // validate businessId belongs to user
+                if shouldAuth(dataSlice) && !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+                    log.Errorf("Business ID '%s' does not belong to user '%s'", businessId, userId)
+                    log.Debugf("User's Business IDs: %s", jsonUtil.AnyToJson(user.BusinessIds))
 
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,

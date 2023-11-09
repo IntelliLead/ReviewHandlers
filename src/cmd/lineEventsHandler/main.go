@@ -14,7 +14,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
+    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents/postback"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -77,8 +77,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
     if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
+        lineEvents = postback.TestEditQuickReplyMessage
         // lineEvents = message.TestRealReplyEvent
-        lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
+        // lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
     } else {
         err = nil
         lineEvents, err = line.ParseRequest(&request)
