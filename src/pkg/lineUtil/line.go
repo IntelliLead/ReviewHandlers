@@ -110,7 +110,12 @@ func (l *Line) SendNewReview(review model.Review, business model.Business, userD
         }
 
         // send the message to each user
-        flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage, business.BusinessId, businessIdIndex)
+        // omit business name if the user only has single business
+        businessNamePtr := (*string)(nil)
+        // if len(userPtr.BusinessIds) > 1 {
+        //     businessNamePtr = &business.BusinessName
+        // }
+        flexMessage, err := l.buildReviewFlexMessage(review, quickReplyMessage, business.BusinessId, businessIdIndex, businessNamePtr)
         if err != nil {
             l.log.Error("Error building flex message in SendNewReview: ", err)
         }

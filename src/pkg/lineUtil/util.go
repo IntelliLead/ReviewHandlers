@@ -240,12 +240,19 @@ func (l *Line) buildQuickReplySettingsFlexMessage(business model.Business) (line
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
+func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int, businessName *string) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
         l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
         return nil, err
+    }
+
+    // update business name if exist
+    if util.IsEmptyStringPtr(businessName) {
+        delete(jsonMap, "hero")
+    } else {
+        jsonMap["hero"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["text"] = *businessName
     }
 
     // update review message
@@ -363,6 +370,9 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
         l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
         return nil, err
     }
+
+    // remove hero section because we do not have business name
+    delete(jsonMap, "hero")
 
     // update review message
     var reviewMessage string
@@ -1063,11 +1073,6 @@ func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName str
     }
 
     // substitute business name
-    // if util.IsEmptyStringPtr(businessName) {
-    //     // remove hero section
-    //     jsonMap["hero"] = map[string]interface{}{}
-    // } else {
-    // hero -> contents[0] -> text
     jsonMap["hero"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = businessName
@@ -1091,11 +1096,6 @@ func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string
     }
 
     // substitute business name
-    // if util.IsEmptyStringPtr(businessName) {
-    //     // remove hero section
-    //     jsonMap["hero"] = map[string]interface{}{}
-    // } else {
-    // hero -> contents[0] -> text
     jsonMap["hero"].
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = businessName
