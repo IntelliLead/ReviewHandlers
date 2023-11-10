@@ -11,7 +11,7 @@ import (
     "net/url"
 )
 
-const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。️很抱歉為您造成不便。"
+const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。"
 
 func getMessageType(event *linebot.Event) (linebot.MessageType, error) {
     // LINE Go SDK is bugged, this is the workaround

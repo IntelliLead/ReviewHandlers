@@ -438,6 +438,20 @@ func (l *Line) NotifyUserReplyFailed(userId string, reviewerName string, isAutoR
     return l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
 }
 
+// ReplyUserReplyFailedWithReason replies to the user that the reply failed with the reason
+// both the reviewerName and reason can be empty
+func (l *Line) ReplyUserReplyFailedWithReason(replyToken string, reviewerName string, reason string) (*linebot.BasicResponse, error) {
+    var text string
+    if util.IsEmptyString(reviewerName) {
+        text = "回覆評論失敗。"
+    } else {
+        text = fmt.Sprintf("回覆 %s 的評論失敗。", reviewerName)
+    }
+    text += reason + "很抱歉為您造成不便。"
+
+    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
+}
+
 func buildReplyFailedMessage(reviewerName string, isAutoReply bool) string {
     if isAutoReply {
         return fmt.Sprintf("自動回覆 %s 的評論失敗。很抱歉為您造成不便。", reviewerName)
@@ -595,13 +609,6 @@ func (l *Line) ReplyMoreMessage(replyToken string) (*linebot.BasicResponse, erro
 
 func (l *Line) ReplyUser(replyToken string, message string) (*linebot.BasicResponse, error) {
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(message)).Do()
-}
-
-func (l *Line) ReplyUserReviewReplyFailedWithReason(replyToken string, reviewerName string, reason string) (*linebot.BasicResponse, error) {
-    var text string
-    text = fmt.Sprintf("回覆 %s 的評論失敗。%s", reviewerName, reason)
-
-    return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(text)).Do()
 }
 
 func (l *Line) NotifyUserCannotUseLineEmoji(replyToken string) (*linebot.BasicResponse, error) {

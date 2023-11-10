@@ -34,8 +34,19 @@ func ProcessReviewReplyMessage(
     reply, err := lineEventProcessor.ParseReplyMessage(message)
     if err != nil {
         log.Error("Error parsing reply message:", err)
+
+        _, notifyUserErr := line.ReplyUserReplyFailedWithReason(event.ReplyToken, "", "格式有錯。請保留 ‘@’ 符號後的編號，並在空格後面輸入回覆內容。")
+        if notifyUserErr != nil {
+            log.Errorf("Error notifying reply failure to user '%s': %v", user.UserId, notifyUserErr)
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to notify reply failure for user '%s' : %v. Reply Failure reason: %v"}`, user.UserId, notifyUserErr, err),
+            }, notifyUserErr
+
+        }
+
         return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
+            StatusCode: 400,
             Body:       fmt.Sprintf(`{"error": "Failed to parse reply message: %s"}`, err),
         }, err
     }
@@ -88,7 +99,7 @@ func ProcessReviewReplyMessage(
     // validate message does not contain LINE emojis
     // --------------------------------
     if HasLineEmoji(textMessage) {
-        _, err := line.ReplyUserReviewReplyFailedWithReason(event.ReplyToken, review.ReviewerName,
+        _, err := line.ReplyUserReplyFailedWithReason(event.ReplyToken, review.ReviewerName,
             lineUtil.CannotUseLineEmojiMessage)
         if err != nil {
             log.Errorf("Error notifying reply failure for user '%s' for review '%s': %v",
