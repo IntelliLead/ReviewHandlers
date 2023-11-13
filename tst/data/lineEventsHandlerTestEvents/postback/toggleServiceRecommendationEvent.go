@@ -5,7 +5,7 @@ import (
     "time"
 )
 
-var TestToggleAutoQuickReplyEvent = []*linebot.Event{
+var TestToggleServiceRecommendationEvent = []*linebot.Event{
     {
         Type:           linebot.EventTypePostback,
         WebhookEventID: "01H1NCFZSJN1HAPFREM0193Y1Q",
@@ -18,7 +18,7 @@ var TestToggleAutoQuickReplyEvent = []*linebot.Event{
             UserID: "Ucc29292b212e271132cee980c58e94eb",
         },
         Postback: &linebot.Postback{
-            Data: "/QuickReply/12251512170589559833/Toggle/AutoReply",
+            Data: "/AiReply/4496688115335717986/Toggle/ServiceRecommendation",
         },
         ReplyToken: "TST",
         Mode:       linebot.EventModeActive,

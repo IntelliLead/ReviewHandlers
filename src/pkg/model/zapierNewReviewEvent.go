@@ -24,6 +24,12 @@ type ZapierNewReviewEvent struct {
     ZapierReplyWebhook   string             `dynamodbav:"zapierReplyWebhook" validate:"url"`
 }
 
+func (z ZapierNewReviewEvent) Validate() error {
+    return validateZapierNewReviewEvent.Struct(z)
+}
+
+var validateZapierNewReviewEvent *validator.Validate
+
 // Regular expression for VendorReviewId
 var vendorReviewIdRegex = regexp.MustCompile(`^accounts/\d+/locations/\d+/reviews/.+$`)
 
@@ -33,8 +39,8 @@ func validateVendorReviewId(fl validator.FieldLevel) bool {
 }
 
 func init() {
-    validate := validator.New()
-    err := validate.RegisterValidation("vendorReviewId", validateVendorReviewId)
+    validateZapierNewReviewEvent = validator.New(validator.WithRequiredStructEnabled())
+    err := validateZapierNewReviewEvent.RegisterValidation("vendorReviewId", validateVendorReviewId)
     if err != nil {
         panic(err)
     }

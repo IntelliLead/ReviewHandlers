@@ -132,6 +132,7 @@ func ProcessMessageEvent(
 
     // --------------------------------
     // prepare businessId for command requests that include businessId index
+    // assumption: user exists
     // --------------------------------
     var businessId bid.BusinessId
     if cmd.Command[0] == util.UpdateQuickReplyMessageCmd || cmd.Command[0] == util.UpdateBusinessDescriptionMessageCmd || cmd.Command[0] == util.UpdateKeywordsMessageCmd {

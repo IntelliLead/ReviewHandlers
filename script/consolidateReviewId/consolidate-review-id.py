@@ -10,9 +10,6 @@ def get_next_review_id(review_id):
     numeric_str = review_id
     new_numeric_str = increment_ascii_codes(numeric_str, len(numeric_str) // 3 - 1)
 
-    # debug
-    print("The next review ID after " + review_id + " is " + new_numeric_str + "\n")
-
     return new_numeric_str
 
 

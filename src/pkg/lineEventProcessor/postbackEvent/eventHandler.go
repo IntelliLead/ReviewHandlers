@@ -198,10 +198,10 @@ func handleKeywordToggle(
 
 func handleServiceRecommendationToggle(
     user model.User,
+    businessDescription *string,
     userDao *ddbDao.UserDao,
     log *zap.SugaredLogger) (model.User, error) {
-
-    if !user.ServiceRecommendationEnabled && util.IsEmptyStringPtr(user.ServiceRecommendation) && util.IsEmptyStringPtr(user.BusinessDescription) {
+    if !user.ServiceRecommendationEnabled && util.IsEmptyStringPtr(user.ServiceRecommendation) && util.IsEmptyStringPtr(businessDescription) {
         return model.User{}, exception.NewServiceRecommendationConditionNotMetException("Service recommendation condition not met for " + user.UserId)
     }
 

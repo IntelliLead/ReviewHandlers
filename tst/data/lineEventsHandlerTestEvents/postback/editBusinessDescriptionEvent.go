@@ -5,7 +5,7 @@ import (
     "time"
 )
 
-var TestToggleAutoQuickReplyEvent = []*linebot.Event{
+var TestEditBusinessDescription = []*linebot.Event{
     {
         Type:           linebot.EventTypePostback,
         WebhookEventID: "01H1NCFZSJN1HAPFREM0193Y1Q",
@@ -18,9 +18,9 @@ var TestToggleAutoQuickReplyEvent = []*linebot.Event{
             UserID: "Ucc29292b212e271132cee980c58e94eb",
         },
         Postback: &linebot.Postback{
-            Data: "/QuickReply/12251512170589559833/Toggle/AutoReply",
+            Data: "/AiReply/4496688115335717986/EditBusinessDescription",
         },
-        ReplyToken: "TST",
+        ReplyToken: "1ef196a5d3a4450daa8aba7cc7c14186",
         Mode:       linebot.EventModeActive,
     },
 }
