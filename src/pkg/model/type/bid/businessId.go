@@ -1,40 +1,19 @@
 package bid
 
 import (
-    "errors"
-    "github.com/go-playground/validator/v10"
-    "regexp"
+    "fmt"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
 )
 
 type BusinessId string
 
-var (
-    validate        = validator.New(validator.WithRequiredStructEnabled())
-    businessIdRegex = regexp.MustCompile(`^accounts/\d+/locations/\d+$`)
-)
-
-func init() {
-    err := validate.RegisterValidation("businessId", validateBusinessId)
-    if err != nil {
-        panic(err)
-    }
-}
-
 func NewBusinessId(businessIdStr string) (BusinessId, error) {
-    businessId := BusinessId(businessIdStr)
-    if err := validate.Var(businessId, "businessId"); err != nil {
-        return "", errors.New("invalid BusinessId format")
+    if util.IsNumericString(businessIdStr) == false {
+        return "", fmt.Errorf("BusinessId must be numeric string. '%s' is invalid", businessIdStr)
     }
+    businessId := BusinessId(businessIdStr)
 
     return businessId, nil
-}
-
-func (bid BusinessId) validate() error {
-    err := validate.Var(string(bid), "matches=^accounts/\\d+/locations/\\d+$")
-    if err != nil {
-        return errors.New("invalid BusinessId format")
-    }
-    return nil
 }
 
 func (bid BusinessId) String() string {
@@ -52,8 +31,4 @@ func BusinessIdsToStringSlice(bids []BusinessId) []string {
         businessIdsStr[i] = string(v)
     }
     return businessIdsStr
-}
-
-func validateBusinessId(fl validator.FieldLevel) bool {
-    return businessIdRegex.MatchString(fl.Field().String())
 }

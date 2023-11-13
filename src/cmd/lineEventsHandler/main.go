@@ -49,7 +49,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Headers:    map[string]string{"Content-Type": "application/json"},
-            Body:       `{"mesage": "OK"}`,
+            Body:       `{"message": "OK"}`,
         }, nil
     }
 
@@ -77,8 +77,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
     if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
-        lineEvents = postback.TestEditQuickReplyMessage
+        lineEvents = postback.TestToggleServiceRecommendationEvent
         // lineEvents = message.TestRealReplyEvent
+        // lineEvents = lineEventsHandlerTestEvents.TestRichMenuQuickReplySettingsEvent
         // lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
     } else {
         err = nil

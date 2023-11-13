@@ -4,6 +4,7 @@ import (
     "encoding/json"
     "strings"
     "time"
+    "unicode"
 )
 
 func UtcToReadableTwTimestamp(timestamp time.Time) (string, error) {
@@ -99,4 +100,13 @@ func DeepCopy(src interface{}) (interface{}, error) {
     }
 
     return dst, nil
+}
+
+func IsNumericString(s string) bool {
+    for _, r := range s {
+        if !unicode.IsDigit(r) {
+            return false
+        }
+    }
+    return true
 }

@@ -4,36 +4,15 @@ import (
     "errors"
     "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "regexp"
     "strings"
     "unicode"
 )
 
 // ParsePostBackData parses the postback data from LINE
 // Each argument is separated by "/"
-// The only exception is, BusinessID is treated as a single argument
-// e.g., "/AiReply/accounts/123/locations/456" -> ["AiReply", "accounts/123/locations/456"]
+// e.g., "/AiReply/123456" -> ["AiReply", "123456"]
 func ParsePostBackData(data string) ([]string, error) {
-    // Regular expression to match the business ID format
-    re := regexp.MustCompile(`accounts/\d+/locations/\d+`)
-
-    // Find the business ID in the input data
-    businessID := re.FindString(data)
-
-    // If a business ID is found, replace it with a placeholder
-    if businessID != "" {
-        data = strings.Replace(data, businessID, "{BUSINESS_ID}", 1)
-    }
-
-    // Split the data by "/"
     dataSlice := strings.Split(data, "/")
-
-    // Replace the placeholder with the actual business ID
-    for i, s := range dataSlice {
-        if s == "{BUSINESS_ID}" {
-            dataSlice[i] = businessID
-        }
-    }
 
     // Shift off the first element, which is empty
     dataSlice = dataSlice[1:]

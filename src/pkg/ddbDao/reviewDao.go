@@ -4,7 +4,6 @@ import (
     "context"
     "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -154,65 +153,33 @@ func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error)
     return review.ReviewId.GetNext(), nil
 }
 
-// CreateReview creates a new review in DynamoDB
-func (d *ReviewDao) CreateReview(review model.Review) error {
+// PutReview creates a new review in DynamoDB
+func (d *ReviewDao) PutReview(review model.Review) error {
     err := model.ValidateReview(&review)
     if err != nil {
-        d.log.Error("CreateReview failed due to invalid review: ", jsonUtil.AnyToJson(review))
+        d.log.Error("PutReview failed due to invalid review: ", jsonUtil.AnyToJson(review))
         return err
     }
-
-    uniqueVendorReviewID := dbModel.NewUniqueVendorReviewIdRecord(review)
 
     av, err := attributevalue.MarshalMap(review)
     if err != nil {
         return err
     }
 
-    uniqueAv, err := attributevalue.MarshalMap(uniqueVendorReviewID)
-    if err != nil {
-        return err
-    }
-
-    _, err = d.client.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
-        TransactItems: []types.TransactWriteItem{
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                av,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                uniqueAv,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-        },
+    _, err = d.client.PutItem(context.TODO(), &dynamodb.PutItemInput{
+        TableName:           aws.String(enum.TableReview.String()),
+        Item:                av,
+        ConditionExpression: aws.String(KeyNotExistsConditionExpression),
     })
     if err != nil {
-        var t *types.TransactionCanceledException
-        switch {
-        case errors.As(err, &t):
-            failedRequests := t.CancellationReasons
-
-            if *(failedRequests[0].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
-                return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
-            }
-
-            if *(failedRequests[1].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
-                return exception.NewVendorReviewIdAlreadyExistException(fmt.Sprintf("UniqueVendorReviewId with vendorReviewID %s already exists", review.VendorReviewId), err)
-            }
-
-            d.log.Debug("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
-
-            return err
-        default:
-            d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
-            return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
+        var t *types.ConditionalCheckFailedException
+        if errors.As(err, &t) {
+            d.log.Error("PutReview failed due to ConditionalCheckFailedException: ", jsonUtil.AnyToJson(err))
+            return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
         }
+
+        d.log.Errorf("PutReview failed for unknown reason: %s", err)
+        return exception.NewUnknownDDBException("PutReview failed for unknown reason: ", err)
     }
 
     return nil

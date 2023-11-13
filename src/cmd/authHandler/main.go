@@ -25,6 +25,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
+    "strings"
 )
 
 func main() {
@@ -141,7 +142,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         Other scenarios are error state
     */
 
-    businesses, err := updateBusinesses(userId, userPtr, businessDao, google)
+    businesses, businessAccountId, err := updateBusinesses(userId, userPtr, businessDao, google)
     if err != nil {
         log.Errorf("Error updating businesses: %s", err)
 
@@ -157,7 +158,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }, err
     }
 
-    user, err := updateUser(userId, businesses, userPtr, userDao, google, line)
+    user, err := updateUser(userId, businesses, businessAccountId, userPtr, userDao, google, line)
     if err != nil {
         log.Errorf("Error updating user: %s", err)
 
@@ -235,25 +236,32 @@ func backfillBusinessAttributesFromUser(business model.Business, user model.User
     }
 }
 
+// updateBusinesses updates businesses and returns the updated businesses and business account ID
 func updateBusinesses(
     userId string,
-    user *model.User, // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+    user *model.User, // TODO: [INT-91] Remove backfill logic once all legacy users have completed OAUTH
     businessDao *ddbDao.BusinessDao,
     google *googleUtil.GoogleClient,
-) ([]model.Business, error) {
+) ([]model.Business, string, error) {
     // retrieve business location (businessId)
     // Google businesses have two portions: business accountID and business locationID
     businessAccount, businessLocations, err := google.GetBusinessAccountAndLocations()
     if err != nil {
         log.Errorf("Error retrieving Google business location: %s", err)
-        return []model.Business{}, err
+        return []model.Business{}, "", err
     }
-    businessAccountId := businessAccount.Name
+
+    businessAccountNameSlice := strings.Split(businessAccount.Name, "/")
+    if len(businessAccountNameSlice) != 2 {
+        log.Errorf("Error parsing business account ID %s", businessAccount.Name)
+        return []model.Business{}, "", errors.New("error parsing business account name")
+    }
+    businessAccountId := businessAccountNameSlice[1]
 
     businessLocations = googleUtil.FilterOpenBusinessLocations(businessLocations)
     if len(businessLocations) == 0 {
         log.Error("User has no open Google business locations under account ", businessAccountId)
-        return []model.Business{}, errors.New("user has no open Google business locations")
+        return []model.Business{}, businessAccountId, errors.New("user has no open Google business locations")
     }
     if len(businessLocations) > 1 {
         log.Info("User has multiple open Google business locations.")
@@ -263,16 +271,22 @@ func updateBusinesses(
 
     var businesses []model.Business
     for _, location := range businessLocations {
-        businessId, err := bid.NewBusinessId(businessAccountId + "/" + location.Name)
+        businessLocationSlice := strings.Split(location.Name, "/")
+        if len(businessLocationSlice) != 2 {
+            log.Errorf("Error parsing business location ID %s", location.Name)
+            return []model.Business{}, businessAccountId, errors.New("error parsing business location name")
+        }
+
+        businessId, err := bid.NewBusinessId(businessLocationSlice[1])
         if err != nil {
-            log.Errorf("Error creating businessId from businessAccountId %s and location.Name %s: %s", businessAccountId, location.Name, err)
-            return []model.Business{}, err
+            log.Errorf("Error creating businessId from business location.Name %s: %s", location.Name, err)
+            return []model.Business{}, businessAccountId, err
         }
 
         businessPtr, err := businessDao.GetBusiness(businessId)
         if err != nil {
             log.Errorf("Error retrieving business %s: %s", businessId, err)
-            return []model.Business{}, err
+            return []model.Business{}, businessAccountId, err
         }
 
         var business model.Business
@@ -286,7 +300,7 @@ func updateBusinesses(
                 userId,
             )
 
-            // TODO: [INT-91] Remove backfill logic once all users have been backfilled
+            // TODO: [INT-91] Remove backfill logic once all legacy users have completed OAUTH
             if user != nil {
                 backfillBusinessAttributesFromUser(business, *user)
             }
@@ -294,7 +308,7 @@ func updateBusinesses(
             err = businessDao.CreateBusiness(business)
             if err != nil {
                 log.Errorf("Error creating business object %v: %v", business, err)
-                return businesses, err
+                return businesses, businessAccountId, err
             }
         } else {
             business = *businessPtr
@@ -305,7 +319,7 @@ func updateBusinesses(
                 userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})
                 if err != nil {
                     log.Errorf("Error building user id append action: %s", err)
-                    return businesses, err
+                    return businesses, businessAccountId, err
                 }
 
                 business, err = businessDao.UpdateAttributes(businessId, []dbModel.AttributeAction{userIdAppendAction}, userId)
@@ -314,12 +328,13 @@ func updateBusinesses(
         businesses = append(businesses, business)
     }
 
-    return businesses, nil
+    return businesses, businessAccountId, nil
 }
 
 func updateUser(
     userId string,
     businesses []model.Business,
+    businessAccountId string,
     userPtr *model.User,
     userDao *ddbDao.UserDao,
     google *googleUtil.GoogleClient,
@@ -343,6 +358,7 @@ func updateUser(
         Email:               googleUserInfo.Email,
         ImageUrl:            googleUserInfo.Picture,
         Locale:              googleUserInfo.Locale,
+        BusinessAccountId:   businessAccountId,
     }
 
     // extract business IDs from businesses
@@ -388,15 +404,24 @@ func updateUser(
         // TODO: [INT-91] Remove backfill logic once all users have completed googleMetadata migration
         if util.IsEmptyString(userPtr.Google.Id) {
             log.Infof("User %s does not have Google metadata. Creating.", userId)
-            action, _err := dbModel.NewAttributeAction(enum.ActionUpdate, "google", googleMetadata)
-            err = _err
+            action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google", googleMetadata)
+            if err != nil {
+                log.Errorf("Error building update Google attribute action: %s", err)
+                return model.User{}, err
+            }
             actions = []dbModel.AttributeAction{action}
         } else {
             actions, err = buildUpdateTokenAttributeActions(google.Token)
-        }
-        if err != nil {
-            log.Errorf("Error building update Google attribute action: %s", err)
-            return model.User{}, err
+            if err != nil {
+                log.Errorf("Error building update Google attribute action: %s", err)
+                return model.User{}, err
+            }
+            updateBusinessAccountIdAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google.businessAccountId", businessAccountId)
+            if err != nil {
+                log.Errorf("Error building update business account ID attribute action: %s", err)
+                return model.User{}, err
+            }
+            actions = append(actions, updateBusinessAccountIdAction)
         }
 
         // build add missing business IDs action

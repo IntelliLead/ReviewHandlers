@@ -13,4 +13,5 @@ type Google struct {
     Email               string    `dynamodbav:"email" validate:"email"`
     ImageUrl            string    `dynamodbav:"imageUrl" validate:"url"`
     Locale              string    `dynamodbav:"locale"`
+    BusinessAccountId   string    `dynamodbav:"businessAccountId" validate:"numeric"`
 }

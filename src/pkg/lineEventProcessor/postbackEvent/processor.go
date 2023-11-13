@@ -127,7 +127,8 @@ func ProcessPostbackEvent(
             switch {
             case bid.IsValidBusinessId(dataSlice[1]):
                 businessId := bid.BusinessId(dataSlice[1])
-                if !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+                // user not retrieved if event does not require auth
+                if shouldAuth(dataSlice) && !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
                     log.Errorf("Business ID '%s' does not belong to user '%s'", businessId, userId)
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,
@@ -164,7 +165,7 @@ func ProcessPostbackEvent(
 
                             _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "Emoji AI 回覆")
                             if err != nil {
-                                log.Errorf("Error notifying user '%s' of update emoji enabled failed: %v", user.UserId, err)
+                                log.Errorf("Error notifying user '%s' of update emoji enabled failed: %v", userId, err)
                                 metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler, 1)
                             }
 
@@ -178,19 +179,19 @@ func ProcessPostbackEvent(
                         user, err = handleSignatureToggle(user, userDao, log)
 
                         if err != nil {
-                            log.Errorf("Error handling signature toggle: %s", err)
                             var signatureDoesNotExistException *exception.SignatureDoesNotExistException
                             if errors.As(err, &signatureDoesNotExistException) {
-                                _, err := line.ReplyUser(event.ReplyToken, "請先填寫簽名，才能開啟簽名功能")
+                                _, err = line.ReplyUser(event.ReplyToken, "請先填寫簽名，才能開啟簽名功能")
                                 if err != nil {
-                                    log.Errorf("Error replying signature settings prompt message to user '%s': %v", user.UserId, err)
+                                    log.Errorf("Error replying signature settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
-                                        StatusCode: 500,
+                                        StatusCode: 200,
                                         Body:       fmt.Sprintf(`{"error": "Error replying signature settings prompt message: %s"}`, err),
                                     }, err
                                 }
                             }
 
+                            log.Errorf("Error handling signature toggle: %s", err)
                             return events.LambdaFunctionURLResponse{
                                 StatusCode: 500,
                                 Body:       fmt.Sprintf(`{"error": "Error handling signature toggle: %s"}`, err),
@@ -204,9 +205,9 @@ func ProcessPostbackEvent(
 
                             var keywordConditionNotMetException *exception.KeywordConditionNotMetException
                             if errors.As(err, &keywordConditionNotMetException) {
-                                _, err := line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
+                                _, err = line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
                                 if err != nil {
-                                    log.Errorf("Error replying keyword settings prompt message to user '%s': %v", user.UserId, err)
+                                    log.Errorf("Error replying keyword settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
                                         StatusCode: 500,
                                         Body:       fmt.Sprintf(`{"error": "Error replying keyword settings prompt message: %s"}`, err),
@@ -221,15 +222,13 @@ func ProcessPostbackEvent(
                         }
 
                     case "ServiceRecommendation":
-                        user, err = handleServiceRecommendationToggle(user, userDao, log)
+                        user, err = handleServiceRecommendationToggle(user, business.BusinessDescription, userDao, log)
                         if err != nil {
-                            log.Errorf("Error handling service recommendation toggle: %s", err)
-
                             var serviceRecommendationConditionNotMetException *exception.ServiceRecommendationConditionNotMetException
                             if errors.As(err, &serviceRecommendationConditionNotMetException) {
                                 _, err := line.ReplyUser(event.ReplyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
                                 if err != nil {
-                                    log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", user.UserId, err)
+                                    log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
                                         StatusCode: 500,
                                         Body:       fmt.Sprintf(`{"error": "Error replying service recommendation settings prompt message: %s"}`, err),
@@ -242,6 +241,7 @@ func ProcessPostbackEvent(
                                 }, nil
                             }
 
+                            log.Errorf("Error handling service recommendation toggle: %s", err)
                             return events.LambdaFunctionURLResponse{
                                 StatusCode: 500,
                                 Body:       fmt.Sprintf(`{"error": "Error handling keyword toggle: %s"}`, err),
@@ -291,7 +291,7 @@ func ProcessPostbackEvent(
                         }, err
                     }
 
-                    user, err := userDao.UpdateAttributes(userId, []dbModel.AttributeAction{action})
+                    user, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{action})
                     if err != nil {
                         log.Errorf("Error updating user '%s' active business ID to '%s': %s", userId, businessId, err)
                         return events.LambdaFunctionURLResponse{
@@ -302,7 +302,7 @@ func ProcessPostbackEvent(
 
                     err = line.ShowAiReplySettingsByUser(event.ReplyToken, user, businessDao)
                     if err != nil {
-                        log.Errorf("Error sending AI reply settings to user '%s': %v", user.UserId, err)
+                        log.Errorf("Error sending AI reply settings to user '%s': %v", userId, err)
                         return events.LambdaFunctionURLResponse{
                             StatusCode: 500,
                             Body:       fmt.Sprintf(`{"error": "Error sending AI reply settings: %s"}`, err),
@@ -319,10 +319,10 @@ func ProcessPostbackEvent(
         case "RichMenu":
             switch dataSlice[1] {
             case "QuickReplySettings":
-                err := line.ShowQuickReplySettingsByUser(
+                err = line.ShowQuickReplySettingsByUser(
                     event.ReplyToken, user, businessDao)
                 if err != nil {
-                    log.Errorf("Error sending quick reply settings to user '%s': %v", user.UserId, err)
+                    log.Errorf("Error sending quick reply settings to user '%s': %v", userId, err)
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,
                         Body:       fmt.Sprintf(`{"error": "Error sending quick reply settings: %s"}`, err),
@@ -330,9 +330,9 @@ func ProcessPostbackEvent(
                 }
 
             case "AiReplySettings":
-                err := line.ShowAiReplySettingsByUser(event.ReplyToken, user, businessDao)
+                err = line.ShowAiReplySettingsByUser(event.ReplyToken, user, businessDao)
                 if err != nil {
-                    log.Errorf("Error sending AI reply settings to user '%s': %v", user.UserId, err)
+                    log.Errorf("Error sending AI reply settings to user '%s': %v", userId, err)
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,
                         Body:       fmt.Sprintf(`{"error": "Error sending AI reply settings: %s"}`, err),
@@ -453,7 +453,7 @@ func ProcessPostbackEvent(
                         }, err
                     }
 
-                    user, err := userDao.UpdateAttributes(userId, []dbModel.AttributeAction{action})
+                    user, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{action})
                     if err != nil {
                         log.Errorf("Error updating user '%s' active business ID to '%s': %s", userId, businessId, err)
                         return events.LambdaFunctionURLResponse{
@@ -464,7 +464,7 @@ func ProcessPostbackEvent(
 
                     err = line.ShowQuickReplySettingsByUser(event.ReplyToken, user, businessDao)
                     if err != nil {
-                        log.Errorf("Error sending AI reply settings to user '%s': %v", user.UserId, err)
+                        log.Errorf("Error sending AI reply settings to user '%s': %v", userId, err)
                         return events.LambdaFunctionURLResponse{
                             StatusCode: 500,
                             Body:       fmt.Sprintf(`{"error": "Error sending AI reply settings: %s"}`, err),
