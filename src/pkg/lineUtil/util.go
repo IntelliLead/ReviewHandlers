@@ -433,13 +433,6 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
         }
     }
 
-    // remove all buttons - non-interactive review
-    if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
-        if _, ok := contents.([]interface{}); ok {
-            jsonMap["footer"].(map[string]interface{})["contents"] = []interface{}{}
-        }
-    }
-
     // Convert the map to LINE flex message
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
