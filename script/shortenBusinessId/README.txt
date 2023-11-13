@@ -18,8 +18,22 @@ It should be modified before used again for other purposes.
     export DEV_ACCOUNT={STAGE_ACCOUNT}
     . ../get-tmp-creds.sh
     ```
-3. Run script with dry-run mode to verify the data to be migrated
-4. Run script without dry-run mode to make the change
+3. Run first script with dry-run mode to verify the data to be migrated
+    ```
+    python3 shorten-businessid-user-business-table.py --dry-run
+    ```
+4. Run first script without dry-run mode to commit the change
+    ```
+    python3 shorten-businessid-user-business-table.py
+    ```
+5. Run second script with dry-run mode to verify the data to be migrated
+    ```
+    python3 shorten-businessid-review-table.py --dry-run
+    ```
+6. Run second script without dry-run mode to commit the change
+    ```
+    python3 shorten-businessid-review-table.py
+    ```
 5. Enable pipeline for that stage
 6. Repeat for next stage
 

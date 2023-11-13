@@ -132,10 +132,10 @@ func ProcessMessageEvent(
 
     // --------------------------------
     // prepare businessId for command requests that include businessId index
-    // assumption: user exists
+    // only for commands that require auth (or else user obj does not exist)
     // --------------------------------
     var businessId bid.BusinessId
-    if cmd.Command[0] == util.UpdateQuickReplyMessageCmd || cmd.Command[0] == util.UpdateBusinessDescriptionMessageCmd || cmd.Command[0] == util.UpdateKeywordsMessageCmd {
+    if shouldAuth(message) && cmd.Command[0] == util.UpdateQuickReplyMessageCmd || cmd.Command[0] == util.UpdateBusinessDescriptionMessageCmd || cmd.Command[0] == util.UpdateKeywordsMessageCmd {
         if len(cmd.Command) < 2 {
             log.Errorf("Error parsing command message '%s' from user '%s': %v", message, userId, err)
             return events.LambdaFunctionURLResponse{
