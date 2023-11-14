@@ -120,7 +120,7 @@ def update_user_table(dry_run: bool):
         else:
             print(
                 f"Dry run, would have updated user {user_id} with:\n"
-                f"user.activeBusinessId from to {user['activeBusinessId']['S']}\n"
+                f"user.activeBusinessId to {user['activeBusinessId']['S']}\n"
                 f"user.businessIds to {user['businessIds']['SS']}\n"
                 f"user.google.businessAccountId to {user['google']['M']['businessAccountId']['S']}\n"
             )

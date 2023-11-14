@@ -221,6 +221,12 @@ func ProcessPostbackEvent(
                             }, err
                         }
 
+                        // notify all other users of toggle (skip notifying self)
+                        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
+                        if err != nil {
+                            log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
+                        }
+
                     case "ServiceRecommendation":
                         user, err = handleServiceRecommendationToggle(user, business.BusinessDescription, userDao, log)
                         if err != nil {
@@ -247,12 +253,6 @@ func ProcessPostbackEvent(
                                 Body:       fmt.Sprintf(`{"error": "Error handling keyword toggle: %s"}`, err),
                             }, err
                         }
-                    }
-
-                    // notify all other users of toggle (skip notifying self)
-                    err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
-                    if err != nil {
-                        log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
                     }
 
                     err = line.ShowAiReplySettings(event.ReplyToken, user, business, businessDao)
