@@ -38,6 +38,18 @@ def update_review_table(dry_run: bool):
         old_business_id = review['userId']['S']
         review_id = review['uniqueId']['S']
 
+        # if reviewId begins with '#UNIQUE_VENDOR_REVIEW_ID#', then it should be deleted
+        if review_id.startswith('#UNIQUE_VENDOR_REVIEW_ID#'):
+            if not dry_run:
+                dynamodb.delete_item(
+                    TableName='Review',
+                    Key={'userId': {'S': old_business_id}, 'uniqueId': {'S': review_id}}
+                )
+                print(f"Deleted unique vendor review ID record review with key {old_business_id},{review_id}")
+            else:
+                print(f"DRY_RUN:, would have deleted review with key {old_business_id},{review_id}")
+            continue
+
         if "createdAt" not in review:
             print(f"WARN: Review {old_business_id}, {review_id} has no createdAt attribute. Skipping.")
             continue

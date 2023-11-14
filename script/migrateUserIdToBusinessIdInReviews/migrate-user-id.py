@@ -59,21 +59,16 @@ def main(dry_run=False):
             review['userId']['S'] = business_id
 
             # prepare unique vendor review id records
-            new_unique_vendor_review_id_record = {
-                'userId': {'S': business_id},
-                'uniqueId': {'S': f"#UNIQUE_VENDOR_REVIEW_ID#{review['vendorReviewId']['S']}"},
-            }
+            unique_vendor_review_id_record_sort_key = f"#UNIQUE_VENDOR_REVIEW_ID#{review['vendorReviewId']['S']}"
 
             if dry_run:
                 print("\n")
                 print(f"Would have processed review with ID {review['uniqueId']['S']} and user ID {user_id} by:")
                 print(
                     f"1. Add new review with partition key {business_id} and sort key {review['uniqueId']['S']}")
-                print(
-                    f"2. Add unique vendor review ID record with partition key {business_id} and sort key {new_unique_vendor_review_id_record['uniqueId']['S']}")
                 print(f"3. Delete old review with partition key {user_id} and sort key {review['uniqueId']['S']}")
                 print(
-                    f"4. Delete old unique vendor review ID record with partition key {user_id} and sort key {new_unique_vendor_review_id_record['uniqueId']['S']}")
+                    f"4. Delete old unique vendor review ID record with partition key {user_id} and sort key {unique_vendor_review_id_record_sort_key}")
                 print("\n")
 
             else:
@@ -87,12 +82,6 @@ def main(dry_run=False):
                             }
                         },
                         {
-                            'Put': {
-                                'TableName': 'Review',
-                                'Item': new_unique_vendor_review_id_record
-                            }
-                        },
-                        {
                             'Delete': {
                                 'TableName': 'Review',
                                 'Key': {'userId': {'S': user_id}, 'uniqueId': {'S': review['uniqueId']['S']}}
@@ -102,7 +91,7 @@ def main(dry_run=False):
                             'Delete': {
                                 'TableName': 'Review',
                                 'Key': {'userId': {'S': user_id},
-                                        'uniqueId': {'S': new_unique_vendor_review_id_record['uniqueId']['S']}}
+                                        'uniqueId': {'S': unique_vendor_review_id_record_sort_key}}
                             }
                         }
                     ]
