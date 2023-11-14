@@ -24,13 +24,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // script parameters
     // --------------------
-    businessId, err := bid.NewBusinessId("accounts/109717233744421630062/locations/3442155390184691720")
+    businessId, err := bid.NewBusinessId("13617862395744229126")
     if err != nil {
         log.Error("Error parsing business id: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error parsing business id"}`, StatusCode: 500}, nil
     }
-    userId := "Ud5ff72b21621e6873262c463c04187c3"
-    reviewIdStrs := []string{"q", "r", "s", "t", "u"}
+    // userId := "U731c1eda52ad77c9b9ef59eb5bd08ffb"
+    reviewIdStrs := []string{"d"}
 
     reviewIds := make([]rid.ReviewId, len(reviewIdStrs))
     for i, reviewIdStr := range reviewIdStrs {
@@ -72,7 +72,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     business := *businessPtr
 
     for _, reviewId := range reviewIds {
-        review, err := reviewDao.GetReview(userId, reviewId)
+        review, err := reviewDao.GetReview(businessId.String(), reviewId)
         if err != nil {
             log.Errorf("Error getting review: %s", err)
             return events.LambdaFunctionURLResponse{
