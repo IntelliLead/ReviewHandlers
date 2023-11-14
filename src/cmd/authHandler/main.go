@@ -313,7 +313,7 @@ func updateBusinesses(
         } else {
             business = *businessPtr
             if !util.StringInSlice(userId, business.UserIds) {
-                log.Infof("User %s does not have association with business %s yet. Creating association.", userId, businessId)
+                log.Infof("Business '%s' is unaware of '%s' yet. Creating association.", businessId, userId)
 
                 // add user to business and update business Google token
                 userIdAppendAction, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "userIds", []string{userId})

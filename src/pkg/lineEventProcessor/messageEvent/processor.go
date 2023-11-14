@@ -227,7 +227,7 @@ func ProcessMessageEvent(
             log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
         }
 
-        err = line.ShowQuickReplySettings(event.ReplyToken, user, business, businessDao)
+        err = line.ShowQuickReplySettingsWithActiveBusiness(event.ReplyToken, user, business, businessDao)
         if err != nil {
             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
             return events.LambdaFunctionURLResponse{

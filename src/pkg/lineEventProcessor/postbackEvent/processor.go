@@ -319,7 +319,7 @@ func ProcessPostbackEvent(
         case "RichMenu":
             switch dataSlice[1] {
             case "QuickReplySettings":
-                err = line.ShowQuickReplySettingsByUser(
+                err = line.ShowQuickReplySettings(
                     event.ReplyToken, user, businessDao)
                 if err != nil {
                     log.Errorf("Error sending quick reply settings to user '%s': %v", userId, err)
@@ -425,7 +425,7 @@ func ProcessPostbackEvent(
                             log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
                         }
 
-                        err = line.ShowQuickReplySettings(event.ReplyToken, user, business, businessDao)
+                        err = line.ShowQuickReplySettingsWithActiveBusiness(event.ReplyToken, user, business, businessDao)
                         if err != nil {
                             log.Errorf("Error showing quick reply settings for user '%s': %v", userId, err)
                             return events.LambdaFunctionURLResponse{
@@ -462,7 +462,7 @@ func ProcessPostbackEvent(
                         }, err
                     }
 
-                    err = line.ShowQuickReplySettingsByUser(event.ReplyToken, user, businessDao)
+                    err = line.ShowQuickReplySettings(event.ReplyToken, user, businessDao)
                     if err != nil {
                         log.Errorf("Error sending AI reply settings to user '%s': %v", userId, err)
                         return events.LambdaFunctionURLResponse{

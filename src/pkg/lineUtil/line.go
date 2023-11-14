@@ -105,8 +105,10 @@ func (l *Line) SendNewReview(review model.Review, business model.Business, userD
 
         businessIdIndex := util.FindStringIndex(bid.BusinessIdsToStringSlice(userPtr.BusinessIds), business.BusinessId.String())
         if businessIdIndex == -1 {
-            l.log.Errorf("Business '%s' not found in user '%s'", business.BusinessId, userId)
-            return errors.New(fmt.Sprintf("Business '%s' not found in user '%s'", business.BusinessId, userId))
+            errStr := fmt.Sprintf("Business '%s' not found in user '%s'. Not sending review to this user.", business.BusinessId, userId)
+            l.log.Error(errStr)
+            metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameNewReviewEventHandler, 1)
+            continue
         }
 
         // send the message to each user
@@ -148,10 +150,10 @@ func (l *Line) SendNewReviewToUser(review model.Review, userId string) error {
     return nil
 }
 
-func (l *Line) ShowQuickReplySettingsByUser(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
+func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
     businessPtr, err := businessDao.GetBusiness(user.ActiveBusinessId)
     if err != nil {
-        l.log.Error("Error getting business in ShowQuickReplySettingsByUser: ", err)
+        l.log.Error("Error getting business in ShowQuickReplySettings: ", err)
         return err
     }
     if businessPtr == nil {
@@ -160,10 +162,10 @@ func (l *Line) ShowQuickReplySettingsByUser(replyToken string, user model.User, 
     }
     activeBusiness := *businessPtr
 
-    return l.ShowQuickReplySettings(replyToken, user, activeBusiness, businessDao)
+    return l.ShowQuickReplySettingsWithActiveBusiness(replyToken, user, activeBusiness, businessDao)
 }
 
-func (l *Line) ShowQuickReplySettings(
+func (l *Line) ShowQuickReplySettingsWithActiveBusiness(
     replyToken string,
     user model.User,
     activeBusiness model.Business,

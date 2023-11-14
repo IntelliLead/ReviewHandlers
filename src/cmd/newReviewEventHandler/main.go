@@ -159,14 +159,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         business = *businessPtr
         err = line.SendNewReview(review, business, userDao)
         if err != nil {
-            log.Errorf("Error sending new review to users of business '%s': %s", business.BusinessId, jsonUtil.AnyToJson(err))
+            log.Errorf("Error sending new review to users of business '%s': %s", business.BusinessId, err)
             return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE users of business"}`, StatusCode: 500}, nil
         }
         log.Info("Successfully sent new review to all users belonging to business: ", business.BusinessId)
     } else {
         err = line.SendNewReviewToUser(review, userId)
         if err != nil {
-            log.Errorf("Error sending new review to user '%s': %s", userId, jsonUtil.AnyToJson(err))
+            log.Errorf("Error sending new review to user '%s': %s", userId, err)
             return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE user"}`, StatusCode: 500}, nil
         }
         log.Info("Successfully sent new review to user: ", userId)
