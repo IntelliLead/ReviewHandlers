@@ -73,7 +73,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
        2. If business is not found, user is not authed. Use userId as partition key to create new review
     */
     var business model.Business
-    var userId string
     // VendorReviewId is in the format of "accounts/BUSINESS_ACCOUNT_ID/locations/BUSINESS_ID/reviews/BUSINESS_REVIEW_ID"
     businessId, err := bid.NewBusinessId(strings.Split(event.VendorReviewId, "/")[3])
     if err != nil {
@@ -90,10 +89,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if businessPtr == nil {
         log.Infof("Business '%s' does not exist.", businessId)
 
-        if event.UserId == nil {
+        if util.IsEmptyStringPtr(event.UserId) {
             log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
             return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
         }
+        userId := *event.UserId
 
         log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", userId)
 
@@ -164,6 +164,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
         log.Info("Successfully sent new review to all users belonging to business: ", business.BusinessId)
     } else {
+        if util.IsEmptyStringPtr(event.UserId) {
+            log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
+            return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
+        }
+        userId := *event.UserId
+
         err = line.SendNewReviewToUser(review, userId)
         if err != nil {
             log.Errorf("Error sending new review to user '%s': %s", userId, err)
@@ -189,18 +195,18 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
             quickReplyMessage := *quickReplyMessagePtr
             err = lineEventProcessor.ReplyReview(util.AutoReplyUserId, quickReplyMessage, review, reviewDao, log)
             if err != nil {
-                log.Errorf("Error handling replying '%s' to review '%s' from user '%s': %v", quickReplyMessage, review.ReviewId.String(), userId, err)
+                log.Errorf("Error handling replying '%s' to review '%s' : %v", quickReplyMessage, review.ReviewId.String(), err)
 
-                _, notifyUserErr := line.NotifyUserReplyFailed(userId, review.ReviewerName, true)
+                notifyUserErr := line.NotifyUsersReplyFailed(business.UserIds, review.ReviewerName, true)
                 if notifyUserErr != nil {
-                    log.Errorf("Error notifying user '%s' reply failed for review '%s': %v", userId, review.ReviewId.String(), notifyUserErr)
+                    log.Errorf("Error notifying users of business '%s' reply failed for review '%s': %v", businessId, review.ReviewId.String(), notifyUserErr)
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,
                         Body:       fmt.Sprintf(`{"error": "Auto reply failed: %s. Failed to notify user of failure: %s"}`, err, notifyUserErr),
                     }, nil
                 }
 
-                log.Infof("Successfully notified user '%s' auto reply failed for review '%s'", userId, review.ReviewId.String())
+                log.Infof("Successfully notified users of business '%s' auto reply failed for review '%s'", businessId, review.ReviewId.String())
 
                 return events.LambdaFunctionURLResponse{
                     StatusCode: 500,

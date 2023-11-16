@@ -37,7 +37,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
         WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(businessId))).
         Build()
     if err != nil {
-        d.log.Error("Unable to produce key condition expression for GetNextReviewID with businessId %s: ", businessId, err)
+        d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with businessId %s: %s", businessId, err)
         return "", err
     }
 
@@ -51,7 +51,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
         Limit:                     aws.Int32(1),
     })
     if err != nil {
-        d.log.Error("Unable to execute query in GetNextReviewID with businessId %s: ", businessId, err)
+        d.log.Errorf("Unable to execute query in GetNextReviewID with businessId %s: %s", businessId, err)
         return "", err
     }
 
@@ -61,7 +61,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
             WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
             Build()
         if err != nil {
-            d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
+            d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with userId %s: %s", userId, err)
             return "", err
         }
 
@@ -75,7 +75,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
             Limit:                     aws.Int32(1),
         })
         if err != nil {
-            d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
+            d.log.Errorf("Unable to execute query in GetNextReviewID with userId %s: %s", userId, err)
             return "", err
         }
 
@@ -91,7 +91,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
         var review model.Review
         err = attributevalue.UnmarshalMap(result.Items[0], &review)
         if err != nil {
-            d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
+            d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
             return "", err
         }
         return review.ReviewId.GetNext(), nil
@@ -101,7 +101,7 @@ func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.Revie
     var review model.Review
     err = attributevalue.UnmarshalMap(result.Items[0], &review)
     if err != nil {
-        d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
+        d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
         return "", err
     }
 
@@ -116,7 +116,7 @@ func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error)
         WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
         Build()
     if err != nil {
-        d.log.Error("Unable to produce key condition expression for GetNextReviewID with userId %s: ", userId, err)
+        d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with userId %s: %s", userId, err)
         return "", err
     }
 
@@ -130,7 +130,7 @@ func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error)
         Limit:                     aws.Int32(1),
     })
     if err != nil {
-        d.log.Error("Unable to execute query in GetNextReviewID with userId %s: ", userId, err)
+        d.log.Errorf("Unable to execute query in GetNextReviewID with userId %s: %s", userId, err)
         return "", err
     }
 
@@ -146,7 +146,7 @@ func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error)
     var review model.Review
     err = attributevalue.UnmarshalMap(result.Items[0], &review)
     if err != nil {
-        d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
+        d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
         return "", err
     }
 

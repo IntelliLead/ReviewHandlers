@@ -436,8 +436,16 @@ func (l *Line) ReplyUserReplyFailed(replyToken string, reviewerName string, isAu
     return l.lineClient.ReplyMessage(replyToken, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
 }
 
-func (l *Line) NotifyUserReplyFailed(userId string, reviewerName string, isAutoReply bool) (*linebot.BasicResponse, error) {
-    return l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
+func (l *Line) NotifyUsersReplyFailed(userIds []string, reviewerName string, isAutoReply bool) error {
+    returnErr := error(nil)
+    for _, userId := range userIds {
+        _, err := l.lineClient.PushMessage(userId, linebot.NewTextMessage(buildReplyFailedMessage(reviewerName, isAutoReply))).Do()
+        if err != nil {
+            l.log.Errorf("Error sending message to '%s' in NotifyUsersReplyFailed: %v", userId, err)
+            returnErr = err
+        }
+    }
+    return returnErr
 }
 
 // ReplyUserReplyFailedWithReason replies to the user that the reply failed with the reason
