@@ -151,18 +151,25 @@ func (l *Line) SendNewReviewToUser(review model.Review, userId string) error {
 }
 
 func (l *Line) ShowQuickReplySettings(replyToken string, user model.User, businessDao *ddbDao.BusinessDao) error {
-    businessPtr, err := businessDao.GetBusiness(user.ActiveBusinessId)
-    if err != nil {
-        l.log.Error("Error getting business in ShowQuickReplySettings: ", err)
-        return err
+    orderedBusinesses := make([]model.Business, len(user.BusinessIds))
+    for i, id := range user.GetSortedBusinessIds() {
+        b, err := businessDao.GetBusiness(id)
+        if err != nil {
+            l.log.Errorf("Error getting business '%s' for user '%s': %v", id, user.UserId, err)
+            return err
+        }
+        if b == nil {
+            l.log.Errorf("Business '%s' does not exist for user '%s'", id, user.UserId)
+            return fmt.Errorf("business '%s' does not exist for user '%s'", id, user.UserId)
+        }
+        orderedBusinesses[i] = *b
     }
-    if businessPtr == nil {
-        l.log.Errorf("Business '%s' not found", user.ActiveBusinessId)
-        return errors.New(fmt.Sprintf("Business '%s' not found", user.ActiveBusinessId))
-    }
-    activeBusiness := *businessPtr
 
-    return l.ShowQuickReplySettingsWithActiveBusiness(replyToken, user, activeBusiness, businessDao)
+    if len(user.BusinessIds) > 1 {
+        return l.showQuickReplySettingsForMultiBusiness(replyToken, orderedBusinesses, user.ActiveBusinessId)
+    } else {
+        return l.showQuickReplySettingsForSingleBusiness(replyToken, orderedBusinesses[0])
+    }
 }
 
 func (l *Line) ShowQuickReplySettingsWithActiveBusiness(
@@ -171,29 +178,35 @@ func (l *Line) ShowQuickReplySettingsWithActiveBusiness(
     activeBusiness model.Business,
     businessDao *ddbDao.BusinessDao,
 ) error {
-    if len(user.BusinessIds) > 1 {
-        orderedBusinesses := make([]model.Business, len(user.BusinessIds))
-        for i, id := range user.GetSortedBusinessIds() {
-            b, err := businessDao.GetBusiness(id)
-            if err != nil {
-                l.log.Errorf("Error getting business '%s' for user '%s': %v", id, user.UserId, err)
-                return err
-            }
-            if b == nil {
-                l.log.Errorf("Business '%s' does not exist for user '%s'", id, user.UserId)
-                return fmt.Errorf("business '%s' does not exist for user '%s'", id, user.UserId)
-            }
-            orderedBusinesses[i] = *b
-        }
-        if user.ActiveBusinessId != activeBusiness.BusinessId {
-            l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
-        }
-
-        return l.showQuickReplySettingsForMultiBusiness(replyToken, orderedBusinesses, activeBusiness.BusinessId)
+    if len(user.BusinessIds) == 1 {
+        return l.showQuickReplySettingsForSingleBusiness(replyToken, activeBusiness)
     }
 
-    return l.showQuickReplySettingsForSingleBusiness(replyToken, activeBusiness)
+    orderedBusinesses := make([]model.Business, len(user.BusinessIds))
+    for i, id := range user.GetSortedBusinessIds() {
+        if id == activeBusiness.BusinessId {
+            orderedBusinesses[i] = activeBusiness
+            continue
+        }
+
+        b, err := businessDao.GetBusiness(id)
+        if err != nil {
+            l.log.Errorf("Error getting business '%s' for user '%s': %v", id, user.UserId, err)
+            return err
+        }
+        if b == nil {
+            l.log.Errorf("Business '%s' does not exist for user '%s'", id, user.UserId)
+            return fmt.Errorf("business '%s' does not exist for user '%s'", id, user.UserId)
+        }
+        orderedBusinesses[i] = *b
+    }
+
+    if user.ActiveBusinessId != activeBusiness.BusinessId {
+        l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
+        metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+    }
+
+    return l.showQuickReplySettingsForMultiBusiness(replyToken, orderedBusinesses, activeBusiness.BusinessId)
 }
 
 func (l *Line) showQuickReplySettingsForMultiBusiness(

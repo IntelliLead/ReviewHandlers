@@ -424,16 +424,15 @@ func updateUser(
             actions = append(actions, updateBusinessAccountIdAction)
         }
 
-        // build add missing business IDs action
-        // find businessIds not in user's businessIds
-        var businessIdsToAssociateUser []bid.BusinessId
+        // find businessIds not in user's businessIds and add them
+        var businessIdsMissingInUser []bid.BusinessId
         for _, businessId := range businessIds {
             if !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
-                businessIdsToAssociateUser = append(businessIdsToAssociateUser, businessId)
+                businessIdsMissingInUser = append(businessIdsMissingInUser, businessId)
             }
         }
-        if len(businessIdsToAssociateUser) > 0 {
-            for _, businessId := range businessIdsToAssociateUser {
+        if len(businessIdsMissingInUser) > 0 {
+            for _, businessId := range businessIdsMissingInUser {
                 action, err := dbModel.NewAttributeAction(enum.ActionAppendStringSet, "businessIds", []string{businessId.String()})
                 if err != nil {
                     log.Errorf("Error building businessIds append action: %s", err)
@@ -441,6 +440,17 @@ func updateUser(
                 }
                 actions = append(actions, action)
             }
+        }
+
+        // repair active businessID if it is missing
+        if util.IsEmptyString(user.ActiveBusinessId.String()) {
+            log.Infof("User %s does not have active businessId. Repairing.", userId)
+            action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "activeBusinessId", businessIds[0].String())
+            if err != nil {
+                log.Errorf("Error building activeBusinessId update action: %s", err)
+                return user, err
+            }
+            actions = append(actions, action)
         }
 
         // update user
