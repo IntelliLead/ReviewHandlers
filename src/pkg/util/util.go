@@ -1,8 +1,10 @@
 package util
 
 import (
+    "encoding/json"
     "strings"
     "time"
+    "unicode"
 )
 
 func UtcToReadableTwTimestamp(timestamp time.Time) (string, error) {
@@ -61,4 +63,50 @@ func StringInSlice(str string, list []string) bool {
         }
     }
     return false
+}
+
+func RemoveStringFromSlice(slice []string, str string) []string {
+    var result []string
+    for _, s := range slice {
+        if s != str {
+            result = append(result, s)
+        }
+    }
+    return result
+}
+
+// FindStringIndex returns the first index of the target string, or -1 if no match is found.
+func FindStringIndex(slice []string, target string) int {
+    for i, value := range slice {
+        if value == target {
+            return i
+        }
+    }
+    return -1 // not found
+}
+
+func DeepCopy(src interface{}) (interface{}, error) {
+    // Marshal the source into JSON
+    jsonObj, err := json.Marshal(src)
+    if err != nil {
+        return nil, err
+    }
+
+    // Unmarshal JSON into a new variable
+    var dst interface{}
+    err = json.Unmarshal(jsonObj, &dst)
+    if err != nil {
+        return nil, err
+    }
+
+    return dst, nil
+}
+
+func IsNumericString(s string) bool {
+    for _, r := range s {
+        if !unicode.IsDigit(r) {
+            return false
+        }
+    }
+    return true
 }

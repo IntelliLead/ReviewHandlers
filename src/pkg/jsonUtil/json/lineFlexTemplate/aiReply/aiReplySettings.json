@@ -80,9 +80,9 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯業務描述",
-                            "data": "/AiReply/EditBusinessDescription",
+                            "data": "/AiReply/{BUSINESS_ID}/EditBusinessDescription",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/description 高端餐酒館…"
+                            "fillInText": "/description/{BUSINESS_ID_INDEX} "
                         }
                     }
                 ]
@@ -115,8 +115,8 @@
                                 "gravity": "center",
                                 "action": {
                                     "type": "postback",
-                                    "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Emoji"
+                                    "label": "EmojiToggle",
+                                    "data": "/AiReply/{BUSINESS_ID}/Toggle/Emoji"
                                 },
                                 "flex": 1
                             }
@@ -144,7 +144,7 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "簽名",
+                                "text": "回覆名稱",
                                 "size": "md",
                                 "color": "#555555",
                                 "flex": 4,
@@ -161,7 +161,7 @@
                                 "action": {
                                     "type": "postback",
                                     "label": "SignatureToggle",
-                                    "data": "/AiReply/Toggle/Signature"
+                                    "data": "/AiReply/{BUSINESS_ID}/Toggle/Signature"
                                 },
                                 "flex": 1
                             }
@@ -209,9 +209,9 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯簽名",
-                            "data": "/AiReply/EditSignature",
+                            "data": "/AiReply/{BUSINESS_ID}/EditSignature",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/signature "
+                            "fillInText": "/signature/{BUSINESS_ID_INDEX} "
                         }
                     }
                 ]
@@ -245,7 +245,7 @@
                                 "action": {
                                     "type": "postback",
                                     "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/Keyword"
+                                    "data": "/AiReply/{BUSINESS_ID}/Toggle/Keyword"
                                 },
                                 "flex": 1
                             }
@@ -293,9 +293,9 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯關鍵字",
-                            "data": "/AiReply/EditKeywords",
+                            "data": "/AiReply/{BUSINESS_ID}/EditKeywords",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/keywords 台北美食,…"
+                            "fillInText": "/keywords/{BUSINESS_ID_INDEX} "
                         }
                     },
                     {
@@ -349,8 +349,8 @@
                                 "gravity": "center",
                                 "action": {
                                     "type": "postback",
-                                    "label": "KeywordToggle",
-                                    "data": "/AiReply/Toggle/ServiceRecommendation"
+                                    "label": "ServiceRecommendationToggle",
+                                    "data": "/AiReply/{BUSINESS_ID}/Toggle/ServiceRecommendation"
                                 },
                                 "flex": 1
                             }
@@ -398,9 +398,9 @@
                         "action": {
                             "type": "postback",
                             "label": "編輯推薦業務",
-                            "data": "/AiReply/EditServiceRecommendations",
+                            "data": "/AiReply/{BUSINESS_ID}/EditServiceRecommendations",
                             "inputOption": "openKeyboard",
-                            "fillInText": "/recommendation "
+                            "fillInText": "/recommendation/{BUSINESS_ID_INDEX} "
                         }
                     },
                     {

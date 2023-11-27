@@ -1,7 +1,9 @@
 package slackUtil
 
 import (
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/slack-go/slack"
@@ -77,6 +79,47 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
     }
 
     s.log.Debugf("Message 2 successfully sent to slack channel %s at %s", respChannel, respTimestamp)
+
+    return nil
+}
+
+func (s *Slack) SendNewUserOauthCompletionMessage(user model.User, businesses []model.Business) error {
+    readableTimestamp, err := util.UtcToReadableTwTimestamp(time.Now())
+    if err != nil {
+        s.log.Error("Unable to convert timestamp to readable format in SendNewUserOauthCompletionMessage: ", err)
+        return err
+    }
+
+    msg1 := ""
+    if s.stage != enum.StageProd {
+        msg1 += "*[" + s.stage.String() + "]* "
+    }
+    msg1 += "New user completed OAUTH at " + readableTimestamp + ". User ID: "
+
+    businessesStr := ""
+    for _, business := range businesses {
+        businessesStr += fmt.Sprintf("• %s\n%s\n\n", business.BusinessName, business.BusinessId.String())
+    }
+
+    blocks := []slack.Block{
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, msg1, false, false), nil, nil),
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, user.UserId, false, false), nil, nil),
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, "LINE username: "+user.LineUsername, false, false), nil, nil),
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, "\nBusinesses:", false, false), nil, nil),
+        slack.NewSectionBlock(slack.NewTextBlockObject(slack.PlainTextType, businessesStr, false, false), nil, nil),
+        slack.NewDividerBlock(),
+    }
+
+    respChannel, respTimestamp, err := s.client.PostMessage(
+        s.channelId,
+        slack.MsgOptionBlocks(blocks...),
+    )
+    if err != nil {
+        s.log.Error("Unable to send message to slack in SendNewUserOauthCompletionMessage: ", err)
+        return err
+    }
+
+    s.log.Debugf("Message successfully sent to slack channel %s at %s", respChannel, respTimestamp)
 
     return nil
 }

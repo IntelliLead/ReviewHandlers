@@ -1,6 +1,7 @@
-package lineEventsHandlerTestEvents
+package message
 
 import (
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "time"
 )
@@ -19,9 +20,9 @@ var TestReplyEvent = []*linebot.Event{
         },
         Message: &linebot.TextMessage{
             ID:   "14479352052004",
-            Text: "@0 my reply text 回復留言 *(U@#&*",
+            Text: "@0T yay",
         },
-        ReplyToken: "36ffd31138354b2dbe94d1a7759fb9ab",
+        ReplyToken: util.TestReplyToken,
         Mode:       linebot.EventModeActive,
     },
 }

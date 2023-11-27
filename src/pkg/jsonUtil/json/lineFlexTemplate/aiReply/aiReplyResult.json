@@ -31,7 +31,7 @@
             "contents": [
               {
                 "type": "text",
-                "text": "評論者：",
+                "text": "評論人：",
                 "size": "sm",
                 "flex": 0,
                 "color": "#666666"
@@ -94,6 +94,27 @@
           }
         ],
         "paddingBottom": "lg"
+      },
+      {
+        "type": "box",
+        "layout": "baseline",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "text",
+            "text": "生成人：",
+            "size": "sm",
+            "flex": 0,
+            "color": "#666666"
+          },
+          {
+            "type": "text",
+            "text": "{GENERATE_AUTHOR_NAME}",
+            "wrap": true,
+            "size": "sm",
+            "flex": 5
+          }
+        ]
       }
     ]
   },
@@ -107,8 +128,8 @@
           "type": "postback",
           "label": "送出回覆",
           "inputOption": "openKeyboard",
-          "data": "/AiReply/Reply",
-          "fillInText": "@{REVIEW_ID} {AI_REPLY}"
+          "data": "/AiReply/{BUSINESS_ID}/EditReply",
+          "fillInText": "@{BUSINESS_ID_INDEX}|{REVIEW_ID} {AI_REPLY}"
         },
         "color": "#445783"
       },
@@ -117,7 +138,7 @@
         "action": {
           "type": "postback",
           "label": "換一個",
-          "data": "/AiReply/GenerateAiReply/{REVIEW_ID}"
+          "data": "/AiReply/GenerateAiReply/{BUSINESS_ID}/{REVIEW_ID}"
         },
         "color": "#445783"
       }

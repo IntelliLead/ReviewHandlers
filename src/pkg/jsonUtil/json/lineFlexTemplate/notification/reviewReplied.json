@@ -1,0 +1,172 @@
+{
+  "type": "bubble",
+  "hero": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "{BUSINESS_NAME}",
+        "size": "lg",
+        "wrap": true,
+        "margin": "lg",
+        "style": "normal",
+        "align": "center",
+        "color": "#FFFFFFFF",
+        "offsetBottom": "sm"
+      }
+    ],
+    "backgroundColor": "#5e6fbd"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "評論回覆通知",
+            "weight": "bold",
+            "size": "xl",
+            "margin": "md",
+            "wrap": true
+          }
+        ]
+      },
+      {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "lg",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "評論：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "wrap": false,
+                "size": "sm",
+                "flex": 5,
+                "text": "{REVIEW}",
+                "margin": "md"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "評論人：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REVIEWER_NAME}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5
+              }
+            ]
+          },
+          {
+            "type": "separator"
+          },
+          {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "回覆：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REPLY}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5,
+                "margin": "md"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "回覆人：",
+                "size": "sm",
+                "flex": 0,
+                "color": "#666666"
+              },
+              {
+                "type": "text",
+                "text": "{REPLIER_NAME}",
+                "wrap": true,
+                "size": "sm",
+                "flex": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": "小提示：可以重複回覆同一條評論，覆蓋上次回覆內容哦！",
+        "size": "xs",
+        "color": "#aaaaaa",
+        "wrap": true,
+        "margin": "lg"
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "postback",
+          "label": "修改回覆",
+          "inputOption": "openKeyboard",
+          "data": "/Notification/Replied/Reply",
+          "fillInText": "@{BUSINESS_ID_INDEX}|{REVIEW_ID} {REPLY}"
+        },
+        "color": "#445783"
+      }
+    ]
+  },
+  "styles": {
+    "body": {
+      "backgroundColor": "#F5F5F5"
+    },
+    "footer": {
+      "separator": true,
+      "backgroundColor": "#8fa6cc"
+    }
+  }
+}

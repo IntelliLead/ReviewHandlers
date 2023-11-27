@@ -14,7 +14,7 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
-    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents"
+    "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents/postback"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameLineEventsHandler.String(), handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameLineEventsHandler, handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -37,7 +37,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // Check if the request is a health check call
     // --------------------
-    isHealthCheckCall, err := lineEventProcessor.ProcessHealthCheckCall(request, log)
+    isHealthCheckCall, err := lineEventProcessor.HandleHealthCheck(request, log)
     if err != nil {
         log.Error("Error handling health check call:", err)
         return events.LambdaFunctionURLResponse{
@@ -49,7 +49,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         return events.LambdaFunctionURLResponse{
             StatusCode: 200,
             Headers:    map[string]string{"Content-Type": "application/json"},
-            Body:       `{"mesage": "OK"}`,
+            Body:       `{"message": "OK"}`,
         }, nil
     }
 
@@ -68,14 +68,19 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // LINE
     line := lineUtil.NewLine(log)
 
+    // --------------------
     // parse message to LINE events
+    // --------------------
     var lineEvents []*linebot.Event
 
     // This is useful for local development, where we can't/won't generate a new request with valid signature.
     // LINE events signature becomes invalid after a while (sometimes days). In this case, instead of generating a new request, we can opt to bypass event parser (signature check) and craft our own parsed line events.
     if stage == enum.StageLocal {
         log.Debug("Running in local environment. Skipping LINE event parser")
-        lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
+        lineEvents = postback.TestToggleServiceRecommendationEvent
+        // lineEvents = message.TestRealReplyEvent
+        // lineEvents = lineEventsHandlerTestEvents.TestRichMenuQuickReplySettingsEvent
+        // lineEvents = lineEventsHandlerTestEvents.TestRichMenuAiReplySettingsEvent
     } else {
         err = nil
         lineEvents, err = line.ParseRequest(&request)
@@ -113,7 +118,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
             slack := slackUtil.NewSlack(log, stage)
-            return lineEventProcessor.ProcessFollowEvent(event, businessDao, userDao, slack, line, log)
+            return lineEventProcessor.ProcessFollowEvent(event, userDao, slack, line, log)
 
         case linebot.EventTypePostback:
             log.Info("Received Postback event")

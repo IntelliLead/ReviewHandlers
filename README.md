@@ -30,3 +30,61 @@ Collection of Lambda handlers to process Google reviews
    ```
 4. Upload Rich menu image associated with new Rich Menu entity by running `https://api-data.line.me/v2/bot/richmenu/{{richMenuId}}/content` with the (new) Rich Menu image as attachment. Verify response is empty 200.
 5. Set the newly configured Rich Menu entity as default by running `https://api.line.me/v2/bot/user/all/richmenu/{{richMenuId}}`. Verify response is empty 200.
+
+
+## SOPs
+### Sending review to users
+Run script/sendReviewToUser with SAM CLI
+1. modify businessId, userId, and reviewIds arguments in script
+2. Create SAM CLI template
+   ```yaml
+   Resources:
+     Function:
+       Type: AWS::Serverless::Function
+       Properties:
+         Timeout: 300
+         MemorySize: 128
+         Handler: sendReviewToUser
+         CodeUri: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers/script
+         Runtime: go1.x
+         Architectures:
+           - x86_64
+         Environment:
+           Variables:
+             STAGE: local
+   ```
+3. Ensure SAM CLI AWS connection profile is set to the designated AWS account
+4. Run with SAM CLI with any input arguments
+```
+[profile il-alpha]
+sso_start_url = https://d-926756898f.awsapps.com/start
+sso_region = us-west-2
+sso_account_id = 222196498939
+sso_role_name = AdministratorAccess
+region = ap-northeast-1
+output = json
+
+[profile il-beta]
+sso_start_url = https://d-926756898f.awsapps.com/start
+sso_region = us-west-2
+sso_account_id = 673067564576
+sso_role_name = AdministratorAccess
+region = ap-northeast-1
+output = json
+
+[profile il-gamma]
+sso_start_url = https://d-926756898f.awsapps.com/start
+sso_region = us-west-2
+sso_account_id = 250743217525
+sso_role_name = AdministratorAccess
+region = ap-northeast-1
+output = json
+
+[profile il-prod]
+sso_start_url = https://d-926756898f.awsapps.com/start
+sso_region = us-west-2
+sso_account_id = 613539315064
+sso_role_name = AdministratorAccess
+region = ap-northeast-1
+output = json
+```

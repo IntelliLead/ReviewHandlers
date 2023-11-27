@@ -4,12 +4,11 @@ import (
     "context"
     "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    _type "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -32,13 +31,13 @@ func NewReviewDao(client *dynamodb.Client, logger *zap.SugaredLogger) *ReviewDao
     }
 }
 
-func (d *ReviewDao) GetNextReviewID(businessId string) (_type.ReviewId, error) {
-    // Define the expression to retrieve the largest ReviewId for the given BusinessId
+// TODO: Remove userId field and constrain businessId type to bid.BusinessId, after [INT-97] is done
+func (d *ReviewDao) GetNextReviewID(businessId string, userId string) (rid.ReviewId, error) {
     expr, err := expression.NewBuilder().
         WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(businessId))).
         Build()
     if err != nil {
-        d.log.Error("Unable to produce key condition expression for GetNextReviewID with businessId %s: ", businessId, err)
+        d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with businessId %s: %s", businessId, err)
         return "", err
     }
 
@@ -52,97 +51,147 @@ func (d *ReviewDao) GetNextReviewID(businessId string) (_type.ReviewId, error) {
         Limit:                     aws.Int32(1),
     })
     if err != nil {
-        d.log.Error("Unable to execute query in GetNextReviewID with businessId %s: ", businessId, err)
+        d.log.Errorf("Unable to execute query in GetNextReviewID with businessId %s: %s", businessId, err)
         return "", err
     }
 
-    // If there are no existing reviews, start with ReviewId 0
+    // If there are no existing reviews, check if the partition key is user id. If found, return the next review id for that user as the business ID
     if len(result.Items) == 0 {
-        return _type.NewReviewId("0"), nil
+        expr, err := expression.NewBuilder().
+            WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
+            Build()
+        if err != nil {
+            d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with userId %s: %s", userId, err)
+            return "", err
+        }
+
+        result, err = d.client.Query(context.TODO(), &dynamodb.QueryInput{
+            TableName:                 aws.String(enum.TableReview.String()),
+            IndexName:                 aws.String(ReviewIndexCreatedAtLsi.String()),
+            KeyConditionExpression:    expr.KeyCondition(),
+            ExpressionAttributeNames:  expr.Names(),
+            ExpressionAttributeValues: expr.Values(),
+            ScanIndexForward:          aws.Bool(false), // get largest
+            Limit:                     aws.Int32(1),
+        })
+        if err != nil {
+            d.log.Errorf("Unable to execute query in GetNextReviewID with userId %s: %s", userId, err)
+            return "", err
+        }
+
+        if len(result.Items) == 0 {
+            reviewId, err := rid.NewReviewId("0")
+            if err != nil {
+                return "", err
+            }
+            return reviewId, nil
+        }
+
+        // Extract the current largest reviewId for the user
+        var review model.Review
+        err = attributevalue.UnmarshalMap(result.Items[0], &review)
+        if err != nil {
+            d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
+            return "", err
+        }
+        return review.ReviewId.GetNext(), nil
     }
 
-    // Extract the current largest ReviewId
+    // Extract the current largest reviewId
     var review model.Review
     err = attributevalue.UnmarshalMap(result.Items[0], &review)
     if err != nil {
-        d.log.Error("Unable to unmarshal the first query result in GetNextReviewID with query response %s: ", result.Items[0], err)
+        d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
         return "", err
     }
 
-    return (*review.ReviewId).GetNext(), nil
+    d.log.Debug("GetNextReviewID: ", jsonUtil.AnyToJson(review))
+
+    return review.ReviewId.GetNext(), nil
 }
 
-// CreateReview creates a new review in DynamoDB
-func (d *ReviewDao) CreateReview(review model.Review) error {
-    err := model.ValidateReview(&review)
+// TODO: Remove function, after [INT-97] is done
+func (d *ReviewDao) GetNextReviewIDByUserId(userId string) (rid.ReviewId, error) {
+    expr, err := expression.NewBuilder().
+        WithKeyCondition(expression.Key(util.ReviewTablePartitionKey).Equal(expression.Value(userId))).
+        Build()
     if err != nil {
-        d.log.Error("CreateReview failed due to invalid review: ", jsonUtil.AnyToJson(review))
-        return err
+        d.log.Errorf("Unable to produce key condition expression for GetNextReviewID with userId %s: %s", userId, err)
+        return "", err
     }
 
-    uniqueVendorReviewID := dbModel.NewUniqueVendorReviewIdRecord(review)
+    result, err := d.client.Query(context.TODO(), &dynamodb.QueryInput{
+        TableName:                 aws.String(enum.TableReview.String()),
+        IndexName:                 aws.String(ReviewIndexCreatedAtLsi.String()),
+        KeyConditionExpression:    expr.KeyCondition(),
+        ExpressionAttributeNames:  expr.Names(),
+        ExpressionAttributeValues: expr.Values(),
+        ScanIndexForward:          aws.Bool(false), // get largest
+        Limit:                     aws.Int32(1),
+    })
+    if err != nil {
+        d.log.Errorf("Unable to execute query in GetNextReviewID with userId %s: %s", userId, err)
+        return "", err
+    }
+
+    if len(result.Items) == 0 {
+        reviewId, err := rid.NewReviewId("0")
+        if err != nil {
+            return "", err
+        }
+        return reviewId, nil
+    }
+
+    // Extract the current largest reviewId
+    var review model.Review
+    err = attributevalue.UnmarshalMap(result.Items[0], &review)
+    if err != nil {
+        d.log.Errorf("Unable to unmarshal the first query result in GetNextReviewID with query response %s: %s", result.Items[0], err)
+        return "", err
+    }
+
+    return review.ReviewId.GetNext(), nil
+}
+
+// PutReview creates a new review in DynamoDB
+func (d *ReviewDao) PutReview(review model.Review) error {
+    err := model.ValidateReview(&review)
+    if err != nil {
+        d.log.Error("PutReview failed due to invalid review: ", jsonUtil.AnyToJson(review))
+        return err
+    }
 
     av, err := attributevalue.MarshalMap(review)
     if err != nil {
         return err
     }
 
-    uniqueAv, err := attributevalue.MarshalMap(uniqueVendorReviewID)
-    if err != nil {
-        return err
-    }
-
-    _, err = d.client.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
-        TransactItems: []types.TransactWriteItem{
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                av,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-            {
-                Put: &types.Put{
-                    TableName:           aws.String(enum.TableReview.String()),
-                    Item:                uniqueAv,
-                    ConditionExpression: aws.String(KeyNotExistsConditionExpression),
-                },
-            },
-        },
+    _, err = d.client.PutItem(context.TODO(), &dynamodb.PutItemInput{
+        TableName:           aws.String(enum.TableReview.String()),
+        Item:                av,
+        ConditionExpression: aws.String(KeyNotExistsConditionExpression),
     })
     if err != nil {
-        var t *types.TransactionCanceledException
-        switch {
-        case errors.As(err, &t):
-            failedRequests := t.CancellationReasons
-
-            if *(failedRequests[0].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
-                return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
-            }
-
-            if *(failedRequests[1].Code) == string(types.BatchStatementErrorCodeEnumConditionalCheckFailed) {
-                return exception.NewVendorReviewIdAlreadyExistException(fmt.Sprintf("UniqueVendorReviewId with vendorReviewID %s already exists", review.VendorReviewId), err)
-            }
-
-            d.log.Debug("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
-
-            return err
-        default:
-            d.log.Error("CreateReview TransactWriteItems failed for unknown reason: ", jsonUtil.AnyToJson(err))
-            return exception.NewUnknownDDBException("CreateReview TransactWriteItems failed for unknown reason: ", err)
+        var t *types.ConditionalCheckFailedException
+        if errors.As(err, &t) {
+            d.log.Error("PutReview failed due to ConditionalCheckFailedException: ", jsonUtil.AnyToJson(err))
+            return exception.NewReviewAlreadyExistException(fmt.Sprintf("Review with reviewID %s already exists", review.ReviewId.String()), err)
         }
+
+        d.log.Errorf("PutReview failed for unknown reason: %s", err)
+        return exception.NewUnknownDDBException("PutReview failed for unknown reason: ", err)
     }
 
     return nil
 }
 
 type UpdateReviewInput struct {
-    BusinessId  string         `dynamodbav:"userId"`
-    ReviewId    _type.ReviewId `dynamodbav:"uniqueId"`
-    LastUpdated time.Time      `dynamodbav:"lastUpdated"` // unixtime does not work
-    LastReplied time.Time      `dynamodbav:"lastReplied"` // unixtime does not work
-    Reply       string         `dynamodbav:"reply"`
-    RepliedBy   string         `dynamodbav:"repliedBy"` // userId
+    BusinessId  string       `dynamodbav:"userId"`
+    ReviewId    rid.ReviewId `dynamodbav:"uniqueId"`
+    LastUpdated time.Time    `dynamodbav:"lastUpdated"` // unixtime does not work
+    LastReplied time.Time    `dynamodbav:"lastReplied"` // unixtime does not work
+    Reply       string       `dynamodbav:"reply"`
+    RepliedBy   string       `dynamodbav:"repliedBy"` // userId
 }
 
 func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
@@ -212,7 +261,7 @@ func (d *ReviewDao) UpdateReview(input UpdateReviewInput) error {
     return nil
 }
 
-func (d *ReviewDao) GetReview(businessId string, reviewId _type.ReviewId) (*model.Review, error) {
+func (d *ReviewDao) GetReview(businessId string, reviewId rid.ReviewId) (*model.Review, error) {
     // Create the key for the GetItem request
     key, err := attributevalue.MarshalMap(map[string]interface{}{
         util.ReviewTablePartitionKey: businessId,

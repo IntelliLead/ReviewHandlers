@@ -4,7 +4,7 @@ import (
     "context"
     "encoding/json"
     "errors"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
@@ -14,18 +14,20 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
+    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-    "github.com/go-playground/validator/v10"
     "github.com/google/uuid"
     "os"
+    "strings"
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameNewReviewEventHandler.String(), handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameNewReviewEventHandler, handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -42,7 +44,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Error("Error parsing request body: ", err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error parsing request body"}`, StatusCode: 400}, nil
     }
-    err = validator.New().Struct(event)
+    err = event.Validate()
     if err != nil {
         // Handle validation error
         log.Error("Validation error when parsing request body: ", err)
@@ -55,6 +57,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // initialize resources
     // --------------------
+    line := lineUtil.NewLine(log)
     // DDB
     cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
     if err != nil {
@@ -65,50 +68,74 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
     reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
 
-    // --------------------
-    // map to Review object
-    // --------------------
-    hasUserCompletedOauth, user, business, err := auth.ValidateUserAuth(event.UserId, userDao, businessDao, log)
+    /*
+       1. Extract business ID from event and get business from DB
+       2. If business is not found, user is not authed. Use userId as partition key to create new review
+    */
+    var business model.Business
+    // VendorReviewId is in the format of "accounts/BUSINESS_ACCOUNT_ID/locations/BUSINESS_ID/reviews/BUSINESS_REVIEW_ID"
+    businessId, err := bid.NewBusinessId(strings.Split(event.VendorReviewId, "/")[3])
     if err != nil {
-        log.Errorf("Error checking if user %s has completed oauth: %s", event.UserId, err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user has completed oauth"}`, StatusCode: 500}, nil
+        log.Errorf("Error parsing business ID from vendorReviewId '%s': %v", event.VendorReviewId, err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error parsing business ID from vendorReviewId"}`, StatusCode: 500}, nil
+    }
+    businessPtr, err := businessDao.GetBusiness(businessId)
+    if err != nil {
+        log.Errorf("Error getting business '%s': %v", businessId, err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting business"}`, StatusCode: 500}, nil
     }
 
-    businessId := event.UserId
-    if hasUserCompletedOauth {
-        log.Infof("User %s has completed oauth. Assigning its businessId '%s' as review partition key", event.UserId, *user.ActiveBusinessId)
-        businessId = *user.ActiveBusinessId
+    var review model.Review
+    if businessPtr == nil {
+        log.Infof("Business '%s' does not exist.", businessId)
+
+        if util.IsEmptyStringPtr(event.UserId) {
+            log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
+            return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
+        }
+        userId := *event.UserId
+
+        log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", userId)
+
+        reviewId, err := reviewDao.GetNextReviewIDByUserId(userId)
+        if err != nil {
+            log.Errorf("Error getting next review id for user %s: %v", userId, err)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
+        }
+
+        review, err = model.NewReview(userId, reviewId, event)
+        if err != nil {
+            log.Error("Validation error occurred during mapping to Review object: ", err)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
+        }
     } else {
-        log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", event.UserId)
+        business = *businessPtr
+
+        var reviewId rid.ReviewId
+        if !util.IsEmptyStringPtr(event.UserId) {
+            reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), *event.UserId)
+        } else {
+            reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), "stub_user_id")
+        }
+        if err != nil {
+            log.Errorf("Error getting next review id for business %s: %v", business.BusinessId, err)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
+        }
+
+        review, err = model.NewReview(business.BusinessId.String(), reviewId, event)
     }
 
-    reviewPtr, err := model.NewReview(businessId, event)
-    if err != nil {
-        log.Error("Validation error occurred during mapping to Review object: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
-    }
-    review := *reviewPtr
     // local testing: generate a new vendor review ID to prevent duplication
     if stage == enum.StageLocal.String() {
         review.VendorReviewId = uuid.New().String()
     }
 
-    log.Debug("Review object from request: ", jsonUtil.AnyToJson(review))
+    log.Debug("Storing new review object from request: ", jsonUtil.AnyToJson(review))
 
     // --------------------
     // store review
     // --------------------
-    nextReviewId, err := reviewDao.GetNextReviewID(review.BusinessId)
-    if err != nil {
-        log.Errorf("Error getting next review id for BusinessId %s: %v", review.BusinessId, err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
-    }
-
-    review.ReviewId = &nextReviewId
-
-    log.Debugf("Assigned review id %s to new review", nextReviewId.String())
-
-    err = reviewDao.CreateReview(review)
+    err = reviewDao.PutReview(review)
     if err != nil {
         log.Error("Error creating review: ", err)
 
@@ -125,56 +152,82 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
     }
 
-    // TODO: [INT-94] Send to all users in the business instead of relying on the userId defined in Zapier (legacy)
-    // --------------------
-    // validate user exists
-    // --------------------
-    if user == nil {
-        log.Error("User does not exist: ", review.UserId)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "User does not exist"}`, StatusCode: 400}, nil
-    }
-
-    log.Debugf("User %s exists, proceeding", review.UserId)
-
     // --------------------------------
     // forward to LINE by calling LINE messaging API
     // --------------------------------
-    line := lineUtil.NewLine(log)
-
-    err = line.SendNewReview(review, *user)
-    if err != nil {
-        log.Errorf("Error sending new review to LINE user %s: %s", user.UserId, jsonUtil.AnyToJson(err))
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE"}`, StatusCode: 500}, nil
-    }
-
-    log.Debugf("Successfully sent new review to LINE user: '%s'", user.UserId)
-
-    if user.ActiveBusinessId == nil {
-        log.Errorf("User %s has no active business. Cannot perform auto reply", user.UserId)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "User has no active business. Cannot perform auto reply"}`, StatusCode: 200}, nil
-    }
-
-    autoQuickReplyEnabled := business.AutoQuickReplyEnabled
-    quickReplyMessage := business.QuickReplyMessage
-
-    if autoQuickReplyEnabled && util.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
-        if quickReplyMessage == nil {
-            log.Error("User has autoQuickReplyEnabled but no quickReplyMessage: %s", user.UserId)
-            return events.LambdaFunctionURLResponse{
-                Body: `{"message": "Error getting quick reply message"}`, StatusCode: 501}, nil
-        }
-
-        lambdaReturn, err := lineEventProcessor.ReplyReview(
-            business.BusinessId,
-            user.UserId, nil, *quickReplyMessage, review, reviewDao, line, log, true)
+    if businessPtr != nil {
+        business = *businessPtr
+        err = line.SendNewReview(review, business, userDao)
         if err != nil {
-            return lambdaReturn, err
+            log.Errorf("Error sending new review to users of business '%s': %s", business.BusinessId, err)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE users of business"}`, StatusCode: 500}, nil
+        }
+        log.Info("Successfully sent new review to all users belonging to business: ", business.BusinessId)
+    } else {
+        if util.IsEmptyStringPtr(event.UserId) {
+            log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
+            return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
+        }
+        userId := *event.UserId
+
+        err = line.SendNewReviewToUser(review, userId)
+        if err != nil {
+            log.Errorf("Error sending new review to user '%s': %s", userId, err)
+            return events.LambdaFunctionURLResponse{Body: `{"message": "Error sending new review to LINE user"}`, StatusCode: 500}, nil
+        }
+        log.Info("Successfully sent new review to user: ", userId)
+    }
+
+    // --------------------------------
+    // auto reply
+    // --------------------------------
+    if businessPtr != nil {
+        autoQuickReplyEnabled := business.AutoQuickReplyEnabled
+        quickReplyMessagePtr := business.QuickReplyMessage
+
+        if autoQuickReplyEnabled && util.IsEmptyStringPtr(quickReplyMessagePtr) {
+            log.Errorf("AutoQuickReplyEnabled set to true but no quickReplyMessage")
+            return events.LambdaFunctionURLResponse{
+                Body: `{"message": "Error getting quick reply message"}`, StatusCode: 500}, nil
         }
 
-        log.Infof("Successfully auto replied review for user ID '%s' for review ID '%s'",
-            user.UserId, review.ReviewId.String())
+        if autoQuickReplyEnabled && util.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
+            quickReplyMessage := *quickReplyMessagePtr
+            err = lineEventProcessor.ReplyReview(util.AutoReplyUserId, quickReplyMessage, review, reviewDao, log)
+            if err != nil {
+                log.Errorf("Error handling replying '%s' to review '%s' : %v", quickReplyMessage, review.ReviewId.String(), err)
 
-        return lambdaReturn, nil
+                notifyUserErr := line.NotifyUsersReplyFailed(business.UserIds, review.ReviewerName, true)
+                if notifyUserErr != nil {
+                    log.Errorf("Error notifying users of business '%s' reply failed for review '%s': %v", businessId, review.ReviewId.String(), notifyUserErr)
+                    return events.LambdaFunctionURLResponse{
+                        StatusCode: 500,
+                        Body:       fmt.Sprintf(`{"error": "Auto reply failed: %s. Failed to notify user of failure: %s"}`, err, notifyUserErr),
+                    }, nil
+                }
+
+                log.Infof("Successfully notified users of business '%s' auto reply failed for review '%s'", businessId, review.ReviewId.String())
+
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Reply failed: %s"}`, err),
+                }, err
+            }
+
+            // --------------------
+            // Notify review quick replied
+            // --------------------
+            err = line.NotifyReviewAutoReplied(review, quickReplyMessage, business, userDao)
+            if err != nil {
+                log.Errorf("Error sending review reply notification to all users of business '%s': %v", business.BusinessId, err)
+                return events.LambdaFunctionURLResponse{
+                    StatusCode: 500,
+                    Body:       fmt.Sprintf(`{"error": "Failed to send review reply notification to all users of business '%s': %v"}`, business.BusinessId, err),
+                }, err
+            }
+
+            log.Infof("Successfully auto replied review for business '%s' for review '%s'", business.BusinessId, review.ReviewId.String())
+        }
     }
 
     log.Info("Successfully processed new review event: ", jsonUtil.AnyToJson(review))

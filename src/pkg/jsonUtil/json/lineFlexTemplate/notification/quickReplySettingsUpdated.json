@@ -1,0 +1,72 @@
+{
+    "type": "bubble",
+    "hero": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "{BUSINESS_NAME}",
+                "size": "lg",
+                "wrap": true,
+                "margin": "lg",
+                "style": "normal",
+                "align": "center",
+                "color": "#FFFFFFFF",
+                "offsetBottom": "sm"
+            }
+        ],
+        "backgroundColor": "#5e6fbd"
+    },
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "快速回覆設定更新通知",
+                "weight": "bold",
+                "size": "xl",
+                "margin": "md"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "lg",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "更新人：",
+                                "size": "sm",
+                                "flex": 0,
+                                "color": "#666666"
+                            },
+                            {
+                                "type": "text",
+                                "text": "{UPDATER_NAME}",
+                                "wrap": true,
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "styles": {
+        "body": {
+            "backgroundColor": "#F5F5F5"
+        },
+        "footer": {
+            "separator": true,
+            "backgroundColor": "#8fa6cc"
+        }
+    }
+}

@@ -8,8 +8,10 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
+    "github.com/cenkalti/backoff/v4"
     "github.com/sashabaranov/go-openai"
     "go.uber.org/zap"
+    "time"
 )
 
 type Ai struct {
@@ -27,54 +29,73 @@ func NewAi(logger *zap.SugaredLogger) *Ai {
 func (ai *Ai) GenerateReply(review string, business model.Business, user model.User) (string, error) {
     temp := 1.12
     prompt := ai.buildPrompt(business, user)
+    totalPromptTokens := 0
+    totalCompletionTokens := 0
 
-    response, err := ai.gptClient.CreateChatCompletion(
-        context.Background(),
-        openai.ChatCompletionRequest{
-            Temperature: float32(temp),
-            MaxTokens:   256,
-            Model:       openai.GPT4,
-            Messages: []openai.ChatCompletionMessage{
-                {
-                    Role:    openai.ChatMessageRoleSystem,
-                    Content: prompt,
-                },
-                {
-                    Role:    openai.ChatMessageRoleUser,
-                    Content: review,
+    operation := func() (openai.ChatCompletionResponse, error) {
+        response, err := ai.gptClient.CreateChatCompletion(
+            context.Background(),
+            openai.ChatCompletionRequest{
+                Temperature: float32(temp),
+                MaxTokens:   512,
+                Model:       openai.GPT4,
+                Messages: []openai.ChatCompletionMessage{
+                    {
+                        Role:    openai.ChatMessageRoleSystem,
+                        Content: prompt,
+                    },
+                    {
+                        Role:    openai.ChatMessageRoleUser,
+                        Content: review,
+                    },
                 },
             },
-        },
-    )
-    if err != nil {
-        e := &openai.APIError{}
-        if errors.As(err, &e) {
-            switch e.HTTPStatusCode {
-            case 401:
-                ai.log.Error("Error generating AI reply due to invalid API key: ", err)
-            case 429:
-                // rate limiting or engine overload (wait and retry)
-                ai.log.Error("Error generating AI reply due to rate limit exceeded: ", err)
-                // TODO: [INT-62] add retry
-            case 500:
-                ai.log.Error("Error generating AI reply due to OpenAI internal server error: ", err)
-                // TODO: [INT-62] add retry
-            default:
-                ai.log.Error("Error generating AI reply due to unknown error: ", err)
+        )
+        if err != nil {
+            // Increment the counters
+            totalPromptTokens += response.Usage.PromptTokens
+            totalCompletionTokens += response.Usage.CompletionTokens
+
+            e := &openai.APIError{}
+            if errors.As(err, &e) {
+                switch e.HTTPStatusCode {
+                case 401:
+                    ai.log.Error("Error generating AI reply due to invalid API key: ", err)
+                    return response, backoff.Permanent(err)
+                case 429, 502:
+                    // rate limiting or bad gateway (retry these errors)
+                    ai.log.Error("Error generating AI reply. Retrying: ", err)
+                    return response, err
+                default:
+                    ai.log.Error("Error generating AI reply due to unknown error: ", err)
+                    return response, backoff.Permanent(err) // Permanent error, no retry
+                }
             }
+            return response, err
         }
 
+        totalPromptTokens += response.Usage.PromptTokens
+        totalCompletionTokens += response.Usage.CompletionTokens
+        return response, nil
+    }
+
+    backoffPolicy := backoff.NewExponentialBackOff()
+    backoffPolicy.InitialInterval = 1 * time.Millisecond
+    response, err := backoff.RetryNotifyWithData(operation, backoffPolicy, func(err error, duration time.Duration) {
+        ai.log.Error("Retrying due to error: ", err, ". Next attempt in ", duration)
+    })
+    if err != nil {
+        ai.log.Errorf("Generating AI reply failed: %s", err)
         return "", err
     }
 
     // response format: https://platform.openai.com/docs/guides/gpt/completions-response-format
     if response.Choices[0].FinishReason != openai.FinishReasonStop {
-        ai.log.Error("Error generating AI reply due to failure finish reason: %s", jsonUtil.AnyToJson(response.Choices[0]))
-        return response.Choices[0].Message.Content, errors.New(response.Choices[0].Message.Content)
+        ai.log.Errorf("Error generating AI reply due to failure finish reason: %s", jsonUtil.AnyToJson(response.Choices[0]))
+        return "", errors.New(response.Choices[0].Message.Content)
     }
 
-    ai.log.Infof("AI reply used %d input tokens and %d output tokens", response.Usage.PromptTokens, response.Usage.CompletionTokens)
-
+    ai.log.Infof("AI reply used %d input tokens and %d output tokens", totalPromptTokens, totalCompletionTokens)
     return response.Choices[0].Message.Content, nil
 }
 
