@@ -1,0 +1,66 @@
+{
+  "type": "bubble",
+  "hero": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "{BUSINESS_NAME}",
+        "size": "lg",
+        "wrap": true,
+        "margin": "lg",
+        "style": "normal",
+        "align": "center",
+        "color": "#FFFFFFFF",
+        "offsetBottom": "sm"
+      }
+    ],
+    "backgroundColor": "#5e6fbd"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "{MONTH}月報告",
+        "weight": "bold",
+        "size": "xl",
+        "margin": "md",
+        "wrap": true
+      },
+      {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "{SECTION_NAME}",
+            "weight": "bold",
+            "size": "lg",
+            "margin": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "{SECTION_BODY}",
+            "wrap": true,
+            "size": "sm",
+            "flex": 5,
+            "margin": "md"
+          }
+        ]
+      }
+    ]
+  },
+  "styles": {
+    "body": {
+      "backgroundColor": "#F5F5F5"
+    },
+    "footer": {
+      "separator": true,
+      "backgroundColor": "#8fa6cc"
+    }
+  }
+}

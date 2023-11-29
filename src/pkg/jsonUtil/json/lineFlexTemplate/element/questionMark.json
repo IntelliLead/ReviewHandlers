@@ -1,0 +1,11 @@
+{
+    "type": "image",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Icon-round-Question_mark.svg/200px-Icon-round-Question_mark.svg.png",
+    "size": "25%",
+    "gravity": "center",
+    "action": {
+        "type": "postback",
+        "label": "action",
+        "data": "/data/postback"
+    }
+}

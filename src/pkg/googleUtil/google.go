@@ -2,6 +2,8 @@ package googleUtil
 
 import (
     "context"
+    "encoding/json"
+    "fmt"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
@@ -10,11 +12,15 @@ import (
     "go.uber.org/zap"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
+    "google.golang.org/api/businessprofileperformance/v1"
     "google.golang.org/api/googleapi"
     "google.golang.org/api/mybusinessaccountmanagement/v1"
     "google.golang.org/api/mybusinessbusinessinformation/v1"
     googleOauth "google.golang.org/api/oauth2/v2"
     "google.golang.org/api/option"
+    "io"
+    "net/http"
+    "time"
 )
 
 type GoogleClient struct {
@@ -108,6 +114,7 @@ func (g *GoogleClient) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
 func (g *GoogleClient) GetBusinessAccountAndLocations() (mybusinessaccountmanagement.Account, []mybusinessbusinessinformation.Location, error) {
     accounts, err := g.ListBusinessAccounts()
     if err != nil {
+        g.log.Errorf("Error listing Google business accounts in GetBusinessAccountAndLocations(): %s", err)
         return mybusinessaccountmanagement.Account{}, []mybusinessbusinessinformation.Location{}, err
     }
     var account mybusinessaccountmanagement.Account
@@ -133,6 +140,11 @@ func (g *GoogleClient) GetBusinessAccountAndLocations() (mybusinessaccountmanage
 
 func (g *GoogleClient) ListBusinessLocations(account mybusinessaccountmanagement.Account) ([]mybusinessbusinessinformation.Location, error) {
     businessInfoClient, err := mybusinessbusinessinformation.NewService(context.Background(), option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
+    if err != nil {
+        g.log.Errorf("Error creating Google business information service client in GetBusinessAccountAndLocations(): %s", err)
+        return []mybusinessbusinessinformation.Location{}, err
+    }
+
     accountId := account.Name
     locationsGoogleReq := businessInfoClient.Accounts.Locations.List(accountId)
     locationsResp, err := locationsGoogleReq.Do(googleapi.QueryParameter("readMask", "name,title,storeCode,languageCode,categories,labels,openInfo,profile,serviceArea,serviceItems,storeCode,storefrontAddress"))
@@ -170,4 +182,110 @@ func (g *GoogleClient) ListBusinessAccounts() ([]mybusinessaccountmanagement.Acc
     }
 
     return accounts, nil
+}
+
+// ListReviews retrieves all reviews for a given location, from current time to the earliestDate
+func (g *GoogleClient) ListReviews(account string, location string, earliestDate time.Time) ([]GoogleReview, error) {
+    client := g.config.Client(context.Background(), &g.Token)
+
+    var allReviews []GoogleReview
+    var pageToken string
+
+    for {
+        // 50 is the max page size: https://developers.google.com/my-business/reference/rest/v4/accounts.locations.reviews/list
+        // default sort order is updateTime desc
+        url := fmt.Sprintf("https://mybusiness.googleapis.com/v4/accounts/%s/locations/%s/reviews?pageSize=50", account, location)
+        if pageToken != "" {
+            url += "&pageToken=" + pageToken
+        }
+
+        httpResp, err := client.Get(url)
+        if err != nil {
+            g.log.Errorf("Error making request to Google API: %s", err)
+            return nil, err
+        }
+        defer httpResp.Body.Close()
+        if httpResp.StatusCode != http.StatusOK {
+            g.log.Errorf("Non-OK HTTP status: %d", httpResp.StatusCode)
+            return nil, fmt.Errorf("received non-OK status code: %d", httpResp.StatusCode)
+        }
+        body, err := io.ReadAll(httpResp.Body)
+        if err != nil {
+            g.log.Errorf("Error reading response body: %s", err)
+            return nil, err
+        }
+
+        var response GoogleReviewsResponse
+        err = json.Unmarshal(body, &response)
+        if err != nil {
+            g.log.Errorf("Error unmarshalling Google business reviews response body in ListReviews() with request: %s", err)
+        }
+
+        for idx, review := range response.Reviews {
+            if review.UpdateTime.Before(earliestDate) {
+                allReviews = append(allReviews, response.Reviews[:idx]...)
+                return allReviews, nil
+            }
+        }
+        allReviews = append(allReviews, response.Reviews...)
+
+        if response.NextPageToken == "" {
+            break
+        }
+        pageToken = response.NextPageToken
+    }
+
+    return allReviews, nil
+}
+
+func (g *GoogleClient) ListPerformanceMetrics(businessId string, earliestDate time.Time) ([]PerformanceMetric, error) {
+    client, err := businessprofileperformance.NewService(context.Background(),
+        option.WithTokenSource(g.config.TokenSource(context.Background(), &g.Token)))
+    if err != nil {
+        g.log.Error("Error creating Google business profile performance service client: ", err)
+        return nil, err
+    }
+
+    now := time.Now()
+    response, err := client.Locations.FetchMultiDailyMetricsTimeSeries(fmt.Sprintf("locations/%s", businessId)).
+        DailyMetrics(DailyMetric.Strings(0)...). // exclude DailyMetricUnknown
+        DailyRangeStartDateDay(int64(earliestDate.Day())).
+        DailyRangeStartDateMonth(int64(earliestDate.Month())).
+        DailyRangeStartDateYear(int64(earliestDate.Year())).
+        DailyRangeEndDateDay(int64(now.Day())).
+        DailyRangeEndDateMonth(int64(now.Month())).
+        DailyRangeEndDateYear(int64(now.Year())).
+        Do()
+    if err != nil {
+        g.log.Errorf("Error getting Google business profile performance metrics in ListPerformanceMetrics(): %s", err)
+        return nil, err
+    }
+
+    metricsByDate := make(map[time.Time]map[DailyMetric]int, len(response.MultiDailyMetricTimeSeries[0].DailyMetricTimeSeries[0].TimeSeries.DatedValues))
+    for _, timeSeries := range response.MultiDailyMetricTimeSeries[0].DailyMetricTimeSeries {
+        dailyMetric, err := ToDailyMetric(timeSeries.DailyMetric)
+        if err != nil {
+            g.log.Errorf("Error converting daily metric in ListPerformanceMetrics(): %s", err)
+            return nil, err
+        }
+
+        for _, point := range timeSeries.TimeSeries.DatedValues {
+            date := time.Date(int(point.Date.Year), time.Month(point.Date.Month), int(point.Date.Day), 0, 0, 0, 0, time.UTC)
+            if metricsByDate[date] == nil {
+                metricsByDate[date] = make(map[DailyMetric]int)
+            }
+
+            metricsByDate[date][dailyMetric] = int(point.Value)
+        }
+    }
+
+    var performanceMetrics []PerformanceMetric
+    for date, metrics := range metricsByDate {
+        performanceMetrics = append(performanceMetrics, PerformanceMetric{
+            Date:    date,
+            Metrics: metrics,
+        })
+    }
+
+    return performanceMetrics, nil
 }

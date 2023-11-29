@@ -110,3 +110,7 @@ func IsNumericString(s string) bool {
     }
     return true
 }
+
+func ReplaceNewLines(s string) string {
+    return strings.ReplaceAll(s, "\n", "\t")
+}
