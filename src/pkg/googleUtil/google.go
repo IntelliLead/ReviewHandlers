@@ -2,10 +2,8 @@ package googleUtil
 
 import (
     "context"
+    jsonUtil2 "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
     "golang.org/x/oauth2"
@@ -97,38 +95,11 @@ func (g *GoogleClient) GetGoogleUserInfo() (*googleOauth.Userinfo, error) {
     req := googleOauthClient.Userinfo.Get()
     resp, err := req.Do()
     if err != nil {
-        g.log.Errorf("Error getting Google user info in GetGoogleUserInfo() with request %s: %s", jsonUtil.AnyToJson(req), err)
+        g.log.Errorf("Error getting Google user info in GetGoogleUserInfo() with request %s: %s", jsonUtil2.AnyToJson(req), err)
         return nil, err
     }
 
     return resp, nil
-}
-
-// GetBusinessAccountAndLocations retrieves the business location for the user and business account ID
-func (g *GoogleClient) GetBusinessAccountAndLocations() (mybusinessaccountmanagement.Account, []mybusinessbusinessinformation.Location, error) {
-    accounts, err := g.ListBusinessAccounts()
-    if err != nil {
-        return mybusinessaccountmanagement.Account{}, []mybusinessbusinessinformation.Location{}, err
-    }
-    var account mybusinessaccountmanagement.Account
-    switch len(accounts) {
-    case 0:
-        g.log.Warn("User has no Google business accounts")
-        return mybusinessaccountmanagement.Account{}, []mybusinessbusinessinformation.Location{}, err
-    case 1:
-        account = accounts[0]
-    default:
-        g.log.Warn("User has multiple Google business accounts. Using the first one: ", jsonUtil.AnyToJson(accounts))
-        metric.EmitMetric(enum2.MetricMultipleBusinessAccounts, 1.0)
-        account = accounts[0]
-    }
-
-    locations, err := g.ListBusinessLocations(account)
-    if err != nil {
-        return mybusinessaccountmanagement.Account{}, []mybusinessbusinessinformation.Location{}, err
-    }
-
-    return account, locations, nil
 }
 
 func (g *GoogleClient) ListBusinessLocations(account mybusinessaccountmanagement.Account) ([]mybusinessbusinessinformation.Location, error) {
@@ -137,7 +108,7 @@ func (g *GoogleClient) ListBusinessLocations(account mybusinessaccountmanagement
     locationsGoogleReq := businessInfoClient.Accounts.Locations.List(accountId)
     locationsResp, err := locationsGoogleReq.Do(googleapi.QueryParameter("readMask", "name,title,storeCode,languageCode,categories,labels,openInfo,profile,serviceArea,serviceItems,storeCode,storefrontAddress"))
     if err != nil {
-        g.log.Errorf("Error listing Google business locations in GetBusinessAccountAndLocations() with request %s: %s", jsonUtil.AnyToJson(locationsGoogleReq), err)
+        g.log.Errorf("Error listing Google business locations in GetBusinessAccountAndLocations() with request %s: %s", jsonUtil2.AnyToJson(locationsGoogleReq), err)
         return []mybusinessbusinessinformation.Location{}, err
     }
 
@@ -159,10 +130,10 @@ func (g *GoogleClient) ListBusinessAccounts() ([]mybusinessaccountmanagement.Acc
     listAccountsReq := mybusinessaccountmanagementService.Accounts.List()
     resp, err := listAccountsReq.Do()
     if err != nil {
-        g.log.Errorf("Error listing Google business accounts in GetBusinessAccountAndLocations() with request %s: %s", jsonUtil.AnyToJson(listAccountsReq), err)
+        g.log.Errorf("Error listing Google business accounts in GetBusinessAccountAndLocations() with request %s: %s", jsonUtil2.AnyToJson(listAccountsReq), err)
     }
 
-    g.log.Debug("Retrieved accounts: ", jsonUtil.AnyToJson(resp.Accounts))
+    g.log.Debug("Retrieved accounts: ", jsonUtil2.AnyToJson(resp.Accounts))
 
     accounts := make([]mybusinessaccountmanagement.Account, len(resp.Accounts))
     for i, p := range resp.Accounts {

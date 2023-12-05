@@ -3,16 +3,17 @@ package main
 import (
     "context"
     "errors"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/logger"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/exception"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -291,7 +292,7 @@ func updateUser(
         var actions []dbModel.AttributeAction
         var err error
         // TODO: [INT-91] Remove backfill logic once all users have completed googleMetadata migration
-        if util.IsEmptyString(userPtr.Google.Id) {
+        if stringUtil.IsEmptyString(userPtr.Google.Id) {
             log.Infof("User %s does not have Google metadata. Creating.", userId)
             action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google", googleMetadata)
             if err != nil {
@@ -317,7 +318,7 @@ func updateUser(
         // find businessIds not in user's businessIds
         var businessIdsToAssociateUser []bid.BusinessId
         for _, businessId := range businessIds {
-            if !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+            if !stringUtil.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
                 businessIdsToAssociateUser = append(businessIdsToAssociateUser, businessId)
             }
         }

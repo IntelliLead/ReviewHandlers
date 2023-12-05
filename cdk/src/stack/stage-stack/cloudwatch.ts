@@ -1,4 +1,10 @@
-import { StackCreationInfo, STAGE } from 'common-cdk';
+import {
+    PREPROD_SLACK_CHANNEL_ID,
+    PROD_SLACK_CHANNEL_ID,
+    SLACK_WORKSPACE_ID,
+    StackCreationInfo,
+    STAGE,
+} from 'common-cdk';
 import { Duration, Stack } from 'aws-cdk-lib';
 import { LambdaStack } from './lambda';
 import { Construct } from 'constructs';
@@ -7,7 +13,6 @@ import { SlackChannelConfiguration } from 'aws-cdk-lib/aws-chatbot';
 import { GoFunction } from '@aws-cdk/aws-lambda-go-alpha';
 import { Dashboard, GraphWidget, Metric, TextWidget, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { SnsAction } from 'aws-cdk-lib/aws-cloudwatch-actions';
-import { PREPROD_SLACK_CHANNEL_ID, PROD_SLACK_CHANNEL_ID, SLACK_WORKSPACE_ID } from '../../constant';
 import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
 
 export interface CloudwatchStackProps {

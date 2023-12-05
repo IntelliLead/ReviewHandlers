@@ -4,9 +4,10 @@ import (
     "context"
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/cenkalti/backoff/v4"
     "github.com/sashabaranov/go-openai"
@@ -112,7 +113,7 @@ func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
     businessPrompt, emojiPrompt, keywordsPrompt, serviceRecommendationPrompt, signaturePrompt := "", "", "", "", ""
 
     // business prompt
-    if !util.IsEmptyStringPtr(businessDescription) {
+    if !stringUtil.IsEmptyStringPtr(businessDescription) {
         businessPrompt = fmt.Sprintf(util.BusinessDescriptionPromptFormat, *businessDescription)
     }
 
@@ -123,7 +124,7 @@ func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
 
     // service recommendation prompt
     if user.ServiceRecommendationEnabled {
-        if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+        if stringUtil.IsEmptyStringPtr(user.ServiceRecommendation) {
             serviceRecommendationPrompt = fmt.Sprintf(util.ServiceRecommendationPromptFormat, "")
         } else {
             serviceRecommendationPrompt = fmt.Sprintf(
@@ -133,7 +134,7 @@ func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
 
     // keyword prompt
     if keywordEnabled {
-        if util.IsEmptyStringPtr(keywords) {
+        if stringUtil.IsEmptyStringPtr(keywords) {
             ai.log.Errorf("Keywords is empty for business %s user %s but keyword is enabled", business.BusinessId, user.UserId)
         } else {
             keywordsPrompt = fmt.Sprintf(util.KeywordPromptFormat, *keywords)
@@ -142,7 +143,7 @@ func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
 
     // signature prompt
     if user.SignatureEnabled {
-        if util.IsEmptyStringPtr(user.Signature) {
+        if stringUtil.IsEmptyStringPtr(user.Signature) {
             ai.log.Errorf("Signature is empty for user %s but signature is enabled", user.UserId)
         } else {
             signaturePrompt = fmt.Sprintf(util.SignaturePrompt, *user.Signature)

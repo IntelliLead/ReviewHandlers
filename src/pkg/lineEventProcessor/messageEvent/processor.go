@@ -2,13 +2,14 @@ package messageEvent
 
 import (
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -222,7 +223,7 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of update (skip notifying self)
-        err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
+        err = line.NotifyQuickReplySettingsUpdated(stringUtil.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
         }
@@ -259,7 +260,7 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of toggle (skip notifying self)
-        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
+        err = line.NotifyAiReplySettingsUpdated(stringUtil.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
@@ -313,7 +314,7 @@ func ProcessMessageEvent(
         }
 
         // notify all other users of toggle (skip notifying self)
-        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(updatedBusiness.UserIds, userId), user.LineUsername, updatedBusiness.BusinessName)
+        err = line.NotifyAiReplySettingsUpdated(stringUtil.RemoveStringFromSlice(updatedBusiness.UserIds, userId), user.LineUsername, updatedBusiness.BusinessName)
         if err != nil {
             log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
         }
@@ -437,7 +438,7 @@ func ProcessMessageEvent(
         }, nil
 
     default:
-        // handle unknown message from user
+        // handle unknown messages from user
         err = line.ReplyUnknownResponseReply(event.ReplyToken)
         if err != nil {
             log.Error("Error executing ReplyUnknownResponseReply: ", err)

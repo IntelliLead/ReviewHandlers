@@ -60,18 +60,5 @@ export class VpcStack extends Stack {
                 resources: ['*'],
             })
         );
-
-        //
-        // const bucketGatewayEndpoint = this.vpc.addGatewayEndpoint('bucketGatewayEndpoint', {
-        //     service: GatewayVpcEndpointAwsService.S3,
-        // });
-        //
-        // bucketGatewayEndpoint.addToPolicy(
-        //     new PolicyStatement({
-        //         principals: [new AnyPrincipal()],
-        //         actions: ['s3:*'],
-        //         resources: ['*'],
-        //     })
-        // );
     }
 }

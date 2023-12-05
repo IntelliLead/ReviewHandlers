@@ -1,12 +1,12 @@
 package lineEventProcessor
 
 import (
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil"
-    zapierModel "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil/model"
+    model2 "github.com/IntelliLead/ReviewHandlers/src/pkg/zapierUtil/model"
     "go.uber.org/zap"
     "time"
 )
@@ -23,7 +23,7 @@ func ReplyReview(
         // post reply to zapier
         // --------------------
         zapier := zapierUtil.NewZapier(log)
-        zapierEvent := zapierModel.ReplyToZapierEvent{
+        zapierEvent := model2.ReplyToZapierEvent{
             VendorReviewId: review.VendorReviewId,
             Message:        replyMessage,
         }

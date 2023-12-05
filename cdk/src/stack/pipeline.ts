@@ -1,13 +1,10 @@
-import {
-    getEnvFromStackCreationInfo, IntellileadPipeline, IntelliLeadPipelineProps
-} from "common-cdk";
+import { getEnvFromStackCreationInfo, IntellileadPipeline, IntelliLeadPipelineProps } from 'common-cdk';
 import { Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { SERVICE_NAME } from '../constant';
 import { DeploymentStacks } from './deployment-stacks';
 
 export class PipelineStack extends Stack {
-
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
 
@@ -21,22 +18,35 @@ export class PipelineStack extends Stack {
             trackingPackages: [
                 {
                     package: 'ReviewHandlers',
-                    branch: 'main',
+                    goDependencies: [
+                        {
+                            package: 'CoreCommonUtil',
+                        },
+                        {
+                            package: 'CoreDataAccess',
+                        },
+                    ],
+                },
+                {
+                    package: 'CoreCommonUtil',
+                },
+                {
+                    package: 'CoreDataAccess',
+                    goDependencies: [
+                        {
+                            package: 'CoreCommonUtil',
+                        },
+                    ],
                 },
                 {
                     package: 'CommonCDK',
-                    branch: 'main',
                 },
             ],
         };
 
-        const pipeline = new IntellileadPipeline(
-            this,
-            `${SERVICE_NAME}-Pipeline`,
-            pipelineProps,
-        );
+        const pipeline = new IntellileadPipeline(this, `${SERVICE_NAME}-Pipeline`, pipelineProps);
 
-        pipeline.deploymentGroupCreationProps.forEach(stageProps => {
+        pipeline.deploymentGroupCreationProps.forEach((stageProps) => {
             const { stackCreationInfo } = stageProps;
 
             const deploymentStacks = new DeploymentStacks(
@@ -45,20 +55,14 @@ export class PipelineStack extends Stack {
                 {
                     stackCreationInfo,
                     env: getEnvFromStackCreationInfo(stackCreationInfo),
-                },
+                }
             );
 
-            pipeline.addDeploymentStage(
-                stackCreationInfo,
-                deploymentStacks,
-            );
+            pipeline.addDeploymentStage(stackCreationInfo, deploymentStacks);
         });
 
         pipeline.pipeline.buildPipeline();
 
         return pipeline;
     }
-
 }
-
-

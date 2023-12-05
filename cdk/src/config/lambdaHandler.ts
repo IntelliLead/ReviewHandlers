@@ -4,3 +4,8 @@ export enum LambdaHandlerName {
     NEW_REVIEW_EVENT_HANDLER = 'newReviewEventHandler',
     AUTH_HANDLER = 'authHandler',
 }
+
+export enum LambdaLanguage {
+    PYTHON = 'python',
+    GO = 'go',
+}

@@ -1,8 +1,8 @@
 package googleUtil
 
 import (
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "golang.org/x/oauth2"
     "google.golang.org/api/mybusinessbusinessinformation/v1"
 )

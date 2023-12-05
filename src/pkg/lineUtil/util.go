@@ -2,13 +2,21 @@ package lineUtil
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreCommonUtil/timeUtil"
+    util2 "github.com/IntelliLead/CoreCommonUtil/util"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    _type "github.com/IntelliLead/CoreDataAccess/model/type"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
+    jsonUtil2 "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    model2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "net/url"
+    "strconv"
 )
 
 const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。"
@@ -100,7 +108,7 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
 
     // update quick reply message text box
     quickReplyMessageDisplayed := " "
-    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+    if !stringUtil.IsEmptyStringPtr(business.QuickReplyMessage) {
         quickReplyMessageDisplayed = *business.QuickReplyMessage
     }
     // contents[0] -> body -> contents[2] -> contents[1] -> contents[0] -> text
@@ -148,7 +156,7 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
     (map[string]interface{})["data"] = autoQuickReplyTogglePostbackData
 
     // update other business bubbles
-    otherBusinessBubbleTemplate, err := util.DeepCopy(jsonMap["contents"].([]interface{})[1])
+    otherBusinessBubbleTemplate, err := util2.DeepCopy(jsonMap["contents"].([]interface{})[1])
     if err != nil {
         l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
         return nil, err
@@ -160,7 +168,7 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
             continue
         }
 
-        otherBusinessJsonMap, _ := util.DeepCopy(otherBusinessBubbleTemplate)
+        otherBusinessJsonMap, _ := util2.DeepCopy(otherBusinessBubbleTemplate)
 
         // update business name
         // otherBusinessJsonMap -> body -> contents[0] -> text
@@ -195,7 +203,7 @@ func (l *Line) buildQuickReplySettingsFlexMessage(business model.Business) (line
 
     // update quick reply message text box
     quickReplyMessageDisplayed := " "
-    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+    if !stringUtil.IsEmptyStringPtr(business.QuickReplyMessage) {
         quickReplyMessageDisplayed = *business.QuickReplyMessage
     }
     // body -> contents[2] -> contents[1] -> contents[0] -> text
@@ -249,7 +257,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update business name if exist
-    if util.IsEmptyStringPtr(businessName) {
+    if stringUtil.IsEmptyStringPtr(businessName) {
         delete(jsonMap, "hero")
     } else {
         jsonMap["hero"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["text"] = *businessName
@@ -257,7 +265,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
 
     // update review message
     var reviewMessage string
-    isEmptyReview := util.IsEmptyStringPtr(review.Review)
+    isEmptyReview := stringUtil.IsEmptyStringPtr(review.Review)
     if isEmptyReview {
         reviewMessage = "（無文字內容）"
     } else {
@@ -271,7 +279,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update stars
-    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
+    starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
     if err != nil {
         l.log.Error("Error creating starRating JSON: ", err)
         return nil, err
@@ -284,7 +292,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update review time
-    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    readableReviewTimestamp, err := timeUtil.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
         l.log.Error("Error converting review timestamp to readable format: ", err)
         return nil, err
@@ -315,7 +323,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update edit reply button
-    urid, err := model.NewUserReviewId(&businessIdIndex, review.ReviewId)
+    urid, err := model2.NewUserReviewId(&businessIdIndex, review.ReviewId)
     if err != nil {
         l.log.Error("Error creating UserReviewId: ", err)
         return nil, err
@@ -330,7 +338,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     }
 
     // update AI reply button
-    // // remove AI reply button (3rd element in contents array) if review is empty
+    // // remove AI reply button (3rd element in the contents array) if review is empty
     if isEmptyReview {
         if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
             if contentsArr, ok := contents.([]interface{}); ok {
@@ -347,7 +355,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     // must be done LAST because it will remove the quick reply button if the quick reply message is empty
     if contents, ok := jsonMap["footer"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
-            if util.IsEmptyString(quickReplyMessage) {
+            if stringUtil.IsEmptyString(quickReplyMessage) {
                 // remove quick reply button
                 jsonMap["footer"].(map[string]interface{})["contents"] = append(contentsArr[1:])
             } else {
@@ -371,12 +379,12 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
         return nil, err
     }
 
-    // remove hero section because we do not have business name
+    // remove the hero section because we do not have a business name
     delete(jsonMap, "hero")
 
     // update review message
     var reviewMessage string
-    isEmptyReview := util.IsEmptyStringPtr(review.Review)
+    isEmptyReview := stringUtil.IsEmptyStringPtr(review.Review)
     if isEmptyReview {
         reviewMessage = "（無文字內容）"
     } else {
@@ -390,7 +398,7 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
     }
 
     // update stars
-    starRatingJsonArr, err := review.NumberRating.LineFlexTemplateJson()
+    starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
     if err != nil {
         l.log.Error("Error creating starRating JSON: ", err)
         return nil, err
@@ -403,7 +411,7 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
     }
 
     // update review time
-    readableReviewTimestamp, err := util.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
+    readableReviewTimestamp, err := timeUtil.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
         l.log.Error("Error converting review timestamp to readable format: ", err)
         return nil, err
@@ -468,7 +476,7 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = aiReply
 
-    // update generate author name
+    // update generates author name
     // body -> contents[4] -> contents[1] -> text
     jsonMap["body"].
     (map[string]interface{})["contents"].([]interface{})[4].
@@ -527,7 +535,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
 
     // substitute business description
     var businessDescription string
-    if util.IsEmptyStringPtr(business.BusinessDescription) {
+    if stringUtil.IsEmptyStringPtr(business.BusinessDescription) {
         businessDescription = " "
     } else {
         businessDescription = *business.BusinessDescription
@@ -591,7 +599,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
 
     // substitute signature
     var signature string
-    if util.IsEmptyStringPtr(user.Signature) {
+    if stringUtil.IsEmptyStringPtr(user.Signature) {
         signature = " "
     } else {
         signature = *user.Signature
@@ -638,7 +646,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
 
     // substitute keywords
     var keywords string
-    if util.IsEmptyStringPtr(business.Keywords) {
+    if stringUtil.IsEmptyStringPtr(business.Keywords) {
         keywords = " "
     } else {
         keywords = *business.Keywords
@@ -684,7 +692,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
 
     // substitute service recommendation
     var serviceRecommendation string
-    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+    if stringUtil.IsEmptyStringPtr(user.ServiceRecommendation) {
         serviceRecommendation = " "
     } else {
         serviceRecommendation = *user.ServiceRecommendation
@@ -712,7 +720,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
     (map[string]interface{})["text"] = serviceRecommendation
 
     // update other business bubbles
-    otherBusinessBubbleTemplate, err := util.DeepCopy(jsonMap["contents"].([]interface{})[1])
+    otherBusinessBubbleTemplate, err := util2.DeepCopy(jsonMap["contents"].([]interface{})[1])
     if err != nil {
         l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
         return nil, err
@@ -724,7 +732,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
             continue
         }
 
-        otherBusinessJsonMap, _ := util.DeepCopy(otherBusinessBubbleTemplate)
+        otherBusinessJsonMap, _ := util2.DeepCopy(otherBusinessBubbleTemplate)
 
         // update business name
         // otherBusinessJsonMap -> body -> contents[0] -> text
@@ -758,7 +766,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User,
 
     // substitute business description
     var businessDescription string
-    if util.IsEmptyStringPtr(business.BusinessDescription) {
+    if stringUtil.IsEmptyStringPtr(business.BusinessDescription) {
         businessDescription = " "
     } else {
         businessDescription = *business.BusinessDescription
@@ -815,7 +823,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User,
 
     // substitute signature
     var signature string
-    if util.IsEmptyStringPtr(user.Signature) {
+    if stringUtil.IsEmptyStringPtr(user.Signature) {
         signature = " "
     } else {
         signature = *user.Signature
@@ -857,7 +865,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User,
 
     // substitute keywords
     var keywords string
-    if util.IsEmptyStringPtr(business.Keywords) {
+    if stringUtil.IsEmptyStringPtr(business.Keywords) {
         keywords = " "
     } else {
         keywords = *business.Keywords
@@ -898,7 +906,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User,
 
     // substitute service recommendation
     var serviceRecommendation string
-    if util.IsEmptyStringPtr(user.ServiceRecommendation) {
+    if stringUtil.IsEmptyStringPtr(user.ServiceRecommendation) {
         serviceRecommendation = " "
     } else {
         serviceRecommendation = *user.ServiceRecommendation
@@ -1014,7 +1022,7 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
 
     // substitute review
     reviewMessage := "（無文字內容）"
-    if !util.IsEmptyStringPtr(review.Review) {
+    if !stringUtil.IsEmptyStringPtr(review.Review) {
         reviewMessage = *review.Review
     }
     // body -> contents[1] -> contents[0] -> contents[1] -> text
@@ -1102,4 +1110,37 @@ func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string
     (map[string]interface{})["text"] = updaterName
 
     return l.jsonMapToLineFlexContainer(jsonMap)
+}
+
+func buildNumberRatingLineFlexTemplateJson(rating _type.NumberRating) ([]interface{}, error) {
+    n := int(rating)
+    if n < 1 || n > 5 {
+        return nil, errors.New("invalid numberRating value: " + strconv.Itoa(n))
+    }
+
+    jsons := jsonUtil2.LoadReviewMessageLineFlexTemplateJsons()
+
+    goldStarJson, err := jsonUtil.JsonToMap(jsons.GoldStarIcon)
+    if err != nil {
+        return nil, err
+    }
+
+    grayStarJson, err := jsonUtil.JsonToMap(jsons.GrayStarIcon)
+    if err != nil {
+        return nil, err
+    }
+
+    stars := make([]interface{}, 5)
+
+    for i := 0; i < 5; i++ {
+        if i < n {
+            // Use goldStarJson for filled stars
+            stars[i] = goldStarJson
+        } else {
+            // Use grayStarJson for empty stars
+            stars[i] = grayStarJson
+        }
+    }
+
+    return stars, nil
 }

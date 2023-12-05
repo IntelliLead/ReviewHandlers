@@ -3,20 +3,22 @@ package main
 import (
     "context"
     "errors"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
+    enum3 "github.com/IntelliLead/CoreCommonUtil/enum"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/logger"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    enum4 "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/exception"
+    model2 "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
@@ -24,12 +26,13 @@ import (
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "golang.org/x/oauth2"
+    "google.golang.org/api/mybusinessaccountmanagement/v1"
     "os"
     "strings"
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameAuthHandler, handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameAuthHandler.String(), handleRequest))
 }
 
 var (
@@ -38,7 +41,7 @@ var (
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     stageStr := os.Getenv(util.StageEnvKey)
-    stage := enum2.StringToStage(stageStr) // panic if invalid stage
+    stage := enum3.ToStage(stageStr) // panic if invalid stage
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // ----
@@ -105,7 +108,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         err := line.SendMessage(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
         if err != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, err)
-            metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+            metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
         }
 
         return events.LambdaFunctionURLResponse{
@@ -121,7 +124,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         err := line.SendMessage(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
         if err != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, err)
-            metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+            metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
         }
 
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, err
@@ -149,7 +152,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         lineSendErr := line.SendMessage(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
         if lineSendErr != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, lineSendErr)
-            metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+            metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
         }
 
         return events.LambdaFunctionURLResponse{
@@ -165,7 +168,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         lineSendErr := line.SendMessage(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
         if lineSendErr != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, lineSendErr)
-            metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+            metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
         }
 
         return events.LambdaFunctionURLResponse{
@@ -180,13 +183,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     err = slackUtil.NewSlack(log, stage).SendNewUserOauthCompletionMessage(user, businesses)
     if err != nil {
         log.Errorf("Error sending Slack message: %s", err)
-        metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+        metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
     }
 
     err = line.SendMessage(userId, "驗證成功。可以開始使用啦！")
     if err != nil {
         log.Errorf("Error sending LINE message to '%s': %s", userId, err)
-        metric.EmitLambdaMetric(enum3.Metric5xxError, enum2.HandlerNameAuthHandler, 1)
+        metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
     }
 
     log.Info("Successfully finished lambda execution")
@@ -220,7 +223,7 @@ func buildUpdateTokenAttributeActions(token oauth2.Token) ([]dbModel.AttributeAc
 
 // TODO: [INT-91] Remove backfill logic once all users have been backfilled
 // backfillBusinessAttributesFromUser in-place backfills business attributes from user
-func backfillBusinessAttributesFromUser(business model.Business, user model.User) {
+func backfillBusinessAttributesFromUser(business model2.Business, user model2.User) {
     business.BusinessDescription = user.BusinessDescription
     business.Keywords = user.Keywords
     if user.KeywordEnabled == nil {
@@ -239,62 +242,78 @@ func backfillBusinessAttributesFromUser(business model.Business, user model.User
 // updateBusinesses updates businesses and returns the updated businesses and business account ID
 func updateBusinesses(
     userId string,
-    user *model.User, // TODO: [INT-91] Remove backfill logic once all legacy users have completed OAUTH
+    user *model2.User, // TODO: [INT-91] Remove backfill logic once all legacy users have completed OAUTH
     businessDao *ddbDao.BusinessDao,
     google *googleUtil.GoogleClient,
-) ([]model.Business, string, error) {
-    // retrieve business location (businessId)
+) ([]model2.Business, string, error) {
     // Google businesses have two portions: business accountID and business locationID
-    businessAccount, businessLocations, err := google.GetBusinessAccountAndLocations()
+
+    accounts, err := google.ListBusinessAccounts()
     if err != nil {
-        log.Errorf("Error retrieving Google business location: %s", err)
-        return []model.Business{}, "", err
+        return []model2.Business{}, "", err
+    }
+    var businessAccount mybusinessaccountmanagement.Account
+    switch len(accounts) {
+    case 0:
+        log.Warn("User has no Google business accounts")
+        return []model2.Business{}, "", errors.New("user has no Google business accounts")
+    case 1:
+        businessAccount = accounts[0]
+    default:
+        log.Warn("User has multiple Google business accounts. Using the first one: ", jsonUtil.AnyToJson(accounts))
+        metric.EmitMetricWithNamespace(enum2.MetricMultipleBusinessAccounts.String(), 1.0, util.AuthMetricNamespace)
+        businessAccount = accounts[0]
+    }
+
+    businessLocations, err := google.ListBusinessLocations(businessAccount)
+    if err != nil {
+        return []model2.Business{}, "", err
     }
 
     businessAccountNameSlice := strings.Split(businessAccount.Name, "/")
     if len(businessAccountNameSlice) != 2 {
         log.Errorf("Error parsing business account ID %s", businessAccount.Name)
-        return []model.Business{}, "", errors.New("error parsing business account name")
+        return []model2.Business{}, "", errors.New("error parsing business account name")
     }
     businessAccountId := businessAccountNameSlice[1]
 
     businessLocations = googleUtil.FilterOpenBusinessLocations(businessLocations)
     if len(businessLocations) == 0 {
         log.Error("User has no open Google business locations under account ", businessAccountId)
-        return []model.Business{}, businessAccountId, errors.New("user has no open Google business locations")
+        return []model2.Business{}, businessAccountId, errors.New("user has no open Google business locations")
     }
     if len(businessLocations) > 1 {
         log.Info("User has multiple open Google business locations.")
-        metric.EmitMetric(enum3.MetricMultipleBusinessLocations, 1.0)
+        metric.EmitMetricWithNamespace(enum2.MetricMultipleBusinessLocations.String(), 1.0, util.AuthMetricNamespace)
     }
     log.Info("User's open Google business locations are: ", jsonUtil.AnyToJson(businessLocations))
 
-    var businesses []model.Business
+    var businesses []model2.Business
     for _, location := range businessLocations {
         businessLocationSlice := strings.Split(location.Name, "/")
         if len(businessLocationSlice) != 2 {
             log.Errorf("Error parsing business location ID %s", location.Name)
-            return []model.Business{}, businessAccountId, errors.New("error parsing business location name")
+            return []model2.Business{}, businessAccountId, errors.New("error parsing business location name")
         }
 
         businessId, err := bid.NewBusinessId(businessLocationSlice[1])
         if err != nil {
             log.Errorf("Error creating businessId from business location.Name %s: %s", location.Name, err)
-            return []model.Business{}, businessAccountId, err
+            return []model2.Business{}, businessAccountId, err
         }
 
         businessPtr, err := businessDao.GetBusiness(businessId)
         if err != nil {
             log.Errorf("Error retrieving business %s: %s", businessId, err)
-            return []model.Business{}, businessAccountId, err
+            return []model2.Business{}, businessAccountId, err
         }
 
-        var business model.Business
+        var business model2.Business
         if businessPtr == nil {
             log.Infof("Business '%s' does not exist. Creating new business.", businessId)
 
             // create business
-            business = model.NewBusiness(
+            business = model2.NewBusiness(
                 businessId,
                 location.Title,
                 userId,
@@ -312,7 +331,7 @@ func updateBusinesses(
             }
         } else {
             business = *businessPtr
-            if !util.StringInSlice(userId, business.UserIds) {
+            if !stringUtil.StringInSlice(userId, business.UserIds) {
                 log.Infof("Business '%s' is unaware of '%s' yet. Creating association.", businessId, userId)
 
                 // add user to business and update business Google token
@@ -333,23 +352,23 @@ func updateBusinesses(
 
 func updateUser(
     userId string,
-    businesses []model.Business,
+    businesses []model2.Business,
     businessAccountId string,
-    userPtr *model.User,
+    userPtr *model2.User,
     userDao *ddbDao.UserDao,
     google *googleUtil.GoogleClient,
     line *lineUtil.Line,
-) (model.User, error) {
+) (model2.User, error) {
     // get user info from Google
     googleUserInfo, err := google.GetGoogleUserInfo()
     if err != nil {
         log.Errorf("Error retrieving Google user info: %s", err)
-        return model.User{}, err
+        return model2.User{}, err
     }
 
     log.Debug("Google user info: ", jsonUtil.AnyToJson(googleUserInfo))
 
-    googleMetadata := model.Google{
+    googleMetadata := model2.Google{
         Id:                  googleUserInfo.Id,
         AccessToken:         google.Token.AccessToken,
         AccessTokenExpireAt: google.Token.Expiry,
@@ -367,20 +386,20 @@ func updateUser(
         businessIds = append(businessIds, business.BusinessId)
     }
 
-    var user model.User
+    var user model2.User
     if userPtr == nil {
         log.Infof("User '%s' does not exist. Creating new user.", userId)
 
         lineGetUserResp, err := line.GetUser(userId)
         if err != nil {
             log.Errorf("Error retrieving user %s from LINE: %s", userId, err)
-            return model.User{}, err
+            return model2.User{}, err
         }
 
-        user, err = model.NewUser(userId, businessIds, lineGetUserResp, googleMetadata)
+        user, err = model2.NewUser(userId, businessIds, lineGetUserResp, googleMetadata)
         if err != nil {
             log.Errorf("Error creating new user object: %s", err)
-            return model.User{}, err
+            return model2.User{}, err
         }
 
         err = userDao.CreateUser(user)
@@ -402,24 +421,24 @@ func updateUser(
         var actions []dbModel.AttributeAction
         var err error
         // TODO: [INT-91] Remove backfill logic once all users have completed googleMetadata migration
-        if util.IsEmptyString(userPtr.Google.Id) {
+        if stringUtil.IsEmptyString(userPtr.Google.Id) {
             log.Infof("User %s does not have Google metadata. Creating.", userId)
             action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google", googleMetadata)
             if err != nil {
                 log.Errorf("Error building update Google attribute action: %s", err)
-                return model.User{}, err
+                return model2.User{}, err
             }
             actions = []dbModel.AttributeAction{action}
         } else {
             actions, err = buildUpdateTokenAttributeActions(google.Token)
             if err != nil {
                 log.Errorf("Error building update Google attribute action: %s", err)
-                return model.User{}, err
+                return model2.User{}, err
             }
             updateBusinessAccountIdAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "google.businessAccountId", businessAccountId)
             if err != nil {
                 log.Errorf("Error building update business account ID attribute action: %s", err)
-                return model.User{}, err
+                return model2.User{}, err
             }
             actions = append(actions, updateBusinessAccountIdAction)
         }
@@ -427,7 +446,7 @@ func updateUser(
         // find businessIds not in user's businessIds and add them
         var businessIdsMissingInUser []bid.BusinessId
         for _, businessId := range businessIds {
-            if !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+            if !stringUtil.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
                 businessIdsMissingInUser = append(businessIdsMissingInUser, businessId)
             }
         }
@@ -443,7 +462,7 @@ func updateUser(
         }
 
         // repair active businessID if it is missing
-        if util.IsEmptyString(user.ActiveBusinessId.String()) {
+        if stringUtil.IsEmptyString(user.ActiveBusinessId.String()) {
             log.Infof("User %s does not have active businessId. Repairing.", userId)
             action, err := dbModel.NewAttributeAction(enum.ActionUpdate, "activeBusinessId", businessIds[0].String())
             if err != nil {

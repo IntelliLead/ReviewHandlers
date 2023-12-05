@@ -3,17 +3,17 @@ package auth
 import (
     "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    jsonUtil2 "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    enum3 "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/exception"
+    "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
 
@@ -48,7 +48,7 @@ func ValidateUserAuthOrRequestAuth(
         if errors.As(err, &userDoesNotExistException) {
             err = requestAuth(replyToken, userId, line, log)
             if err != nil {
-                metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             }
             return false, nil, nil
         }
@@ -61,7 +61,7 @@ func ValidateUserAuthOrRequestAuth(
         log.Info("User ", userId, " has not completed OAUTH. Sending auth request.")
         err = requestAuth(replyToken, userId, line, log)
         if err != nil {
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
         }
     } else {
         log.Info("User ", userId, " has completed OAUTH.")
@@ -94,42 +94,42 @@ func requestAuth(
 
 // TODO: [INT-91] remove this check after LINE user info backfilling is done
 func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineUtil.Line, handlerName enum2.HandlerName, log *zap.SugaredLogger) {
-    if util.IsEmptyString(user.LineUsername) || util.IsEmptyString(user.LineProfilePictureUrl) || util.IsEmptyString(user.Language) {
+    if stringUtil.IsEmptyString(user.LineUsername) || stringUtil.IsEmptyString(user.LineProfilePictureUrl) || stringUtil.IsEmptyString(user.Language) {
         lineGetUserResp, err := line.GetUser(user.UserId)
         if err != nil {
             log.Errorf("Error getting user info from LINE: %s", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             return // do not backfill
         }
 
         lineUserNameAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineUsername", lineGetUserResp.DisplayName)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             return // do not backfill
         }
         lineProfilePictureUrlAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "lineProfilePictureUrl", lineGetUserResp.PictureURL)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             return // do not backfill
         }
         languageAction, err := dbModel.NewAttributeAction(enum3.ActionUpdate, "language", lineGetUserResp.Language)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             return // do not backfill
         }
 
         updatedUser, err := userDao.UpdateAttributes(user.UserId, []dbModel.AttributeAction{lineUserNameAction, lineProfilePictureUrlAction, languageAction})
         if err != nil {
             log.Errorf("Error updating user info: %s", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             return
         }
 
         *user = updatedUser
-        log.Info("Successfully backfilled user's line info: ", jsonUtil.AnyToJson(updatedUser))
+        log.Info("Successfully backfilled user's line info: ", jsonUtil2.AnyToJson(updatedUser))
     }
 }
 
@@ -158,8 +158,8 @@ func ValidateUserAuth(
 
     user := *userPtr
 
-    // either conditions work, checking both for robustness
-    if len(user.BusinessIds) == 0 || util.IsEmptyString(user.Google.RefreshToken) {
+    // either condition works, checking both for robustness
+    if len(user.BusinessIds) == 0 || stringUtil.IsEmptyString(user.Google.RefreshToken) {
         return false, user, nil
     }
 

@@ -3,16 +3,16 @@ package postbackEvent
 import (
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
+    "github.com/IntelliLead/CoreDataAccess/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/aiUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "go.uber.org/zap"
 )
 
@@ -38,7 +38,7 @@ func handleAutoQuickReplyToggle(
     }
     business := *businessPtr
 
-    if !business.AutoQuickReplyEnabled && (util.IsEmptyStringPtr(business.QuickReplyMessage)) {
+    if !business.AutoQuickReplyEnabled && (stringUtil.IsEmptyStringPtr(business.QuickReplyMessage)) {
         return business, exception.NewAutoQuickReplyConditionNotMetException("Please fill in quick reply message before enabling auto quick reply")
     }
 
@@ -92,7 +92,7 @@ func handleGenerateAiReply(
         return errors.New(errStr)
     }
     review := *reviewPtr
-    if util.IsEmptyStringPtr(review.Review) {
+    if stringUtil.IsEmptyStringPtr(review.Review) {
         errStr := fmt.Sprintf("Review is empty. Cannot generate AI reply. userId: %s ; UserReviewId: %s", userId, reviewId)
         log.Error(errStr)
         return errors.New(errStr)
@@ -120,7 +120,7 @@ func handleGenerateAiReply(
     // create AI generated result card
     // --------------------
     generateAuthorName := user.LineUsername
-    if util.IsEmptyString(generateAuthorName) {
+    if stringUtil.IsEmptyString(generateAuthorName) {
         generateAuthorName = "您的同仁"
     }
     err = line.SendAiGeneratedReply(aiReply, review, generateAuthorName, business, user, userDao)
@@ -157,7 +157,7 @@ func handleSignatureToggle(
     userDao *ddbDao.UserDao,
     log *zap.SugaredLogger) (model.User, error) {
 
-    if !user.SignatureEnabled && util.IsEmptyStringPtr(user.Signature) {
+    if !user.SignatureEnabled && stringUtil.IsEmptyStringPtr(user.Signature) {
         return model.User{}, exception.NewSignatureDoesNotExistException("Signature does not exist for " + user.UserId)
     }
 
@@ -180,7 +180,7 @@ func handleKeywordToggle(
     business model.Business,
     businessDao *ddbDao.BusinessDao,
 ) (model.Business, error) {
-    if !business.KeywordEnabled && (util.IsEmptyStringPtr(business.Keywords) || util.IsEmptyStringPtr(business.BusinessDescription)) {
+    if !business.KeywordEnabled && (stringUtil.IsEmptyStringPtr(business.Keywords) || stringUtil.IsEmptyStringPtr(business.BusinessDescription)) {
         return model.Business{}, exception.NewKeywordConditionNotMetException("Keyword condition not met for " + user.UserId)
     }
 
@@ -201,7 +201,7 @@ func handleServiceRecommendationToggle(
     businessDescription *string,
     userDao *ddbDao.UserDao,
     log *zap.SugaredLogger) (model.User, error) {
-    if !user.ServiceRecommendationEnabled && util.IsEmptyStringPtr(user.ServiceRecommendation) && util.IsEmptyStringPtr(businessDescription) {
+    if !user.ServiceRecommendationEnabled && stringUtil.IsEmptyStringPtr(user.ServiceRecommendation) && stringUtil.IsEmptyStringPtr(businessDescription) {
         return model.User{}, exception.NewServiceRecommendationConditionNotMetException("Service recommendation condition not met for " + user.UserId)
     }
 

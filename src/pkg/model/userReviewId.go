@@ -3,7 +3,7 @@ package model
 import (
     "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
+    "github.com/IntelliLead/CoreDataAccess/model/type/rid"
     "github.com/go-playground/validator/v10"
     "strconv"
     "strings"

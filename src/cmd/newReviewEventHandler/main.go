@@ -5,17 +5,19 @@ import (
     "encoding/json"
     "errors"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/enum"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/logger"
+    "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/exception"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
+    "github.com/IntelliLead/CoreDataAccess/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -27,7 +29,7 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameNewReviewEventHandler, handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameNewReviewEventHandler.String(), handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -89,7 +91,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if businessPtr == nil {
         log.Infof("Business '%s' does not exist.", businessId)
 
-        if util.IsEmptyStringPtr(event.UserId) {
+        if stringUtil.IsEmptyStringPtr(event.UserId) {
             log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
             return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
         }
@@ -112,7 +114,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         business = *businessPtr
 
         var reviewId rid.ReviewId
-        if !util.IsEmptyStringPtr(event.UserId) {
+        if !stringUtil.IsEmptyStringPtr(event.UserId) {
             reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), *event.UserId)
         } else {
             reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), "stub_user_id")
@@ -140,13 +142,9 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Error("Error creating review: ", err)
 
         var reviewAlreadyExistException exception.ReviewAlreadyExistException
-        var vendorReviewIdAlreadyExistException exception.VendorReviewIdAlreadyExistException
         switch {
         case errors.As(err, &reviewAlreadyExistException):
             return events.LambdaFunctionURLResponse{Body: `{"message": "Review already exists"}`, StatusCode: 400}, nil
-        case errors.As(err, &vendorReviewIdAlreadyExistException):
-            log.Error("Create review failed because vendorReviewId unique record exists but not the review object: ", review)
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Database conflict"}`, StatusCode: 500}, nil
         default:
             return events.LambdaFunctionURLResponse{Body: `{"message": "Error creating review"}`, StatusCode: 500}, nil
         }
@@ -164,7 +162,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         }
         log.Info("Successfully sent new review to all users belonging to business: ", business.BusinessId)
     } else {
-        if util.IsEmptyStringPtr(event.UserId) {
+        if stringUtil.IsEmptyStringPtr(event.UserId) {
             log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
             return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
         }
@@ -185,13 +183,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         autoQuickReplyEnabled := business.AutoQuickReplyEnabled
         quickReplyMessagePtr := business.QuickReplyMessage
 
-        if autoQuickReplyEnabled && util.IsEmptyStringPtr(quickReplyMessagePtr) {
+        if autoQuickReplyEnabled && stringUtil.IsEmptyStringPtr(quickReplyMessagePtr) {
             log.Errorf("AutoQuickReplyEnabled set to true but no quickReplyMessage")
             return events.LambdaFunctionURLResponse{
                 Body: `{"message": "Error getting quick reply message"}`, StatusCode: 500}, nil
         }
 
-        if autoQuickReplyEnabled && util.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
+        if autoQuickReplyEnabled && stringUtil.IsEmptyStringPtr(review.Review) && review.NumberRating == 5 {
             quickReplyMessage := *quickReplyMessagePtr
             err = lineEventProcessor.ReplyReview(util.AutoReplyUserId, quickReplyMessage, review, reviewDao, log)
             if err != nil {
@@ -241,7 +239,7 @@ func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
     }
     text := *event.Review
 
-    originalLine, translationFound := util.ExtractOriginalFromGoogleTranslate(text)
+    originalLine, translationFound := stringUtil.ExtractOriginalFromGoogleTranslate(text)
     if translationFound {
         event.Review = &originalLine
     }

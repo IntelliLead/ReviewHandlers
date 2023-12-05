@@ -1,5 +1,5 @@
 import { StackCreationInfo } from 'common-cdk';
-import { Stack } from 'aws-cdk-lib';
+import { CfnOutput, Stack } from 'aws-cdk-lib';
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { IRole } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
@@ -22,7 +22,14 @@ export class DdbStack extends Stack {
         super(scope, id, props);
 
         DdbTable.forEach((table) => {
-            this.tableEntries.set(table.tableName, this.createTable(table));
+            const ddb = this.createTable(table);
+            this.tableEntries.set(table.tableName, ddb);
+
+            new CfnOutput(this, `${table.tableName}TableArnCfnOutput`, {
+                value: ddb.tableArn,
+                description: `DynamoDB table arn for ${table.tableName}`,
+                exportName: `${table.tableName}TableArn`,
+            });
         });
     }
 

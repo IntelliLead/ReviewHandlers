@@ -29,7 +29,7 @@ export class SecretStack extends Stack {
             description: `${SERVICE_NAME} secrets`,
         });
 
-        // Add cross account access to server secret to allow alpha to use beta server secret
+        // Add cross-account access to server secret to allow alpha to use beta server secret
         // Org principal is automatically added to Secret resource policy and KMS Key policy for cross account access
         secret.grantRead(orgPrincipal);
     }

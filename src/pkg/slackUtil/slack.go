@@ -2,10 +2,10 @@ package slackUtil
 
 import (
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/enum"
+    "github.com/IntelliLead/CoreCommonUtil/timeUtil"
+    "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/slack-go/slack"
     "go.uber.org/zap"
     "time"
@@ -43,7 +43,7 @@ func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
 }
 
 func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) error {
-    readableTimestamp, err := util.UtcToReadableTwTimestamp(timestamp)
+    readableTimestamp, err := timeUtil.UtcToReadableTwTimestamp(timestamp)
     if err != nil {
         s.log.Error("Unable to convert timestamp to readable format in SendNewUserFollowedMessage: ", err)
         return err
@@ -84,7 +84,7 @@ func (s *Slack) SendNewUserFollowedMessage(userId string, timestamp time.Time) e
 }
 
 func (s *Slack) SendNewUserOauthCompletionMessage(user model.User, businesses []model.Business) error {
-    readableTimestamp, err := util.UtcToReadableTwTimestamp(time.Now())
+    readableTimestamp, err := timeUtil.UtcToReadableTwTimestamp(time.Now())
     if err != nil {
         s.log.Error("Unable to convert timestamp to readable format in SendNewUserOauthCompletionMessage: ", err)
         return err

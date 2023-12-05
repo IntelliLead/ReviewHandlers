@@ -3,14 +3,16 @@ package lineUtil
 import (
     "errors"
     "fmt"
+    jsonUtil2 "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -59,7 +61,7 @@ func (l *Line) SendMessage(userId string, message string) error {
         return err
     }
 
-    l.log.Infof("Successfully sent message to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+    l.log.Infof("Successfully sent message to user '%s': %s", userId, jsonUtil2.AnyToJson(resp))
     return nil
 }
 
@@ -80,14 +82,14 @@ func (l *Line) ReplyUnknownResponseReply(replyToken string) error {
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in ReplyUnknownResponseReply: %s", jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in ReplyUnknownResponseReply: %s", jsonUtil2.AnyToJson(resp))
     return nil
 }
 
 // SendNewReview sends a new review to all the users of the business
 func (l *Line) SendNewReview(review model.Review, business model.Business, userDao *ddbDao.UserDao) error {
     quickReplyMessage := ""
-    if !util.IsEmptyStringPtr(business.QuickReplyMessage) {
+    if !stringUtil.IsEmptyStringPtr(business.QuickReplyMessage) {
         quickReplyMessage = business.GetFinalQuickReplyMessage(review)
     }
 
@@ -103,11 +105,11 @@ func (l *Line) SendNewReview(review model.Review, business model.Business, userD
             return errors.New(fmt.Sprintf("User '%s' not found", userId))
         }
 
-        businessIdIndex := util.FindStringIndex(bid.BusinessIdsToStringSlice(userPtr.BusinessIds), business.BusinessId.String())
+        businessIdIndex := stringUtil.FindStringIndex(bid.BusinessIdsToStringSlice(userPtr.BusinessIds), business.BusinessId.String())
         if businessIdIndex == -1 {
             errStr := fmt.Sprintf("Business '%s' not found in user '%s'. Not sending review to this user.", business.BusinessId, userId)
             l.log.Error(errStr)
-            metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameNewReviewEventHandler, 1)
+            metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameNewReviewEventHandler.String(), 1)
             continue
         }
 
@@ -203,7 +205,7 @@ func (l *Line) ShowQuickReplySettingsWithActiveBusiness(
 
     if user.ActiveBusinessId != activeBusiness.BusinessId {
         l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
-        metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+        metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
     }
 
     return l.showQuickReplySettingsForMultiBusiness(replyToken, orderedBusinesses, activeBusiness.BusinessId)
@@ -233,7 +235,7 @@ func (l *Line) showQuickReplySettingsForMultiBusiness(
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings: %s", jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in ShowQuickReplySettings: %s", jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -255,7 +257,7 @@ func (l *Line) showQuickReplySettingsForSingleBusiness(replyToken string, busine
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in showQuickReplySettingsForSingleBusiness: %s", jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in showQuickReplySettingsForSingleBusiness: %s", jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -297,7 +299,7 @@ func (l *Line) ShowAiReplySettings(
         }
         if user.ActiveBusinessId != activeBusiness.BusinessId {
             l.log.Errorf("Active business '%s' does not match business '%s' for user '%s'", user.ActiveBusinessId, activeBusiness.BusinessId, user.UserId)
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
         }
         return l.showAiReplySettingsForMultiBusiness(replyToken, user, orderedBusinesses, activeBusiness.BusinessId)
     }
@@ -322,7 +324,7 @@ func (l *Line) showAiReplySettingsForSingleBusiness(replyToken string, user mode
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForSingleBusiness to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForSingleBusiness to %s: %s", user.UserId, jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -344,7 +346,7 @@ func (l *Line) showAiReplySettingsForMultiBusiness(replyToken string, user model
         return err
     }
 
-    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForMultiBusiness to %s: %s", user.UserId, jsonUtil.AnyToJson(resp))
+    l.log.Debugf("Successfully executed line.ReplyMessage in showAiReplySettingsForMultiBusiness to %s: %s", user.UserId, jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -359,7 +361,7 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, generat
             businessIdIndex, err = user.GetBusinessIdIndex(business.BusinessId)
             if err != nil {
                 l.log.Errorf("Error getting businessIdIndex for business '%s' in SendAiGeneratedReply: %v", business.BusinessId, err)
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
         } else {
@@ -370,20 +372,20 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, generat
             }
             if sendingUser == nil {
                 l.log.Errorf("User '%s' not found in SendAiGeneratedReply. Inconsistent userIds in business '%s'", userId, business.BusinessId)
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
             businessIdIndex, err = sendingUser.GetBusinessIdIndex(business.BusinessId)
             if err != nil {
                 l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during SendAiGeneratedReply: %v", business.BusinessId, sendingUser.UserId, err)
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
         }
         flexMessage, err := l.buildAiGeneratedReplyFlexMessage(review, aiReply, generateAuthorName, business.BusinessId, businessIdIndex)
         if err != nil {
             l.log.Error("Error building flex message in SendAiGeneratedReply: ", err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
             continue
         }
 
@@ -417,7 +419,7 @@ func (l *Line) SendAuthRequest(userId string) error {
         return err
     }
 
-    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -440,7 +442,7 @@ func (l *Line) ReplyAuthRequest(replyToken string, userId string) error {
         return err
     }
 
-    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil.AnyToJson(resp))
+    l.log.Infof("Successfully requested auth to user '%s': %s", userId, jsonUtil2.AnyToJson(resp))
 
     return nil
 }
@@ -465,7 +467,7 @@ func (l *Line) NotifyUsersReplyFailed(userIds []string, reviewerName string, isA
 // both the reviewerName and reason can be empty
 func (l *Line) ReplyUserReplyFailedWithReason(replyToken string, reviewerName string, reason string) (*linebot.BasicResponse, error) {
     var text string
-    if util.IsEmptyString(reviewerName) {
+    if stringUtil.IsEmptyString(reviewerName) {
         text = "回覆評論失敗。"
     } else {
         text = fmt.Sprintf("回覆 %s 的評論失敗。", reviewerName)
@@ -502,13 +504,13 @@ func (l *Line) NotifyReviewAutoReplied(
         }
         if sendingUser == nil {
             l.log.Errorf("User '%s' not found in NotifyReviewReplied. Inconsistent userIds in business '%s'", userId, business.BusinessId)
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
             continue
         }
         businessIdIndex, err := sendingUser.GetBusinessIdIndex(business.BusinessId)
         if err != nil {
             l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during NotifyReviewReplied: %v", business.BusinessId, sendingUser.UserId, err)
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
             continue
         }
 
@@ -520,8 +522,8 @@ func (l *Line) NotifyReviewAutoReplied(
 
         _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
         if err != nil {
-            l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
-            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+            l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil2.AnyToJson(flexMessage))
+            metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
             continue
         }
 
@@ -547,7 +549,7 @@ func (l *Line) NotifyReviewReplied(
     userDao *ddbDao.UserDao,
 ) error {
     for _, userId := range business.UserIds {
-        if !util.IsEmptyString(replyToken) && userId == replierUser.UserId && replyToken != util.TestReplyToken {
+        if !stringUtil.IsEmptyString(replyToken) && userId == replierUser.UserId && replyToken != util.TestReplyToken {
             l.log.Debugf("Sending reply message to reply token owner user '%s'", replierUser.UserId)
             businessIdIndex, err := replierUser.GetBusinessIdIndex(business.BusinessId)
             if err != nil {
@@ -561,7 +563,7 @@ func (l *Line) NotifyReviewReplied(
             }
             _, err = l.lineClient.ReplyMessage(replyToken, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
             if err != nil {
-                l.log.Errorf("Error replying to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
+                l.log.Errorf("Error replying to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil2.AnyToJson(flexMessage))
             }
         } else {
             sendingUser, err := userDao.GetUser(userId)
@@ -571,13 +573,13 @@ func (l *Line) NotifyReviewReplied(
             }
             if sendingUser == nil {
                 l.log.Errorf("User '%s' not found in NotifyReviewReplied. Inconsistent userIds in business '%s'", userId, business.BusinessId)
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
             businessIdIndex, err := sendingUser.GetBusinessIdIndex(business.BusinessId)
             if err != nil {
                 l.log.Errorf("Error getting businessIdIndex for business '%s' in user '%s' during NotifyReviewReplied: %v", business.BusinessId, sendingUser.UserId, err)
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
 
@@ -589,8 +591,8 @@ func (l *Line) NotifyReviewReplied(
 
             _, err = l.lineClient.PushMessage(userId, linebot.NewFlexMessage("評論回覆通知", flexMessage)).Do()
             if err != nil {
-                l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil.AnyToJson(flexMessage))
-                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler, 1)
+                l.log.Errorf("Error sending message to '%s' in NotifyReviewReplied: %v . Flex Message: %s", userId, err, jsonUtil2.AnyToJson(flexMessage))
+                metric.EmitLambdaMetric(enum.Metric5xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
                 continue
             }
         }

@@ -3,21 +3,21 @@ package postbackEvent
 import (
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    enum2 "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    enum3 "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
+    "github.com/IntelliLead/CoreDataAccess/model/type/rid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/auth"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    enum3 "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/exception"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/rid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "go.uber.org/zap"
@@ -128,7 +128,7 @@ func ProcessPostbackEvent(
             case bid.IsValidBusinessId(dataSlice[1]):
                 businessId := bid.BusinessId(dataSlice[1])
                 // user not retrieved if event does not require auth
-                if shouldAuth(dataSlice) && !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+                if shouldAuth(dataSlice) && !stringUtil.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
                     log.Errorf("Business ID '%s' does not belong to user '%s'", businessId, userId)
                     return events.LambdaFunctionURLResponse{
                         StatusCode: 500,
@@ -166,7 +166,7 @@ func ProcessPostbackEvent(
                             _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "Emoji AI 回覆")
                             if err != nil {
                                 log.Errorf("Error notifying user '%s' of update emoji enabled failed: %v", userId, err)
-                                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler, 1)
+                                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
                             }
 
                             return events.LambdaFunctionURLResponse{
@@ -222,7 +222,7 @@ func ProcessPostbackEvent(
                         }
 
                         // notify all other users of toggle (skip notifying self)
-                        err = line.NotifyAiReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
+                        err = line.NotifyAiReplySettingsUpdated(stringUtil.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
                         if err != nil {
                             log.Errorf("Error notifying other users of AI reply settings update for user '%s': %v", userId, err)
                         }
@@ -348,16 +348,6 @@ func ProcessPostbackEvent(
                         Body:       fmt.Sprintf(`{"error": "Error replying help message: %s"}`, err),
                     }, err
                 }
-            //
-            // case "More":
-            //     _, err := line.ReplyMoreMessage(event.ReplyToken)
-            //     if err != nil {
-            //         log.Errorf("Error replying More message to user '%s': %v", userId, err)
-            //         return events.LambdaFunctionURLResponse{
-            //             StatusCode: 500,
-            //             Body:       fmt.Sprintf(`{"error": "Error replying more message: %s"}`, err),
-            //         }, err
-            //     }
 
             default:
                 return returnUnhandledPostback(log, *event), nil
@@ -369,7 +359,7 @@ func ProcessPostbackEvent(
                 businessId := bid.BusinessId(dataSlice[1])
 
                 // validate businessId belongs to user
-                if shouldAuth(dataSlice) && !util.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
+                if shouldAuth(dataSlice) && !stringUtil.StringInSlice(businessId.String(), bid.BusinessIdsToStringSlice(user.BusinessIds)) {
                     log.Errorf("Business ID '%s' does not belong to user '%s'", businessId, userId)
                     log.Debugf("User's Business IDs: %s", jsonUtil.AnyToJson(user.BusinessIds))
 
@@ -410,7 +400,7 @@ func ProcessPostbackEvent(
                             _, notifyUserErr := line.NotifyUserUpdateFailed(event.ReplyToken, "自動回覆")
                             if notifyUserErr != nil {
                                 log.Errorf("Error notifying user of updating auto quick reply enabled failed for user '%s': %v", userId, notifyUserErr)
-                                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler, 1)
+                                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
                             }
 
                             return events.LambdaFunctionURLResponse{
@@ -420,7 +410,7 @@ func ProcessPostbackEvent(
                         }
 
                         // notify all other users of toggle (skip notifying self)
-                        err = line.NotifyQuickReplySettingsUpdated(util.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
+                        err = line.NotifyQuickReplySettingsUpdated(stringUtil.RemoveStringFromSlice(business.UserIds, userId), user.LineUsername, business.BusinessName)
                         if err != nil {
                             log.Errorf("Error notifying other users of quick reply settings update for user '%s': %v", userId, err)
                         }

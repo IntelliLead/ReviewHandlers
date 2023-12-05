@@ -1,17 +1,17 @@
 package messageEvent
 
 import (
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/dbModel"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao/enum"
+    "github.com/IntelliLead/CoreDataAccess/model"
+    "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "go.uber.org/zap"
 )
 
 func buildQuickReplyUpdateAttributeActions(quickReplyMessage string) ([]dbModel.AttributeAction, error) {
-    if util.IsEmptyString(quickReplyMessage) {
+    if stringUtil.IsEmptyString(quickReplyMessage) {
         removeAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "quickReplyMessage", nil)
         if err != nil {
             return nil, err
@@ -34,7 +34,7 @@ func buildQuickReplyUpdateAttributeActions(quickReplyMessage string) ([]dbModel.
 // handleUpdateQuickReplyMessage handles the update of the quick reply message
 // returns:
 // 1. bool: whether the quick reply is enabled
-// 2. string: the quick reply message
+// 2. string: quick reply message
 // 3. error
 func handleUpdateQuickReplyMessage(
     businessId bid.BusinessId,
@@ -59,7 +59,7 @@ func handleUpdateQuickReplyMessage(
 
 // handleBusinessDescriptionUpdate handles the update of the business description.
 // returns:
-// 1. updated user (if there were no operation on user, it will be the same as the input)
+// 1. updated user (if there is no operation on user, it will be the same as the input)
 // 2. updated business
 // 3. error
 func handleBusinessDescriptionUpdate(
@@ -71,7 +71,7 @@ func handleBusinessDescriptionUpdate(
     log *zap.SugaredLogger) (model.User, model.Business, error) {
     var updatedBusiness model.Business
     updatedUser := updateRequestUser
-    if util.IsEmptyString(businessDescription) {
+    if stringUtil.IsEmptyString(businessDescription) {
         removeBusinessDescriptionAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "businessDescription", nil)
         if err != nil {
             return model.User{}, model.Business{}, err
@@ -94,7 +94,7 @@ func handleBusinessDescriptionUpdate(
         }
 
         // disable depending features
-        if updateRequestUser.ServiceRecommendationEnabled && util.IsEmptyStringPtr(updateRequestUser.ServiceRecommendation) {
+        if updateRequestUser.ServiceRecommendationEnabled && stringUtil.IsEmptyStringPtr(updateRequestUser.ServiceRecommendation) {
             disableServiceRecommendationEnabledAction, err := dbModel.NewAttributeAction(enum.ActionUpdate, "serviceRecommendationEnabled", false)
             if err != nil {
                 return model.User{}, model.Business{}, err
@@ -131,7 +131,7 @@ func handleUpdateSignature(
     userId := user.UserId
 
     var err error
-    if util.IsEmptyString(signature) {
+    if stringUtil.IsEmptyString(signature) {
         user, err = userDao.UpdateAttributes(userId, []dbModel.AttributeAction{
             {Action: enum.ActionRemove, Name: "signature"},
             // disable depending features
@@ -157,7 +157,7 @@ func handleUpdateKeywords(
     businessDao *ddbDao.BusinessDao,
     log *zap.SugaredLogger) (model.Business, error) {
     var updatedBusiness model.Business
-    if util.IsEmptyString(keywords) {
+    if stringUtil.IsEmptyString(keywords) {
         removeKeywordsAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "keywords", nil)
         if err != nil {
             log.Errorf("Error creating attribute action: %s", err)
@@ -198,7 +198,7 @@ func handleUpdateServiceRecommendation(
     userDao *ddbDao.UserDao,
 ) (model.User, error) {
     var updatedUser model.User
-    if util.IsEmptyString(serviceRecommendation) {
+    if stringUtil.IsEmptyString(serviceRecommendation) {
         removeRecommendationAction, err := dbModel.NewAttributeAction(enum.ActionRemove, "serviceRecommendation", nil)
         if err != nil {
             return model.User{}, err

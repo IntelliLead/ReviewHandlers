@@ -3,15 +3,16 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/enum"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/logger"
+    "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/postbackEvent"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/logger"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/middleware"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
+    enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents/postback"
@@ -24,13 +25,13 @@ import (
 )
 
 func main() {
-    lambda.Start(middleware.MetricMiddleware(enum.HandlerNameLineEventsHandler, handleRequest))
+    lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameLineEventsHandler.String(), handleRequest))
 }
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
     stageStr := os.Getenv(util.StageEnvKey)
-    stage := enum.StringToStage(stageStr) // panic if invalid stage
+    stage := enum.ToStage(stageStr) // panic if invalid stage
 
     log.Infof("Received new request in %s: %s", stage.String(), jsonUtil.AnyToJson(request))
 

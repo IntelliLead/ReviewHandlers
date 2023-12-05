@@ -3,6 +3,7 @@ package awsUtil
 import (
     "encoding/json"
     "errors"
+    "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil/awsModel"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-sdk-go/aws/session"
@@ -37,7 +38,7 @@ func (a *Aws) GetAuthRedirectUrl() (string, error) {
         return "", err
     }
     authRedirectUrl := *response.Parameter.Value
-    if util.IsEmptyString(authRedirectUrl) {
+    if stringUtil.IsEmptyString(authRedirectUrl) {
         a.log.Error("Auth redirect URL is empty")
         return "", errors.New("auth redirect URL is empty")
     }

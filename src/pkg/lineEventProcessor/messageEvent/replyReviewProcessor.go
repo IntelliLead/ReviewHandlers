@@ -2,13 +2,13 @@ package messageEvent
 
 import (
     "fmt"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/ddbDao"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreDataAccess/ddbDao"
+    "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/metric/enum"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/aws/aws-lambda-go/events"
     "github.com/line/line-bot-sdk-go/v7/linebot"
@@ -57,7 +57,7 @@ func ProcessReviewReplyMessage(
         // TODO: return error instead once all new reviews should have businessIdIndex - 2 weeks after Nov 7, 2023
         log.Warn("Attempting to continue assuming index is 0")
         businessIdIndex = 0
-        metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameLineEventsHandler, 1)
+        metric.EmitLambdaMetric(enum.Metric4xxError, enum2.HandlerNameLineEventsHandler.String(), 1)
     } else {
         businessIdIndex = *reply.UserReviewId.BusinessIdIndex
     }
