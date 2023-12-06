@@ -3,6 +3,7 @@ package main
 import (
     "context"
     "errors"
+    "github.com/IntelliLead/CoreCommonUtil/constant"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
@@ -14,7 +15,6 @@ import (
     "github.com/IntelliLead/CoreDataAccess/model/type/bid"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -33,7 +33,7 @@ var (
 )
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
-    stage := os.Getenv(util.StageEnvKey)
+    stage := os.Getenv(constant.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // --------------------

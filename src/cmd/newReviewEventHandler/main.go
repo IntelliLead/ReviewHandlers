@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/constant"
     "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
@@ -34,7 +35,7 @@ func main() {
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
-    stage := os.Getenv(util.StageEnvKey)
+    stage := os.Getenv(constant.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 
     // --------------------

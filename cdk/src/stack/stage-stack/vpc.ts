@@ -50,9 +50,6 @@ export class VpcStack extends Stack {
         const dynamoGatewayEndpoint = this.vpc.addGatewayEndpoint('DynamoDBGatewayEndpoint', {
             service: GatewayVpcEndpointAwsService.DYNAMODB,
         });
-
-        // This allows to customize the endpoint policy
-        // ref-link: https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.GatewayVpcEndpoint.html
         dynamoGatewayEndpoint.addToPolicy(
             new PolicyStatement({
                 principals: [new AnyPrincipal()],
@@ -64,7 +61,6 @@ export class VpcStack extends Stack {
         const s3GatewayEndpoint = this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
             service: GatewayVpcEndpointAwsService.S3,
         });
-
         s3GatewayEndpoint.addToPolicy(
             new PolicyStatement({
                 principals: [new AnyPrincipal()],

@@ -3,6 +3,7 @@ package main
 import (
     "context"
     "errors"
+    "github.com/IntelliLead/CoreCommonUtil/constant"
     enum3 "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
@@ -40,7 +41,7 @@ var (
 )
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
-    stageStr := os.Getenv(util.StageEnvKey)
+    stageStr := os.Getenv(constant.StageEnvKey)
     stage := enum3.ToStage(stageStr) // panic if invalid stage
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
 

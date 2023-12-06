@@ -3,6 +3,7 @@ package main
 import (
     "context"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/constant"
     "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
@@ -14,7 +15,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents/postback"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -30,7 +30,7 @@ func main() {
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
     log := logger.NewLogger()
-    stageStr := os.Getenv(util.StageEnvKey)
+    stageStr := os.Getenv(constant.StageEnvKey)
     stage := enum.ToStage(stageStr) // panic if invalid stage
 
     log.Infof("Received new request in %s: %s", stage.String(), jsonUtil.AnyToJson(request))
