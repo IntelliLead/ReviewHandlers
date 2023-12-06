@@ -1,0 +1,27 @@
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 300
+      MemorySize: 128
+      Handler: src/cmd/tst
+      CodeUri: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers/
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+          STAGE: local
+          GOOGLE_APPLICATION_CREDENTIALS: /opt/clientLibraryConfig-il-alpha.json
+          AUTH_REDIRECT_URL_PARAMETER_NAME: /auth/authRedirectUrl
+          # alpha
+#          AUTH_REDIRECT_URL: https://opnqduzoiln5np3slbrbkflsdy0xnggc.lambda-url.ap-northeast-1.on.aws/
+          # beta
+#          AUTH_REDIRECT_URL: https://5oxhkk7iiaflxvsrhqpd6lvhme0rwpwc.lambda-url.ap-northeast-1.on.aws/
+          # gamma
+#          AUTH_REDIRECT_URL: https://2umksutm3kdcfwtlr3xgkyzsri0uqimg.lambda-url.ap-northeast-1.on.aws/
+          # prod
+#          AUTH_REDIRECT_URL: https://7k4aebqvelxtqauxm2hk57wg4u0cfcva.lambda-url.ap-northeast-1.on.aws/
+
+
+

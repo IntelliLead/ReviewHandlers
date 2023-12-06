@@ -1,0 +1,17 @@
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 300
+      MemorySize: 128
+      Handler: cmd/newReviewEventHandler
+      CodeUri: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers/src
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+          STAGE: local
+          GOOGLE_APPLICATION_CREDENTIALS: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers/config/clientLibraryConfig-il-alpha.json
+
+

@@ -1,6 +1,7 @@
 *.iml
 .idea/
 *.zip
+*/**/build
 
 # ignore everything in src/cmd/ except for the go files
 src/cmd/**/*

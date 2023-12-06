@@ -1,0 +1,11 @@
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 300
+      MemorySize: 128
+      Handler: main
+      CodeUri: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers
+      Runtime: go1.x
+      Architectures:
+        - x86_64

@@ -1,0 +1,15 @@
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 300
+      MemorySize: 128
+      Handler: main
+      CodeUri: /Users/shawn/workspace/intellilead/code-workspace/ReviewHandlers/src/cmd/authHandler
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          STAGE: local
+          AUTH_REDIRECT_URL_PARAMETER_NAME: /auth/authRedirectUrl
