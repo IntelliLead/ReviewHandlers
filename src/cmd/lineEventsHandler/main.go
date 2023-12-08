@@ -3,11 +3,14 @@ package main
 import (
     "context"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/aws"
     "github.com/IntelliLead/CoreCommonUtil/constant"
     "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
     "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreCommonUtil/secretUtil"
+    "github.com/IntelliLead/CoreCommonUtil/ssmUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineEventProcessor/messageEvent"
@@ -18,7 +21,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/tst/data/lineEventsHandlerTestEvents/postback"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "os"
@@ -28,8 +30,14 @@ func main() {
     lambda.Start(middleware.MetricMiddleware(enum2.HandlerNameLineEventsHandler.String(), handleRequest))
 }
 
+var (
+    log             = logger.NewLogger()
+    cfg             = aws.DefaultAwsConfig()
+    authRedirectUrl = ssmUtil.NewSsm(cfg, log).GetSsmParameterValue(os.Getenv(constant.AuthRedirectUrlParameterNameEnvKey))
+    secrets         = secretUtil.NewSecretUtil(cfg, log).GetSecrets()
+)
+
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
-    log := logger.NewLogger()
     stageStr := os.Getenv(constant.StageEnvKey)
     stage := enum.ToStage(stageStr) // panic if invalid stage
 
@@ -57,15 +65,10 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // initialize resources
     // --------------------
-    // DDB
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-    if err != nil {
-        log.Error("Error loading AWS config: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
-    }
     businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
     userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
     reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
+
     // LINE
     line := lineUtil.NewLine(log)
 
@@ -114,16 +117,16 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         switch event.Type {
         case linebot.EventTypeMessage:
             log.Info("Received Message event")
-            return messageEvent.ProcessMessageEvent(event, userId, businessDao, userDao, reviewDao, line, log)
+            return messageEvent.ProcessMessageEvent(event, userId, businessDao, userDao, reviewDao, line, log, authRedirectUrl)
 
         case linebot.EventTypeFollow:
             log.Info("Received Follow event")
-            slack := slackUtil.NewSlack(log, stage)
-            return lineEventProcessor.ProcessFollowEvent(event, userDao, slack, line, log)
+            slack := slackUtil.NewSlack(log, stage, secrets.SlackToken, secrets.NewUserSlackBotChannelId)
+            return lineEventProcessor.ProcessFollowEvent(event, userDao, slack, line, log, authRedirectUrl)
 
         case linebot.EventTypePostback:
             log.Info("Received Postback event")
-            return postbackEvent.ProcessPostbackEvent(event, userId, businessDao, userDao, reviewDao, line, log)
+            return postbackEvent.ProcessPostbackEvent(event, userId, businessDao, userDao, reviewDao, line, log, authRedirectUrl, secrets.GptApiKey)
 
         default:
             log.Info("Unhandled event type: ", event.Type)

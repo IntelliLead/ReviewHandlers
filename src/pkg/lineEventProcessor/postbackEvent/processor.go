@@ -30,7 +30,10 @@ func ProcessPostbackEvent(
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
-    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+    log *zap.SugaredLogger,
+    authRedirectUrl string,
+    gptApiKey string,
+) (events.LambdaFunctionURLResponse, error) {
 
     dataSlice, err := lineEventProcessor.ParsePostBackData(event.Postback.Data)
     if err != nil {
@@ -53,7 +56,7 @@ func ProcessPostbackEvent(
 
         var hasUserCompletedAuth bool
         var err error
-        hasUserCompletedAuth, userPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log)
+        hasUserCompletedAuth, userPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log, authRedirectUrl)
         if err != nil {
             log.Errorf("Error validating user '%s' auth: %s", userId, err)
             return events.LambdaFunctionURLResponse{
@@ -91,7 +94,7 @@ func ProcessPostbackEvent(
             }, err
         }
 
-        err = handleGenerateAiReply(event.ReplyToken, user, businessId, reviewId, businessDao, userDao, reviewDao, line, log)
+        err = handleGenerateAiReply(event.ReplyToken, user, businessId, reviewId, businessDao, userDao, reviewDao, line, log, gptApiKey)
         if err != nil {
             log.Errorf("Error handling /%s/GenerateAiReply: %s", dataSlice[0], err)
 

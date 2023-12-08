@@ -3,13 +3,17 @@ package main
 import (
     "context"
     "errors"
+    "github.com/IntelliLead/CoreCommonUtil/aws"
     "github.com/IntelliLead/CoreCommonUtil/constant"
     enum3 "github.com/IntelliLead/CoreCommonUtil/enum"
+    "github.com/IntelliLead/CoreCommonUtil/googleUtil"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
     "github.com/IntelliLead/CoreCommonUtil/metric"
     enum4 "github.com/IntelliLead/CoreCommonUtil/metric/enum"
     "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreCommonUtil/secretUtil"
+    "github.com/IntelliLead/CoreCommonUtil/ssmUtil"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
@@ -17,14 +21,12 @@ import (
     "github.com/IntelliLead/CoreDataAccess/exception"
     model2 "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/CoreDataAccess/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/slackUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "golang.org/x/oauth2"
     "google.golang.org/api/mybusinessaccountmanagement/v1"
@@ -37,7 +39,10 @@ func main() {
 }
 
 var (
-    log = logger.NewLogger()
+    log             = logger.NewLogger()
+    awsConfig       = aws.DefaultAwsConfig()
+    Secrets         = secretUtil.NewSecretUtil(awsConfig, log).GetSecrets()
+    authRedirectUrl = ssmUtil.NewSsm(awsConfig, log).GetSsmParameterValue(os.Getenv(constant.AuthRedirectUrlParameterNameEnvKey))
 )
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -95,16 +100,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // ----
     // 2. Initialize resources
     // ----
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-    if err != nil {
-        log.Error("Error loading AWS config: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
-    }
-    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
-    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(awsConfig), log)
+    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(awsConfig), log)
     line := lineUtil.NewLine(log)
 
-    google, err := googleUtil.NewGoogleWithAuthCode(log, code)
+    google, err := googleUtil.NewGoogleWithAuthCode(authRedirectUrl, Secrets.GoogleClientID, Secrets.GoogleClientSecret, log, code)
     if err != nil {
         err := line.SendMessage(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
         if err != nil {
@@ -181,7 +181,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // ----------------
     // Notify Slack channel of new business creation
     // ----------------
-    err = slackUtil.NewSlack(log, stage).SendNewUserOauthCompletionMessage(user, businesses)
+    err = slackUtil.NewSlack(log, stage, Secrets.SlackToken, Secrets.NewUserSlackBotChannelId).SendNewUserOauthCompletionMessage(user, businesses)
     if err != nil {
         log.Errorf("Error sending Slack message: %s", err)
         metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)

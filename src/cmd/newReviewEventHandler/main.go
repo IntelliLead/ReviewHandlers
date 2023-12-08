@@ -238,10 +238,6 @@ func removeGoogleTranslate(event *model.ZapierNewReviewEvent) {
     if event.Review == nil {
         return
     }
-    text := *event.Review
-
-    originalLine, translationFound := stringUtil.ExtractOriginalFromGoogleTranslate(text)
-    if translationFound {
-        event.Review = &originalLine
-    }
+    strippedText := stringUtil.StripGoogleTranslate(*event.Review)
+    event.Review = &strippedText
 }

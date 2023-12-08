@@ -24,8 +24,9 @@ func ValidateUserAuthOrRequestAuthTst(
     line *lineUtil.Line,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
+    authRedirectUrl string,
 ) (bool, *model.User, error) {
-    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, line, handlerName, log)
+    return ValidateUserAuthOrRequestAuth("TST", userId, userDao, line, handlerName, log, authRedirectUrl)
 }
 
 // ValidateUserAuthOrRequestAuth checks if the user has completed oauth.
@@ -41,12 +42,13 @@ func ValidateUserAuthOrRequestAuth(
     line *lineUtil.Line,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
+    authRedirectUrl string,
 ) (bool, *model.User, error) {
     hasUserCompletedOauth, user, err := ValidateUserAuth(userId, userDao, line, handlerName, log)
     if err != nil {
         var userDoesNotExistException *exception.UserDoesNotExistException
         if errors.As(err, &userDoesNotExistException) {
-            err = requestAuth(replyToken, userId, line, log)
+            err = requestAuth(replyToken, userId, line, log, authRedirectUrl)
             if err != nil {
                 metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
             }
@@ -59,7 +61,7 @@ func ValidateUserAuthOrRequestAuth(
 
     if !hasUserCompletedOauth {
         log.Info("User ", userId, " has not completed OAUTH. Sending auth request.")
-        err = requestAuth(replyToken, userId, line, log)
+        err = requestAuth(replyToken, userId, line, log, authRedirectUrl)
         if err != nil {
             metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
         }
@@ -75,13 +77,14 @@ func requestAuth(
     userId string,
     line *lineUtil.Line,
     log *zap.SugaredLogger,
+    authRedirectUrl string,
 ) error {
     // when testing in local, there is no replyToken, send to user instead of replying
     var err error
     if replyToken == "TST" {
-        err = line.SendAuthRequest(userId)
+        err = line.SendAuthRequest(userId, authRedirectUrl)
     } else {
-        err = line.ReplyAuthRequest(replyToken, userId)
+        err = line.ReplyAuthRequest(replyToken, userId, authRedirectUrl)
     }
     if err != nil {
         log.Errorf("Error replying auth request: %s", err)

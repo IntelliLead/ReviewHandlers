@@ -40,7 +40,9 @@ func ProcessMessageEvent(
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
-    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+    log *zap.SugaredLogger,
+    authRedirectUrl string,
+) (events.LambdaFunctionURLResponse, error) {
 
     // --------------------------------
     // validate is text message from user
@@ -95,7 +97,7 @@ func ProcessMessageEvent(
         log.Infof("Event requires auth. Validating user auth for user '%s'", userId)
 
         var hasUserAuthed bool
-        hasUserAuthed, userPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log)
+        hasUserAuthed, userPtr, err := auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log, authRedirectUrl)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,

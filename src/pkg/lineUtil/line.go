@@ -3,14 +3,15 @@ package lineUtil
 import (
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/aws"
     jsonUtil2 "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/metric"
     "github.com/IntelliLead/CoreCommonUtil/metric/enum"
+    "github.com/IntelliLead/CoreCommonUtil/secretUtil"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/CoreDataAccess/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     enum2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model/enum"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
@@ -401,13 +402,7 @@ func (l *Line) SendAiGeneratedReply(aiReply string, review model.Review, generat
     return nil
 }
 
-func (l *Line) SendAuthRequest(userId string) error {
-    authRedirectUrl, err := awsUtil.NewAws(l.log).GetAuthRedirectUrl()
-    if err != nil {
-        l.log.Error("Error getting auth redirect url in ReplyAuthRequest: ", err)
-        return err
-    }
-
+func (l *Line) SendAuthRequest(userId string, authRedirectUrl string) error {
     flexMessage, err := l.buildAuthRequestFlexMessage(userId, authRedirectUrl)
     if err != nil {
         l.log.Error("Error building flex message in RequestAuth: ", err)
@@ -424,13 +419,7 @@ func (l *Line) SendAuthRequest(userId string) error {
     return nil
 }
 
-func (l *Line) ReplyAuthRequest(replyToken string, userId string) error {
-    authRedirectUrl, err := awsUtil.NewAws(l.log).GetAuthRedirectUrl()
-    if err != nil {
-        l.log.Error("Error getting auth redirect url in ReplyAuthRequest: ", err)
-        return err
-    }
-
+func (l *Line) ReplyAuthRequest(replyToken string, userId string, authRedirectUrl string) error {
     flexMessage, err := l.buildAuthRequestFlexMessage(userId, authRedirectUrl)
     if err != nil {
         l.log.Error("Error building flex message in RequestAuth: ", err)
@@ -660,7 +649,7 @@ func convertToHttpRequest(request *events.LambdaFunctionURLRequest) *http.Reques
 }
 
 func newLineClient(log *zap.SugaredLogger) *linebot.Client {
-    secrets := awsUtil.NewAws(log).GetSecrets()
+    secrets := secretUtil.NewSecretUtil(aws.DefaultAwsConfig(), log).GetSecrets()
     lineClient, err := linebot.New(secrets.LineChannelSecret, secrets.LineChannelAccessToken)
     if err != nil {
         log.Fatal("cannot create new Line Client", err)

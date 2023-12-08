@@ -18,7 +18,9 @@ func ProcessFollowEvent(event *linebot.Event,
     userDao *ddbDao.UserDao,
     slack *slackUtil.Slack,
     line *lineUtil.Line,
-    log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
+    log *zap.SugaredLogger,
+    authRedirectUrl string,
+) (events.LambdaFunctionURLResponse, error) {
 
     if lineUtil.IsEventFromUser(event) == false {
         log.Info("Message is not from user. Ignoring event")
@@ -38,7 +40,7 @@ func ProcessFollowEvent(event *linebot.Event,
     log.Info("Successfully notified Slack channel of new user follow event")
 
     var hasUserAuthed bool
-    hasUserAuthed, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log)
+    hasUserAuthed, _, err = auth.ValidateUserAuthOrRequestAuth(event.ReplyToken, userId, userDao, line, enum.HandlerNameLineEventsHandler, log, authRedirectUrl)
     if err != nil {
         return events.LambdaFunctionURLResponse{
             StatusCode: 500,

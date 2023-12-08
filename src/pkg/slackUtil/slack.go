@@ -5,7 +5,6 @@ import (
     "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/timeUtil"
     "github.com/IntelliLead/CoreDataAccess/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/slack-go/slack"
     "go.uber.org/zap"
     "time"
@@ -23,9 +22,8 @@ type Slack struct {
     channelId string
 }
 
-func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
-    secrets := awsUtil.NewAws(logger).GetSecrets()
-    client := slack.New(secrets.SlackToken)
+func NewSlack(logger *zap.SugaredLogger, stage enum.Stage, slackToken string, newUserSlackBotChannelId string) *Slack {
+    client := slack.New(slackToken)
 
     // DEBUG: Test authentication
     // _, err := client.AuthTest()
@@ -38,7 +36,7 @@ func NewSlack(logger *zap.SugaredLogger, stage enum.Stage) *Slack {
         client:    client,
         log:       logger,
         stage:     stage,
-        channelId: secrets.NewUserSlackBotChannelId,
+        channelId: newUserSlackBotChannelId,
     }
 }
 

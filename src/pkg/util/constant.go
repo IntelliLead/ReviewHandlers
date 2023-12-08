@@ -21,9 +21,6 @@ func MoreMessage() string {
     return text + url + "\n我們將第一時間回覆。智引力感激您的支持！"
 }
 
-const AuthRedirectUrlParameterNameEnvKey = "AUTH_REDIRECT_URL_PARAMETER_NAME"
-const AuthRedirectUrlEnvKey = "AUTH_REDIRECT_URL"
-
 // message commands
 const UpdateQuickReplyMessageCmd = "quickReply"
 const UpdateBusinessDescriptionMessageCmd = "description"
@@ -84,4 +81,4 @@ const TestZapierReplyWebhook = "https://TST/"
 // stub userId for auto reply author
 const AutoReplyUserId = "autoReply"
 
-const AuthMetricNamespace = "IntelliLeadAuth/Metrics"
+const AuthMetricNamespace = "IntelliLeadAuth/DailyMetrics"

@@ -63,7 +63,9 @@ func handleGenerateAiReply(
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
     line *lineUtil.Line,
-    log *zap.SugaredLogger) error {
+    log *zap.SugaredLogger,
+    gptApiKey string,
+) error {
     userId := user.UserId
 
     // --------------------
@@ -110,7 +112,7 @@ func handleGenerateAiReply(
     // --------------------
     // invoke gpt4
     // --------------------
-    aiReply, err := aiUtil.NewAi(log).GenerateReply(*review.Review, business, user)
+    aiReply, err := aiUtil.NewAi(log, gptApiKey).GenerateReply(*review.Review, business, user)
     if err != nil {
         log.Errorf("Error invoking GPT to generate AI reply: %v", err)
         return err

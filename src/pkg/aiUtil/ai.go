@@ -7,7 +7,6 @@ import (
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/model"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/awsUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/cenkalti/backoff/v4"
     "github.com/sashabaranov/go-openai"
@@ -20,9 +19,9 @@ type Ai struct {
     log       *zap.SugaredLogger
 }
 
-func NewAi(logger *zap.SugaredLogger) *Ai {
+func NewAi(logger *zap.SugaredLogger, gptApiKey string) *Ai {
     return &Ai{
-        gptClient: newGptClient(logger),
+        gptClient: newGptClient(gptApiKey),
         log:       logger,
     }
 }
@@ -100,9 +99,8 @@ func (ai *Ai) GenerateReply(review string, business model.Business, user model.U
     return response.Choices[0].Message.Content, nil
 }
 
-func newGptClient(logger *zap.SugaredLogger) *openai.Client {
-    secrets := awsUtil.NewAws(logger).GetSecrets()
-    return openai.NewClient(secrets.GptApiKey)
+func newGptClient(gptApiKey string) *openai.Client {
+    return openai.NewClient(gptApiKey)
 }
 
 func (ai *Ai) buildPrompt(business model.Business, user model.User) string {
