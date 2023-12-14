@@ -1,6 +1,6 @@
 import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { StackCreationInfo, STAGE } from 'common-cdk';
+import { StackCreationInfo, STAGE, AUTH_REDIRECT_URL_PARAMETER_NAME } from 'common-cdk';
 import { FunctionUrlAuthType, LambdaInsightsVersion, LayerVersion, Tracing } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 import { DdbStack } from './ddb';
@@ -41,24 +41,22 @@ export class LambdaStack extends Stack {
         super(scope, id, props);
         this.props = props;
 
-        const authRedirectUrlParameterName = '/auth/authRedirectUrl';
-
         this.lambdaFunctions[LambdaHandlerName.LINE_EVENTS_HANDLER] = this.createWebhookHandler(
             LambdaHandlerName.LINE_EVENTS_HANDLER,
             {
-                AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+                AUTH_REDIRECT_URL_PARAMETER_NAME: AUTH_REDIRECT_URL_PARAMETER_NAME,
             }
         ).lambdaFn;
 
         this.lambdaFunctions[LambdaHandlerName.NEW_REVIEW_EVENT_HANDLER] = this.createWebhookHandler(
             LambdaHandlerName.NEW_REVIEW_EVENT_HANDLER,
             {
-                AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+                AUTH_REDIRECT_URL_PARAMETER_NAME: AUTH_REDIRECT_URL_PARAMETER_NAME,
             }
         ).lambdaFn;
 
         const authHandlerWebhook = this.createWebhookHandler(LambdaHandlerName.AUTH_HANDLER, {
-            AUTH_REDIRECT_URL_PARAMETER_NAME: authRedirectUrlParameterName,
+            AUTH_REDIRECT_URL_PARAMETER_NAME: AUTH_REDIRECT_URL_PARAMETER_NAME,
         });
         this.lambdaFunctions[LambdaHandlerName.AUTH_HANDLER] = authHandlerWebhook.lambdaFn;
 
@@ -67,7 +65,7 @@ export class LambdaStack extends Stack {
         // So instead we use SSM parameter store to store the auth redirect url and retrieve in runtime with Lambda extension
         // TODO: [INT-84] use Lambda extension to cache the value
         new StringParameter(this, 'authRedirectUrl', {
-            parameterName: authRedirectUrlParameterName,
+            parameterName: AUTH_REDIRECT_URL_PARAMETER_NAME,
             stringValue: authHandlerWebhook.functionUrl.url,
             description: 'The auth handler lambda function url, used as Google OAuth2 redirect url',
         });
