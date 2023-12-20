@@ -70,7 +70,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
 
     // LINE
-    line := lineUtil.NewLine(log)
+    line := lineUtil.NewLineUtil(secrets.LineChannelSecret, secrets.LineChannelAccessToken, log)
 
     // --------------------
     // parse message to LINE events
@@ -90,7 +90,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         lineEvents, err = line.ParseRequest(&request)
         if err != nil {
             // Log and return an error response
-            log.Error("Error parsing Line Event request:", err)
+            log.Error("Error parsing LineUtil Event request:", err)
             return events.LambdaFunctionURLResponse{
                 StatusCode: 400,
                 Body:       fmt.Sprintf(`{"error": "Failed to parse request: %s"}`, err),

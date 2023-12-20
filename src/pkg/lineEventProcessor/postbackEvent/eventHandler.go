@@ -62,7 +62,7 @@ func handleGenerateAiReply(
     businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger,
     gptApiKey string,
 ) error {
@@ -103,7 +103,7 @@ func handleGenerateAiReply(
     // --------------------
     // Notify user that AI is generating reply
     // --------------------
-    _, err = line.NotifyUserAiReplyGenerationInProgress(replyToken)
+    err = line.NotifyUserAiReplyGenerationInProgress(replyToken)
     if err != nil {
         log.Errorf("Error notifying user '%s' that AI is generating reply. Porceeding: %v", userId, err)
         return err

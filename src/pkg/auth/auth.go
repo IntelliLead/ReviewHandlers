@@ -21,7 +21,7 @@ import (
 func ValidateUserAuthOrRequestAuthTst(
     userId string,
     userDao *ddbDao.UserDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
     authRedirectUrl string,
@@ -39,7 +39,7 @@ func ValidateUserAuthOrRequestAuth(
     replyToken string,
     userId string,
     userDao *ddbDao.UserDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     handlerName enum2.HandlerName,
     log *zap.SugaredLogger,
     authRedirectUrl string,
@@ -75,7 +75,7 @@ func ValidateUserAuthOrRequestAuth(
 func requestAuth(
     replyToken string,
     userId string,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger,
     authRedirectUrl string,
 ) error {
@@ -96,9 +96,9 @@ func requestAuth(
 }
 
 // TODO: [INT-91] remove this check after LINE user info backfilling is done
-func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineUtil.Line, handlerName enum2.HandlerName, log *zap.SugaredLogger) {
+func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineUtil.LineUtil, handlerName enum2.HandlerName, log *zap.SugaredLogger) {
     if stringUtil.IsEmptyString(user.LineUsername) || stringUtil.IsEmptyString(user.LineProfilePictureUrl) || stringUtil.IsEmptyString(user.Language) {
-        lineGetUserResp, err := line.GetUser(user.UserId)
+        lineGetUserResp, err := line.Base.GetUser(user.UserId)
         if err != nil {
             log.Errorf("Error getting user info from LINE: %s", err)
             metric.EmitLambdaMetric(enum.Metric5xxError, handlerName.String(), 1)
@@ -144,7 +144,7 @@ func backfillLineUserInfo(user *model.User, userDao *ddbDao.UserDao, line *lineU
 func ValidateUserAuth(
     userId string,
     userDao *ddbDao.UserDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     handlerName enum2.HandlerName,
     logger *zap.SugaredLogger) (bool, model.User, error) {
     userPtr, err := userDao.GetUser(userId)

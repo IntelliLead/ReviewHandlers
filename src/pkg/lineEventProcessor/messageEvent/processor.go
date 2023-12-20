@@ -2,6 +2,8 @@ package messageEvent
 
 import (
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/metric"
+    enum2 "github.com/IntelliLead/CoreCommonUtil/metric/enum"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/CoreDataAccess/model"
@@ -39,7 +41,7 @@ func ProcessMessageEvent(
     businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger,
     authRedirectUrl string,
 ) (events.LambdaFunctionURLResponse, error) {
@@ -171,7 +173,7 @@ func ProcessMessageEvent(
     // --------------------------------
     switch cmd.Command[0] {
     case "h", "Help", "help", "幫助", "協助":
-        _, err := line.ReplyHelpMessage(event.ReplyToken)
+        err = line.ReplyHelpMessage(event.ReplyToken)
         if err != nil {
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
@@ -189,7 +191,7 @@ func ProcessMessageEvent(
         // validate message does not contain LINE emojis
         // --------------------------------
         if HasLineEmoji(lineTextMessage) {
-            _, err := line.NotifyUserCannotUseLineEmoji(event.ReplyToken)
+            err = line.NotifyUserCannotUseLineEmoji(event.ReplyToken)
             if err != nil {
                 log.Errorf("Error notifying user '%s' that LINE Emoji is not yet supported for quick reply: %v", userId, err)
                 return events.LambdaFunctionURLResponse{
@@ -209,15 +211,13 @@ func ProcessMessageEvent(
         business, err := handleUpdateQuickReplyMessage(businessId, quickReplyMessage, user.UserId, businessDao, log)
         if err != nil {
             log.Errorf("Error updating quick reply message '%s' for user '%s': %v", quickReplyMessage, userId, err)
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update quick reply message failed: %s"}`, err),
-                }, err
+            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "快速回覆訊息")
+            if notifyErr != nil {
+                log.Errorf("Failed to notify user of update quick reply message failed: %v", err)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully notified user of update quick reply message failed")
             }
-            log.Error("Successfully notified user of update quick reply message failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update quick reply message: %s"}`, err),
@@ -250,15 +250,17 @@ func ProcessMessageEvent(
         user, business, err := handleBusinessDescriptionUpdate(businessId, businessDescription, user, userDao, businessDao, log)
         if err != nil {
             log.Errorf("Error updating business description '%s' for user '%s': %v", businessDescription, userId, err)
-
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update business description failed: %s"}`, err),
-                }, err
+            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "主要業務")
+            if notifyErr != nil {
+                log.Errorf("Failed to notify user of update business description failed: %v", err)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully notified user of update business description failed")
             }
-            log.Error("Successfully notified user of update signature failed")
+            return events.LambdaFunctionURLResponse{
+                StatusCode: 500,
+                Body:       fmt.Sprintf(`{"error": "Failed to update business description: %s"}`, err),
+            }, err
         }
 
         // notify all other users of toggle (skip notifying self)
@@ -271,15 +273,14 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
-            _, err := line.ReplyUser(event.ReplyToken, "主要業務更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update business description success but show settings failed: %s"}`, err),
-                }, err
+            notifyErr := line.Base.ReplyText(event.ReplyToken, "主要業務更新成功，但顯示設定失敗，請稍後再試")
+            if notifyErr != nil {
+                errMsg := fmt.Sprintf(`{"error": "Failed to reply user of update business description success: %s"}`, notifyErr)
+                log.Error(errMsg)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully replied user of update business description success but show settings failed")
             }
-            log.Error("Successfully replied user of update business description success but show settings failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
@@ -300,15 +301,13 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error updating keywords '%s' for user '%s': %v", keywords, userId, err)
 
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
-            if err != nil {
-                log.Errorf("Failed to notify user of update keywords failed: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update keywords failed: %s"}`, err),
-                }, err
+            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "關鍵字")
+            if notifyErr != nil {
+                log.Errorf("Failed to notify user of update keywords failed: %v", notifyErr)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully notified user of update keywords failed")
             }
-            log.Error("Successfully notified user of update keywords failed")
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update keywords: %s"}`, err),
@@ -325,15 +324,13 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
-            _, err := line.ReplyUser(event.ReplyToken, "關鍵字更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                log.Errorf("Failed to reply user of update keywords success: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update keywords success: %s"}`, err),
-                }, err
+            notifyErr := line.Base.ReplyText(event.ReplyToken, "關鍵字更新成功，但顯示設定失敗，請稍後再試")
+            if notifyErr != nil {
+                log.Errorf("Failed to reply user of update keywords success: %v", notifyErr)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully replied user of update keywords success but show settings failed")
             }
-            log.Error("Successfully replied user of update keywords success but show settings failed")
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings : %s"}`, err),
@@ -352,16 +349,13 @@ func ProcessMessageEvent(
         updatedUser, err := handleUpdateSignature(user, signature, userDao, log)
         if err != nil {
             log.Errorf("Error updating signature '%s' for user '%s': %v", signature, userId, err)
-
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "簽名")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update signature failed: %s"}`, err),
-                }, err
+            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "簽名")
+            if notifyErr != nil {
+                log.Errorf("Failed to notify user of update signature failed: %v", err)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully notified user of update signature failed")
             }
-            log.Error("Successfully notified user of update signature failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update signature: %s"}`, err),
@@ -372,15 +366,13 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
-            _, err := line.ReplyUser(event.ReplyToken, "簽名更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update signature success: %s"}`, err),
-                }, err
+            notifyErr := line.Base.ReplyText(event.ReplyToken, "簽名更新成功，但顯示設定失敗，請稍後再試")
+            if notifyErr != nil {
+                log.Error("Failed to reply user of update signature success: ", notifyErr)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully replied user of update signature success but show settings failed")
             }
-            log.Error("Successfully replied user of update signature success but show settings failed")
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to show AI reply settings: %s"}`, err),
@@ -400,15 +392,13 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error updating service recommendation '%s' for user '%s': %v", serviceRecommendation, userId, err)
 
-            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "推薦業務")
-            if err != nil {
+            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "推薦業務")
+            if notifyErr != nil {
                 log.Errorf("Failed to notify user of update service recommendation failed: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to notify user of update service recommendation failed: %s"}`, err),
-                }, err
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully notified user of update service recommendation failed")
             }
-            log.Error("Successfully notified user of update service recommendation failed")
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Failed to update service recommendation: %s"}`, err),
@@ -419,13 +409,12 @@ func ProcessMessageEvent(
         if err != nil {
             log.Errorf("Error showing AI reply settings for user '%s': %v", userId, err)
 
-            _, err := line.ReplyUser(event.ReplyToken, "推薦更新成功，但顯示設定失敗，請稍後再試")
-            if err != nil {
-                log.Errorf("Failed to reply user of update service recommendation success: %v", err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Failed to reply user of update service recommendation success: %s"}`, err),
-                }, err
+            notifyErr := line.Base.ReplyText(event.ReplyToken, "推薦更新成功，但顯示設定失敗，請稍後再試")
+            if notifyErr != nil {
+                log.Error("Failed to reply user of update service recommendation success: ", notifyErr)
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Info("Successfully replied user of update service recommendation success but show settings failed")
             }
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,

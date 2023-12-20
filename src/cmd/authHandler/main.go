@@ -102,11 +102,11 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // ----
     businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(awsConfig), log)
     userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(awsConfig), log)
-    line := lineUtil.NewLine(log)
+    line := lineUtil.NewLineUtil(Secrets.LineChannelSecret, Secrets.LineChannelAccessToken, log)
 
     google, err := googleUtil.NewGoogleWithAuthCode(authRedirectUrl, Secrets.GoogleClientID, Secrets.GoogleClientSecret, log, code)
     if err != nil {
-        err := line.SendMessage(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
+        err = line.Base.SendText(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
         if err != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, err)
             metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
@@ -122,12 +122,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if err != nil {
         log.Error("Error checking if user exists: ", err)
 
-        err := line.SendMessage(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
-        if err != nil {
-            log.Errorf("Error sending LINE message to '%s': %s", userId, err)
+        notifyErr := line.Base.SendText(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
+        if notifyErr != nil {
+            log.Errorf("Error sending LINE message to '%s': %s", userId, notifyErr)
             metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
+        } else {
+            log.Infof("Successfully notified user '%s' of error", userId)
         }
-
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error checking if user exists"}`, StatusCode: 500}, err
     }
 
@@ -150,10 +151,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if err != nil {
         log.Errorf("Error updating businesses: %s", err)
 
-        lineSendErr := line.SendMessage(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
+        lineSendErr := line.Base.SendText(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
         if lineSendErr != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, lineSendErr)
             metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
+        } else {
+            log.Infof("Successfully notified user '%s' of error", userId)
         }
 
         return events.LambdaFunctionURLResponse{
@@ -166,10 +169,12 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     if err != nil {
         log.Errorf("Error updating user: %s", err)
 
-        lineSendErr := line.SendMessage(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
+        lineSendErr := line.Base.SendText(userId, "驗證失敗。請確認您有勾選授權智引力訪問您的商家訊息再重試！若已勾選，請聯繫客服。很抱歉為您造成不便。")
         if lineSendErr != nil {
             log.Errorf("Error sending LINE message to '%s': %s", userId, lineSendErr)
             metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
+        } else {
+            log.Infof("Successfully notified user '%s' of error", userId)
         }
 
         return events.LambdaFunctionURLResponse{
@@ -187,10 +192,13 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
     }
 
-    err = line.SendMessage(userId, "驗證成功。可以開始使用啦！")
+    err = line.Base.SendText(userId, "驗證成功。可以開始使用啦！")
     if err != nil {
         log.Errorf("Error sending LINE message to '%s': %s", userId, err)
-        metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)
+        return events.LambdaFunctionURLResponse{
+            StatusCode: 500,
+            Body:       `{"error": "Error sending LINE message"}`,
+        }, err
     }
 
     log.Info("Successfully finished lambda execution")
@@ -358,7 +366,7 @@ func updateUser(
     userPtr *model2.User,
     userDao *ddbDao.UserDao,
     google *googleUtil.GoogleClient,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
 ) (model2.User, error) {
     // get user info from Google
     googleUserInfo, err := google.GetGoogleUserInfo()
@@ -391,7 +399,7 @@ func updateUser(
     if userPtr == nil {
         log.Infof("User '%s' does not exist. Creating new user.", userId)
 
-        lineGetUserResp, err := line.GetUser(userId)
+        lineGetUserResp, err := line.Base.GetUser(userId)
         if err != nil {
             log.Errorf("Error retrieving user %s from LINE: %s", userId, err)
             return model2.User{}, err

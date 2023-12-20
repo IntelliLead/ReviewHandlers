@@ -5,11 +5,13 @@ import (
     "encoding/json"
     "errors"
     "fmt"
+    "github.com/IntelliLead/CoreCommonUtil/aws"
     "github.com/IntelliLead/CoreCommonUtil/constant"
     "github.com/IntelliLead/CoreCommonUtil/enum"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
     "github.com/IntelliLead/CoreCommonUtil/middleware"
+    "github.com/IntelliLead/CoreCommonUtil/secretUtil"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/CoreDataAccess/exception"
@@ -27,6 +29,12 @@ import (
     "github.com/google/uuid"
     "os"
     "strings"
+)
+
+var (
+    log       = logger.NewLogger()
+    awsConfig = aws.DefaultAwsConfig()
+    Secrets   = secretUtil.NewSecretUtil(awsConfig, log).GetSecrets()
 )
 
 func main() {
@@ -60,7 +68,8 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // initialize resources
     // --------------------
-    line := lineUtil.NewLine(log)
+    line := lineUtil.NewLineUtil(Secrets.LineChannelSecret, Secrets.LineChannelAccessToken, log)
+
     // DDB
     cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
     if err != nil {

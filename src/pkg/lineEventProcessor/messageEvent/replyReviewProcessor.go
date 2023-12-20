@@ -22,7 +22,7 @@ func ProcessReviewReplyMessage(
     reviewDao *ddbDao.ReviewDao,
     businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger) (events.LambdaFunctionURLResponse, error) {
 
     textMessage := event.Message.(*linebot.TextMessage)
@@ -35,7 +35,7 @@ func ProcessReviewReplyMessage(
     if err != nil {
         log.Error("Error parsing reply message:", err)
 
-        _, notifyUserErr := line.ReplyUserReplyFailedWithReason(event.ReplyToken, "", "格式有錯。請保留 ‘@’ 符號後的編號，並在空格後面輸入回覆內容。")
+        notifyUserErr := line.ReplyUserReplyFailedWithReason(event.ReplyToken, "", "格式有錯。請保留 ‘@’ 符號後的編號，並在空格後面輸入回覆內容。")
         if notifyUserErr != nil {
             log.Errorf("Error notifying reply failure to user '%s': %v", user.UserId, notifyUserErr)
             return events.LambdaFunctionURLResponse{
@@ -99,7 +99,7 @@ func ProcessReviewReplyMessage(
     // validate message does not contain LINE emojis
     // --------------------------------
     if HasLineEmoji(textMessage) {
-        _, err := line.ReplyUserReplyFailedWithReason(event.ReplyToken, review.ReviewerName,
+        err := line.ReplyUserReplyFailedWithReason(event.ReplyToken, review.ReviewerName,
             lineUtil.CannotUseLineEmojiMessage)
         if err != nil {
             log.Errorf("Error notifying reply failure for user '%s' for review '%s': %v",
@@ -123,7 +123,7 @@ func ProcessReviewReplyMessage(
     if err != nil {
         log.Errorf("Error handling replying '%s' to review '%s' for user '%s' business '%s': %v", jsonUtil.AnyToJson(reply.Message), review.ReviewId.String(), user.UserId, businessId, err)
 
-        _, notifyUserErr := line.ReplyUserReplyFailed(event.ReplyToken, review.ReviewerName, false)
+        notifyUserErr := line.ReplyUserReplyFailed(event.ReplyToken, review.ReviewerName, false)
         if notifyUserErr != nil {
             log.Errorf("Error notifying user '%s' reply failed for review '%s': %v", user.UserId, review.ReviewId.String(), notifyUserErr)
             return events.LambdaFunctionURLResponse{

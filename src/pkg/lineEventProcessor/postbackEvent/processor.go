@@ -29,7 +29,7 @@ func ProcessPostbackEvent(
     businessDao *ddbDao.BusinessDao,
     userDao *ddbDao.UserDao,
     reviewDao *ddbDao.ReviewDao,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger,
     authRedirectUrl string,
     gptApiKey string,
@@ -98,17 +98,13 @@ func ProcessPostbackEvent(
         if err != nil {
             log.Errorf("Error handling /%s/GenerateAiReply: %s", dataSlice[0], err)
 
-            _, err := line.NotifyUserAiReplyGenerationFailed(userId)
-            if err != nil {
+            notifyErr := line.NotifyUserAiReplyGenerationFailed(userId)
+            if notifyErr != nil {
                 log.Errorf("Error notifying user '%s' that AI reply generation failed: %v", userId, err)
-                return events.LambdaFunctionURLResponse{
-                    StatusCode: 500,
-                    Body:       fmt.Sprintf(`{"error": "Error notifying user that AI reply generation failed: %s"}`, err),
-                }, err
+                metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+            } else {
+                log.Infof("Successfully notified user '%s' that AI reply generation failed", userId)
             }
-
-            log.Errorf("Successfully notified user '%s' that AI reply generation failed", userId)
-
             return events.LambdaFunctionURLResponse{
                 StatusCode: 500,
                 Body:       fmt.Sprintf(`{"error": "Error handling /%s/GenerateAiReply: %s"}`, dataSlice[0], err),
@@ -166,12 +162,13 @@ func ProcessPostbackEvent(
                         if err != nil {
                             log.Errorf("Error handling emoji toggle: %s", err)
 
-                            _, err := line.NotifyUserUpdateFailed(event.ReplyToken, "Emoji AI 回覆")
-                            if err != nil {
+                            notifyErr := line.NotifyUserUpdateFailed(event.ReplyToken, "Emoji AI 回覆")
+                            if notifyErr != nil {
                                 log.Errorf("Error notifying user '%s' of update emoji enabled failed: %v", userId, err)
                                 metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+                            } else {
+                                log.Info("Successfully notified user of update emoji enabled failed")
                             }
-
                             return events.LambdaFunctionURLResponse{
                                 StatusCode: 500,
                                 Body:       fmt.Sprintf(`{"error": "Error handling emoji toggle: %s"}`, err),
@@ -184,7 +181,7 @@ func ProcessPostbackEvent(
                         if err != nil {
                             var signatureDoesNotExistException *exception.SignatureDoesNotExistException
                             if errors.As(err, &signatureDoesNotExistException) {
-                                _, err = line.ReplyUser(event.ReplyToken, "請先填寫簽名，才能開啟簽名功能")
+                                err = line.Base.ReplyText(event.ReplyToken, "請先填寫簽名，才能開啟簽名功能")
                                 if err != nil {
                                     log.Errorf("Error replying signature settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
@@ -208,7 +205,7 @@ func ProcessPostbackEvent(
 
                             var keywordConditionNotMetException *exception.KeywordConditionNotMetException
                             if errors.As(err, &keywordConditionNotMetException) {
-                                _, err = line.ReplyUser(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
+                                err = line.Base.ReplyText(event.ReplyToken, "請先填寫主要業務及關鍵字，才能開啟關鍵字回覆功能")
                                 if err != nil {
                                     log.Errorf("Error replying keyword settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
@@ -235,7 +232,7 @@ func ProcessPostbackEvent(
                         if err != nil {
                             var serviceRecommendationConditionNotMetException *exception.ServiceRecommendationConditionNotMetException
                             if errors.As(err, &serviceRecommendationConditionNotMetException) {
-                                _, err := line.ReplyUser(event.ReplyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
+                                err = line.Base.ReplyText(event.ReplyToken, "請先填寫推薦業務或主要業務欄位，才能開啟推薦其他業務功能")
                                 if err != nil {
                                     log.Errorf("Error replying service recommendation settings prompt message to user '%s': %v", userId, err)
                                     return events.LambdaFunctionURLResponse{
@@ -343,7 +340,7 @@ func ProcessPostbackEvent(
                 }
 
             case "Help":
-                _, err := line.ReplyHelpMessage(event.ReplyToken)
+                err = line.ReplyHelpMessage(event.ReplyToken)
                 if err != nil {
                     log.Errorf("Error replying help message to user '%s': %v", userId, err)
                     return events.LambdaFunctionURLResponse{
@@ -381,7 +378,7 @@ func ProcessPostbackEvent(
                             var autoQuickReplyConditionNotMetException *exception.AutoQuickReplyConditionNotMetException
                             if errors.As(err, &autoQuickReplyConditionNotMetException) {
                                 log.Warnf("Auto reply condition not met for user '%s': %v", userId, err)
-                                _, replyUserErr := line.ReplyUser(event.ReplyToken, "請先填寫快速回覆訊息，才能開啟自動回覆功能")
+                                replyUserErr := line.Base.ReplyText(event.ReplyToken, "請先填寫快速回覆訊息，才能開啟自動回覆功能")
                                 if replyUserErr != nil {
                                     log.Errorf("Error replying cannot enable auto quick reply prompt to user '%s': %v", userId, replyUserErr)
 
@@ -399,13 +396,13 @@ func ProcessPostbackEvent(
                             }
 
                             log.Errorf("Error handling auto quick reply toggle for user '%s': %v", userId, err)
-
-                            _, notifyUserErr := line.NotifyUserUpdateFailed(event.ReplyToken, "自動回覆")
+                            notifyUserErr := line.NotifyUserUpdateFailed(event.ReplyToken, "自動回覆")
                             if notifyUserErr != nil {
                                 log.Errorf("Error notifying user of updating auto quick reply enabled failed for user '%s': %v", userId, notifyUserErr)
                                 metric.EmitLambdaMetric(enum2.Metric5xxError, enum.HandlerNameLineEventsHandler.String(), 1)
+                            } else {
+                                log.Info("Successfully notified user of update auto quick reply enabled failed")
                             }
-
                             return events.LambdaFunctionURLResponse{
                                 StatusCode: 500,
                                 Body:       fmt.Sprintf(`{"error": "Error handling auto quick reply toggle: %s"}`, notifyUserErr),

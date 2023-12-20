@@ -60,7 +60,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     })
 
     // LINE
-    line := lineUtil.NewLine(log)
+    line := lineUtil.NewLineUtil(log)
 
     // --------------------
     // Add business to user during auth
@@ -165,7 +165,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // // const sendingUserId = "U6d5b2c34bbe084e22be8e30e68650992" // Jessie - IL Internal
     //
     //
-    // line := lineUtil.NewLine(log)
+    // line := lineUtil.NewLineUtil(log)
     // hasUserAuthed, user, business, err := auth.ValidateUserAuthOrRequestAuthTst(
     //     sendingUserId,
     //     userDao,
@@ -188,7 +188,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // --------------------
     // Send Auth Request
     // --------------------
-    // line := lineUtil.NewLine(log)
+    // line := lineUtil.NewLineUtil(log)
     //
     // // send auth request
     // const sendingUserId = "Ucc29292b212e271132cee980c58e94eb" // Shawn - IL Internal
@@ -228,7 +228,7 @@ func updateUser(
     userPtr *model.User,
     userDao *ddbDao.UserDao,
     google *googleUtil.GoogleClient,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
 ) (model.User, error) {
     // get user info from Google
     googleUserInfo, err := google.GetGoogleUserInfo()

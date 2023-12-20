@@ -74,13 +74,13 @@ type message struct {
 // buildQuickReplySettingsFlexMessageForMultiBusiness builds a LINE flex message for quick reply settings for multi-business
 // orderedBusinesses must be sorted by businessIdIndex (i.e., the order as appear in sorted user.BusinessIds)
 // activeBusinessId must be in orderedBusinesses
-func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
+func (l LineUtil) buildQuickReplySettingsFlexMessageForMultiBusiness(
     orderedBusinesses []model.Business,
     activeBusinessId bid.BusinessId,
 ) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettingsMultiBusiness)
     if err != nil {
-        l.log.Error("Error unmarshalling QuickReplySettingsMultiBusiness JSON: ", err)
+        log.Error("Error unmarshalling QuickReplySettingsMultiBusiness JSON: ", err)
         return nil, err
     }
 
@@ -93,7 +93,7 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
         }
     }
     if activeBusinessIndex == -1 {
-        l.log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
+        log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
         return nil, fmt.Errorf("activeBusinessId is not in orderedBusinesses: %s", activeBusinessId)
     }
 
@@ -158,7 +158,7 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
     // update other business bubbles
     otherBusinessBubbleTemplate, err := util2.DeepCopy(jsonMap["contents"].([]interface{})[1])
     if err != nil {
-        l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
+        log.Error("Error copying otherBusinessBubbleTemplate: ", err)
         return nil, err
     }
     // remove template as 2nd bubble
@@ -191,10 +191,10 @@ func (l *Line) buildQuickReplySettingsFlexMessageForMultiBusiness(
 }
 
 // buildQuickReplySettingsFlexMessage builds a LINE flex message for quick reply settings
-func (l *Line) buildQuickReplySettingsFlexMessage(business model.Business) (linebot.FlexContainer, error) {
+func (l LineUtil) buildQuickReplySettingsFlexMessage(business model.Business) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.quickReplyJsons.QuickReplySettings)
     if err != nil {
-        l.log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
+        log.Debug("Error unmarshalling QuickReplySettings JSON: ", err)
         return nil, err
     }
 
@@ -248,11 +248,11 @@ func (l *Line) buildQuickReplySettingsFlexMessage(business model.Business) (line
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int, businessName *string) (linebot.FlexContainer, error) {
+func (l LineUtil) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int, businessName *string) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
-        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
+        log.Debug("Error unmarshalling reviewMessage JSON: ", err)
         return nil, err
     }
 
@@ -281,7 +281,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     // update stars
     starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
     if err != nil {
-        l.log.Error("Error creating starRating JSON: ", err)
+        log.Error("Error creating starRating JSON: ", err)
         return nil, err
     }
 
@@ -294,7 +294,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     // update review time
     readableReviewTimestamp, err := timeUtil.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
-        l.log.Error("Error converting review timestamp to readable format: ", err)
+        log.Error("Error converting review timestamp to readable format: ", err)
         return nil, err
     }
 
@@ -325,7 +325,7 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     // update edit reply button
     urid, err := model2.NewUserReviewId(&businessIdIndex, review.ReviewId)
     if err != nil {
-        l.log.Error("Error creating UserReviewId: ", err)
+        log.Error("Error creating UserReviewId: ", err)
         return nil, err
     }
     replyMessagePrefix := fmt.Sprintf("@%s ", urid.String())
@@ -371,11 +371,11 @@ func (l *Line) buildReviewFlexMessage(review model.Review, quickReplyMessage str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (linebot.FlexContainer, error) {
+func (l LineUtil) buildReviewFlexMessageForUnauthedUser(review model.Review) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.reviewMessageJsons.ReviewMessage)
     if err != nil {
-        l.log.Debug("Error unmarshalling reviewMessage JSON: ", err)
+        log.Debug("Error unmarshalling reviewMessage JSON: ", err)
         return nil, err
     }
 
@@ -400,7 +400,7 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
     // update stars
     starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
     if err != nil {
-        l.log.Error("Error creating starRating JSON: ", err)
+        log.Error("Error creating starRating JSON: ", err)
         return nil, err
     }
 
@@ -413,7 +413,7 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
     // update review time
     readableReviewTimestamp, err := timeUtil.UtcToReadableTwTimestamp(review.ReviewLastUpdated)
     if err != nil {
-        l.log.Error("Error converting review timestamp to readable format: ", err)
+        log.Error("Error converting review timestamp to readable format: ", err)
         return nil, err
     }
 
@@ -445,10 +445,10 @@ func (l *Line) buildReviewFlexMessageForUnauthedUser(review model.Review) (lineb
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
+func (l LineUtil) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplyResult)
     if err != nil {
-        l.log.Debug("Error unmarshalling AiReplyResult JSON: ", err)
+        log.Debug("Error unmarshalling AiReplyResult JSON: ", err)
         return nil, err
     }
 
@@ -504,11 +504,11 @@ func (l *Line) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, orderedBusinesses []model.Business, activeBusinessId bid.BusinessId) (linebot.FlexContainer, error) {
+func (l LineUtil) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, orderedBusinesses []model.Business, activeBusinessId bid.BusinessId) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettingsMultiBusiness)
     if err != nil {
-        l.log.Fatal("Error unmarshalling AiReplySettingsMultiBusiness JSON: ", err)
+        log.Fatal("Error unmarshalling AiReplySettingsMultiBusiness JSON: ", err)
     }
 
     // find index of active business
@@ -520,7 +520,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
         }
     }
     if activeBusinessIndex == -1 {
-        l.log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
+        log.Error("Error finding active business index. activeBusinessId is not in orderedBusinesses: ", activeBusinessId)
         return nil, fmt.Errorf("activeBusinessId is not in orderedBusinesses: %s", activeBusinessId)
     }
 
@@ -722,7 +722,7 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
     // update other business bubbles
     otherBusinessBubbleTemplate, err := util2.DeepCopy(jsonMap["contents"].([]interface{})[1])
     if err != nil {
-        l.log.Error("Error copying otherBusinessBubbleTemplate: ", err)
+        log.Error("Error copying otherBusinessBubbleTemplate: ", err)
         return nil, err
     }
     // remove template as 2nd bubble
@@ -754,11 +754,11 @@ func (l *Line) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User, business model.Business) (linebot.FlexContainer, error) {
+func (l LineUtil) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User, business model.Business) (linebot.FlexContainer, error) {
     // Convert the original JSON to a map[string]interface{}
     jsonMap, err := jsonUtil.JsonToMap(l.aiReplyJsons.AiReplySettings)
     if err != nil {
-        l.log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
+        log.Fatal("Error unmarshalling QuickReplySettings JSON: ", err)
     }
 
     // true for single business
@@ -933,10 +933,10 @@ func (l *Line) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User,
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAuthRequestFlexMessage(userId string, authRedirectUrl string) (linebot.FlexContainer, error) {
+func (l LineUtil) buildAuthRequestFlexMessage(userId string, authRedirectUrl string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.authJsons.AuthRequest)
     if err != nil {
-        l.log.Debug("Error unmarshalling AuthRequest JSON: ", err)
+        log.Debug("Error unmarshalling AuthRequest JSON: ", err)
         return nil, err
     }
 
@@ -953,7 +953,7 @@ func (l *Line) buildAuthRequestFlexMessage(userId string, authRedirectUrl string
         return nil, err
     }
 
-    l.log.Debug("AuthRequest URI: ", uri)
+    log.Debug("AuthRequest URI: ", uri)
 
     jsonMap["footer"].
     (map[string]interface{})["contents"].([]interface{})[0].
@@ -981,27 +981,27 @@ func finalizeAuthUri(uri string, userId string, authRedirectUrl string) (string,
     return parsedURL.String(), nil
 }
 
-func (l *Line) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (linebot.FlexContainer, error) {
+func (l LineUtil) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (linebot.FlexContainer, error) {
     // Convert the map to LINE flex message
     // first convert back to json
     jsonBytes, err := json.Marshal(jsonMap)
     if err != nil {
-        l.log.Error("Error marshalling JSON: ", err)
+        log.Error("Error marshalling JSON: ", err)
         return nil, err
     }
     flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
     if err != nil {
-        l.log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
+        log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
         return nil, err
     }
 
     return flexContainer, nil
 }
 
-func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool, businessName string, businessIdIndex int) (linebot.FlexContainer, error) {
+func (l LineUtil) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool, businessName string, businessIdIndex int) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.ReviewReplied)
     if err != nil {
-        l.log.Debug("Error unmarshalling ReviewReplied JSON: ", err)
+        log.Debug("Error unmarshalling ReviewReplied JSON: ", err)
         return nil, err
     }
 
@@ -1066,10 +1066,10 @@ func (l *Line) buildReviewRepliedNotificationMessage(review model.Review, reply 
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
+func (l LineUtil) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.QuickReplySettingsUpdated)
     if err != nil {
-        l.log.Debug("Error unmarshalling QuickReplySettingsUpdated JSON: ", err)
+        log.Debug("Error unmarshalling QuickReplySettingsUpdated JSON: ", err)
         return nil, err
     }
 
@@ -1089,10 +1089,10 @@ func (l *Line) buildQuickReplySettingsUpdatedNotificationMessage(updaterName str
     return l.jsonMapToLineFlexContainer(jsonMap)
 }
 
-func (l *Line) buildAiReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
+func (l LineUtil) buildAiReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
     jsonMap, err := jsonUtil.JsonToMap(l.notificationJsons.AiReplySettingsUpdated)
     if err != nil {
-        l.log.Debug("Error unmarshalling AiReplySettingsUpdated JSON: ", err)
+        log.Debug("Error unmarshalling AiReplySettingsUpdated JSON: ", err)
         return nil, err
     }
 
@@ -1143,4 +1143,12 @@ func buildNumberRatingLineFlexTemplateJson(rating _type.NumberRating) ([]interfa
     }
 
     return stars, nil
+}
+
+func buildReplyFailedMessage(reviewerName string, isAutoReply bool) string {
+    if isAutoReply {
+        return fmt.Sprintf("自動回覆 %s 的評論失敗。很抱歉為您造成不便。", reviewerName)
+    } else {
+        return fmt.Sprintf("回覆 %s 的評論失敗，請稍後再試。很抱歉為您造成不便。", reviewerName)
+    }
 }

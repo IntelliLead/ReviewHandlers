@@ -17,7 +17,7 @@ import (
 func ProcessFollowEvent(event *linebot.Event,
     userDao *ddbDao.UserDao,
     slack *slackUtil.Slack,
-    line *lineUtil.Line,
+    line *lineUtil.LineUtil,
     log *zap.SugaredLogger,
     authRedirectUrl string,
 ) (events.LambdaFunctionURLResponse, error) {
