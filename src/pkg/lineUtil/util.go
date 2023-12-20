@@ -2,21 +2,18 @@ package lineUtil
 
 import (
     "encoding/json"
-    "errors"
     "fmt"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
+    "github.com/IntelliLead/CoreCommonUtil/line"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreCommonUtil/timeUtil"
     util2 "github.com/IntelliLead/CoreCommonUtil/util"
     "github.com/IntelliLead/CoreDataAccess/model"
-    _type "github.com/IntelliLead/CoreDataAccess/model/type"
     "github.com/IntelliLead/CoreDataAccess/model/type/bid"
-    jsonUtil2 "github.com/IntelliLead/ReviewHandlers/src/pkg/jsonUtil"
     model2 "github.com/IntelliLead/ReviewHandlers/src/pkg/model"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/util"
     "github.com/line/line-bot-sdk-go/v7/linebot"
     "net/url"
-    "strconv"
 )
 
 const CannotUseLineEmojiMessage = "暫不支援LINE Emoji，但是您可以考慮使用 Unicode emoji （比如👍🏻）。"
@@ -187,7 +184,7 @@ func (l LineUtil) buildQuickReplySettingsFlexMessageForMultiBusiness(
         jsonMap["contents"] = append(jsonMap["contents"].([]interface{}), otherBusinessJsonMap)
     }
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 // buildQuickReplySettingsFlexMessage builds a LINE flex message for quick reply settings
@@ -245,7 +242,7 @@ func (l LineUtil) buildQuickReplySettingsFlexMessage(business model.Business) (l
     (map[string]interface{})["action"].
     (map[string]interface{})["data"] = autoQuickReplyTogglePostbackData
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildReviewFlexMessage(review model.Review, quickReplyMessage string, businessId bid.BusinessId, businessIdIndex int, businessName *string) (linebot.FlexContainer, error) {
@@ -279,12 +276,11 @@ func (l LineUtil) buildReviewFlexMessage(review model.Review, quickReplyMessage 
     }
 
     // update stars
-    starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
+    starRatingJsonArr, err := review.NumberRating.FlexMessage(l.reviewMessageJsons.GoldStarIcon, l.reviewMessageJsons.GrayStarIcon)
     if err != nil {
         log.Error("Error creating starRating JSON: ", err)
         return nil, err
     }
-
     if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
@@ -368,7 +364,7 @@ func (l LineUtil) buildReviewFlexMessage(review model.Review, quickReplyMessage 
     }
 
     // Convert the map to LINE flex message
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildReviewFlexMessageForUnauthedUser(review model.Review) (linebot.FlexContainer, error) {
@@ -398,12 +394,11 @@ func (l LineUtil) buildReviewFlexMessageForUnauthedUser(review model.Review) (li
     }
 
     // update stars
-    starRatingJsonArr, err := buildNumberRatingLineFlexTemplateJson(review.NumberRating)
+    starRatingJsonArr, err := review.NumberRating.FlexMessage(l.reviewMessageJsons.GoldStarIcon, l.reviewMessageJsons.GrayStarIcon)
     if err != nil {
         log.Error("Error creating starRating JSON: ", err)
         return nil, err
     }
-
     if contents, ok := jsonMap["body"].(map[string]interface{})["contents"]; ok {
         if contentsArr, ok := contents.([]interface{}); ok {
             contentsArr[1].(map[string]interface{})["contents"] = starRatingJsonArr
@@ -442,7 +437,7 @@ func (l LineUtil) buildReviewFlexMessageForUnauthedUser(review model.Review) (li
     }
 
     // Convert the map to LINE flex message
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply string, generateAuthorName string, businessId bid.BusinessId, businessIdIndex int) (linebot.FlexContainer, error) {
@@ -501,7 +496,7 @@ func (l LineUtil) buildAiGeneratedReplyFlexMessage(review model.Review, aiReply 
     (map[string]interface{})["action"].
     (map[string]interface{})["data"] = fmt.Sprintf("/AiReply/GenerateAiReply/%s/%s", businessId, review.ReviewId.String())
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildAiReplySettingsFlexMessageForMultiBusiness(user model.User, orderedBusinesses []model.Business, activeBusinessId bid.BusinessId) (linebot.FlexContainer, error) {
@@ -751,7 +746,7 @@ func (l LineUtil) buildAiReplySettingsFlexMessageForMultiBusiness(user model.Use
         jsonMap["contents"] = append(jsonMap["contents"].([]interface{}), otherBusinessJsonMap)
     }
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildAiReplySettingsFlexMessageForSingleBusiness(user model.User, business model.Business) (linebot.FlexContainer, error) {
@@ -930,7 +925,7 @@ func (l LineUtil) buildAiReplySettingsFlexMessageForSingleBusiness(user model.Us
     (map[string]interface{})["contents"].([]interface{})[0].
     (map[string]interface{})["text"] = serviceRecommendation
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildAuthRequestFlexMessage(userId string, authRedirectUrl string) (linebot.FlexContainer, error) {
@@ -960,7 +955,7 @@ func (l LineUtil) buildAuthRequestFlexMessage(userId string, authRedirectUrl str
     (map[string]interface{})["action"].
     (map[string]interface{})["uri"] = uri
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func finalizeAuthUri(uri string, userId string, authRedirectUrl string) (string, error) {
@@ -979,23 +974,6 @@ func finalizeAuthUri(uri string, userId string, authRedirectUrl string) (string,
     parsedURL.RawQuery = queryParams.Encode()
 
     return parsedURL.String(), nil
-}
-
-func (l LineUtil) jsonMapToLineFlexContainer(jsonMap map[string]interface{}) (linebot.FlexContainer, error) {
-    // Convert the map to LINE flex message
-    // first convert back to json
-    jsonBytes, err := json.Marshal(jsonMap)
-    if err != nil {
-        log.Error("Error marshalling JSON: ", err)
-        return nil, err
-    }
-    flexContainer, err := linebot.UnmarshalFlexMessageJSON(jsonBytes)
-    if err != nil {
-        log.Error("Error occurred during linebot.UnmarshalFlexMessageJSON: ", err)
-        return nil, err
-    }
-
-    return flexContainer, nil
 }
 
 func (l LineUtil) buildReviewRepliedNotificationMessage(review model.Review, reply string, replierName string, isAutoReply bool, businessName string, businessIdIndex int) (linebot.FlexContainer, error) {
@@ -1063,7 +1041,7 @@ func (l LineUtil) buildReviewRepliedNotificationMessage(review model.Review, rep
     (map[string]interface{})["action"].
     (map[string]interface{})["fillInText"] = fmt.Sprintf("@%d|%s %s", businessIdIndex, review.ReviewId.String(), reply)
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildQuickReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
@@ -1086,7 +1064,7 @@ func (l LineUtil) buildQuickReplySettingsUpdatedNotificationMessage(updaterName 
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["text"] = updaterName
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func (l LineUtil) buildAiReplySettingsUpdatedNotificationMessage(updaterName string, businessName string) (linebot.FlexContainer, error) {
@@ -1109,40 +1087,7 @@ func (l LineUtil) buildAiReplySettingsUpdatedNotificationMessage(updaterName str
     (map[string]interface{})["contents"].([]interface{})[1].
     (map[string]interface{})["text"] = updaterName
 
-    return l.jsonMapToLineFlexContainer(jsonMap)
-}
-
-func buildNumberRatingLineFlexTemplateJson(rating _type.NumberRating) ([]interface{}, error) {
-    n := int(rating)
-    if n < 1 || n > 5 {
-        return nil, errors.New("invalid numberRating value: " + strconv.Itoa(n))
-    }
-
-    jsons := jsonUtil2.LoadReviewMessageLineFlexTemplateJsons()
-
-    goldStarJson, err := jsonUtil.JsonToMap(jsons.GoldStarIcon)
-    if err != nil {
-        return nil, err
-    }
-
-    grayStarJson, err := jsonUtil.JsonToMap(jsons.GrayStarIcon)
-    if err != nil {
-        return nil, err
-    }
-
-    stars := make([]interface{}, 5)
-
-    for i := 0; i < 5; i++ {
-        if i < n {
-            // Use goldStarJson for filled stars
-            stars[i] = goldStarJson
-        } else {
-            // Use grayStarJson for empty stars
-            stars[i] = grayStarJson
-        }
-    }
-
-    return stars, nil
+    return line.JsonMapToLineFlexContainer(jsonMap)
 }
 
 func buildReplyFailedMessage(reviewerName string, isAutoReply bool) string {
