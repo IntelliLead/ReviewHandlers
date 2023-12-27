@@ -41,7 +41,7 @@ func main() {
 var (
     log             = logger.NewLogger()
     awsConfig       = aws.DefaultAwsConfig()
-    Secrets         = secretUtil.NewSecretUtil(awsConfig, log).GetSecrets()
+    secrets         = secretUtil.NewSecretUtil(awsConfig, log).GetSecrets()
     authRedirectUrl = ssmUtil.NewSsm(awsConfig, log).GetSsmParameterValue(os.Getenv(constant.AuthRedirectUrlParameterNameEnvKey))
 )
 
@@ -102,9 +102,14 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // ----
     businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(awsConfig), log)
     userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(awsConfig), log)
-    line := lineUtil.NewLineUtil(Secrets.LineChannelSecret, Secrets.LineChannelAccessToken, log)
+    line := lineUtil.NewLineUtil(secrets.LineChannelSecret, secrets.LineChannelAccessToken, log)
 
-    google, err := googleUtil.NewGoogleWithAuthCode(authRedirectUrl, Secrets.GoogleClientID, Secrets.GoogleClientSecret, log, code)
+    google, err := googleUtil.NewGoogleWithAuthCode(
+        authRedirectUrl,
+        secrets.GoogleClientID,
+        secrets.GoogleClientSecret,
+        log,
+        code)
     if err != nil {
         err = line.Base.SendText(userId, "驗證失敗。請稍後再試。很抱歉問您造成不便！")
         if err != nil {
@@ -186,7 +191,7 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // ----------------
     // Notify Slack channel of new business creation
     // ----------------
-    err = slackUtil.NewSlack(log, stage, Secrets.SlackToken, Secrets.NewUserSlackBotChannelId).SendNewUserOauthCompletionMessage(user, businesses)
+    err = slackUtil.NewSlack(log, stage, secrets.SlackToken, secrets.NewUserSlackBotChannelId).SendNewUserOauthCompletionMessage(user, businesses)
     if err != nil {
         log.Errorf("Error sending Slack message: %s", err)
         metric.EmitLambdaMetric(enum4.Metric5xxError, enum2.HandlerNameAuthHandler.String(), 1)

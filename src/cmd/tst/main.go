@@ -3,9 +3,13 @@ package main
 import (
     "context"
     "errors"
+    "github.com/IntelliLead/CoreCommonUtil/aws"
     "github.com/IntelliLead/CoreCommonUtil/constant"
+    "github.com/IntelliLead/CoreCommonUtil/googleUtil"
     "github.com/IntelliLead/CoreCommonUtil/jsonUtil"
     "github.com/IntelliLead/CoreCommonUtil/logger"
+    "github.com/IntelliLead/CoreCommonUtil/secretUtil"
+    "github.com/IntelliLead/CoreCommonUtil/ssmUtil"
     "github.com/IntelliLead/CoreCommonUtil/stringUtil"
     "github.com/IntelliLead/CoreDataAccess/ddbDao"
     "github.com/IntelliLead/CoreDataAccess/ddbDao/dbModel"
@@ -13,7 +17,6 @@ import (
     "github.com/IntelliLead/CoreDataAccess/exception"
     "github.com/IntelliLead/CoreDataAccess/model"
     "github.com/IntelliLead/CoreDataAccess/model/type/bid"
-    "github.com/IntelliLead/ReviewHandlers/src/pkg/googleUtil"
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
@@ -29,7 +32,10 @@ func main() {
 }
 
 var (
-    log = logger.NewLogger()
+    log             = logger.NewLogger()
+    awsConfig       = aws.DefaultAwsConfig()
+    secrets         = secretUtil.NewSecretUtil(awsConfig, log).GetSecrets()
+    authRedirectUrl = ssmUtil.NewSsm(awsConfig, log).GetSsmParameterValue(os.Getenv(constant.AuthRedirectUrlParameterNameEnvKey))
 )
 
 func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
@@ -52,15 +58,20 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // Google
     // create time from string 2023-11-09T04:50:54.321673692Z
     expiryAt := time.Date(2023, 11, 9, 4, 50, 54, 321673692, time.UTC)
-    google, err := googleUtil.NewGoogleWithToken(log, oauth2.Token{
-        AccessToken:  "ya29.a0AfB_byDaC8AtuGPeSqCTL4nW3jZ3sI0eMVr7HuYj4nsCNspDO2KySlupWGiivASyY3_RvAXx6xhWkGRU_dnPuvhlxAJoeI85rZqYF4rA3AOlrvoNfL81nVfUz5kSQoL3RJYId6Y64eXkToW9qFJNPNJ6duASKbFcCHvcaCgYKAfwSARMSFQHGX2MiIEArtLyAMFQphxmqWp7v4g0171",
-        TokenType:    "Bearer",
-        RefreshToken: "1//0edf9T6I2HrFXCgYIARAAGA4SNwF-L9IrMg7RhxjSj-OAkqJMkDm0uYTAyuGvp6DXG8-HnSvjs5k01Cc1vqWg4mTutE7vj_h_MHo",
-        Expiry:       expiryAt,
-    })
+    google, err := googleUtil.NewGoogleWithToken(
+        authRedirectUrl,
+        secrets.GoogleClientID,
+        secrets.GoogleClientSecret,
+        log,
+        oauth2.Token{
+            AccessToken:  "ya29.a0AfB_byDaC8AtuGPeSqCTL4nW3jZ3sI0eMVr7HuYj4nsCNspDO2KySlupWGiivASyY3_RvAXx6xhWkGRU_dnPuvhlxAJoeI85rZqYF4rA3AOlrvoNfL81nVfUz5kSQoL3RJYId6Y64eXkToW9qFJNPNJ6duASKbFcCHvcaCgYKAfwSARMSFQHGX2MiIEArtLyAMFQphxmqWp7v4g0171",
+            TokenType:    "Bearer",
+            RefreshToken: "1//0edf9T6I2HrFXCgYIARAAGA4SNwF-L9IrMg7RhxjSj-OAkqJMkDm0uYTAyuGvp6DXG8-HnSvjs5k01Cc1vqWg4mTutE7vj_h_MHo",
+            Expiry:       expiryAt,
+        })
 
     // LINE
-    line := lineUtil.NewLineUtil(log)
+    line := lineUtil.NewLineUtil(secrets.LineChannelSecret, secrets.LineChannelAccessToken, log)
 
     // --------------------
     // Add business to user during auth
@@ -261,7 +272,7 @@ func updateUser(
     if userPtr == nil {
         log.Infof("User '%s' does not exist. Creating new user.", userId)
 
-        lineGetUserResp, err := line.GetUser(userId)
+        lineGetUserResp, err := line.Base.GetUser(userId)
         if err != nil {
             log.Errorf("Error retrieving user %s from LINE: %s", userId, err)
             return model.User{}, err
