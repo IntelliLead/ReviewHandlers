@@ -20,8 +20,6 @@ import (
     "github.com/IntelliLead/ReviewHandlers/src/pkg/lineUtil"
     "github.com/aws/aws-lambda-go/events"
     "github.com/aws/aws-lambda-go/lambda"
-    "github.com/aws/aws-sdk-go-v2/config"
-    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "golang.org/x/oauth2"
     "os"
     "time"
@@ -46,127 +44,132 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     // initialize resources
     // --------------------
     // DDB
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-    if err != nil {
-        log.Error("Error loading AWS config: ", err)
-        return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
-    }
-    businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
-    userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
+    // cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+    // if err != nil {
+    //     log.Error("Error loading AWS config: ", err)
+    //     return events.LambdaFunctionURLResponse{Body: `{"message": "Error loading AWS config"}`, StatusCode: 500}, nil
+    // }
+    // businessDao := ddbDao.NewBusinessDao(dynamodb.NewFromConfig(cfg), log)
+    // userDao := ddbDao.NewUserDao(dynamodb.NewFromConfig(cfg), log)
     // reviewDao := ddbDao.NewReviewDao(dynamodb.NewFromConfig(cfg), log)
 
     // Google
-    // create time from string 2023-11-09T04:50:54.321673692Z
-    expiryAt := time.Date(2023, 11, 9, 4, 50, 54, 321673692, time.UTC)
+    // Location: 蒜香豆幹
+    // create time from string 2023-12-11T11:03:05.820437781Z
+    expiryAt := time.Date(2023, 12, 11, 11, 3, 5, 820437781, time.UTC)
     google, err := googleUtil.NewGoogleWithToken(
         authRedirectUrl,
         secrets.GoogleClientID,
         secrets.GoogleClientSecret,
         log,
         oauth2.Token{
-            AccessToken:  "ya29.a0AfB_byDaC8AtuGPeSqCTL4nW3jZ3sI0eMVr7HuYj4nsCNspDO2KySlupWGiivASyY3_RvAXx6xhWkGRU_dnPuvhlxAJoeI85rZqYF4rA3AOlrvoNfL81nVfUz5kSQoL3RJYId6Y64eXkToW9qFJNPNJ6duASKbFcCHvcaCgYKAfwSARMSFQHGX2MiIEArtLyAMFQphxmqWp7v4g0171",
+            AccessToken:  "ya29.a0AfB_byDL6ceT7ponSPNtPdC3iZeZTr23Sjp8GNbAsZBuD5RjQTmRmMnUEYq-nBMigCKiXg1RWpP9sqfZd4UB7XkQRN15q1RpE7rtb0G9zIRLo3X2n8hKBXa6e5NWVsQVdcFh0jKsjTbUy995y-BLobX74hguabeVpxiJaCgYKAckSARISFQHGX2MigYiVeB6Q9I99JNAguTKS2A0171",
             TokenType:    "Bearer",
-            RefreshToken: "1//0edf9T6I2HrFXCgYIARAAGA4SNwF-L9IrMg7RhxjSj-OAkqJMkDm0uYTAyuGvp6DXG8-HnSvjs5k01Cc1vqWg4mTutE7vj_h_MHo",
+            RefreshToken: "1//0ep1o2HpKcyywCgYIARAAGA4SNwF-L9IrAyy-dC1L4LoDSUX1agZIfOca3D3sdc2n-ZOCjS5MWjD8ZjWqfv5mQPTIsRl7R0INwwg",
             Expiry:       expiryAt,
         })
 
     // LINE
-    line := lineUtil.NewLineUtil(secrets.LineChannelSecret, secrets.LineChannelAccessToken, log)
-
-    // --------------------
-    // Add business to user during auth
-    // --------------------
-    bid1, _ := bid.NewBusinessId("12251512170589559833") // IL
-    bid2, _ := bid.NewBusinessId("4496688115335717986")  // IL Internal
-    businessIds := []bid.BusinessId{bid1, bid2}
-    var businesses []model.Business
-    for _, businessId := range businessIds {
-        business, err := businessDao.GetBusiness(businessId)
-        if err != nil {
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 500,
-            }, err
-        }
-        if business == nil {
-            log.Errorf("Business %s does not exist", businessId)
-            return events.LambdaFunctionURLResponse{
-                StatusCode: 400,
-            }, err
-        }
-        businesses = append(businesses, *business)
-    }
-
-    userId := "Ucc29292b212e271132cee980c58e94eb"
-
-    businessAccountId := "106775638291982182570"
-
-    // get user
-    userPtr, err := userDao.GetUser(userId)
-    if err != nil {
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-        }, err
-    }
-
-    if err != nil {
-        return events.LambdaFunctionURLResponse{
-            StatusCode: 500,
-        }, err
-    }
-
-    user, err := updateUser(userId,
-        businesses,
-        businessAccountId,
-        userPtr,
-        userDao,
-        google,
-        line,
-    )
-    if err != nil {
-        return events.LambdaFunctionURLResponse{}, err
-    }
-
-    log.Infof("User updated: %s", jsonUtil.AnyToJson(user))
+    // line := lineUtil.NewLineUtil(secrets.LineChannelSecret, secrets.LineChannelAccessToken, log)
 
     // --------------------
     // Get all business locations
     // --------------------
-    // businessId := "accounts/108369004405812112145/locations/14318252560721528455"
-    // business, err := businessDao.GetBusiness(businessId)
+    // businessId, _ := bid.NewBusinessId("184164883650001245")
+    // businessPtr, err := businessDao.GetBusiness(businessId)
     // if err != nil {
     //     return events.LambdaFunctionURLResponse{
     //         StatusCode: 500,
     //     }, err
     // }
-    // if business == nil {
+    // if businessPtr == nil {
     //     log.Errorf("Business %s does not exist", businessId)
     //     return events.LambdaFunctionURLResponse{
     //         StatusCode: 400,
     //     }, err
     // }
     //
-    // log.Infof("Business retrieved is: %s", jsonUtil.AnyToJson(business))
-    //
-    // googleClient, err := googleUtil.NewGoogleWithToken(log, googleUtil.GoogleToToken(*business.Google))
+    // log.Infof("Business retrieved is: %s", jsonUtil.AnyToJson(businessPtr))
+
+    // accounts, err := google.ListBusinessAccounts()
     // if err != nil {
     //     return events.LambdaFunctionURLResponse{
     //         StatusCode: 500,
     //     }, err
     // }
+    // log.Info("Accounts retrieved: ", jsonUtil.AnyToJson(accounts))
     //
-    // accounts, err := googleClient.ListBusinessAccounts()
-    // if err != nil {
-    //     return events.LambdaFunctionURLResponse{
-    //         StatusCode: 500,
-    //     }, err
-    // }
-    // locations, err := googleClient.ListBusinessLocations(accounts[0])
+    // locations, err := google.ListBusinessLocations(accounts[0])
     // if err != nil {
     //     return events.LambdaFunctionURLResponse{
     //         StatusCode: 500,
     //     }, err
     // }
     // log.Info("Locations retrieved: ", jsonUtil.AnyToJson(locations))
+
+    locationId := "5746273854471781614"
+    startDate := time.Now().AddDate(-2, 10, -5)
+    log.Info("Start date: ", startDate)
+    dailyPerformanceMetrics, err := google.ListDailyPerformanceMetrics(locationId, startDate)
+    if err != nil {
+        return events.LambdaFunctionURLResponse{}, err
+    }
+    log.Info("Daily performance metrics retrieved: ", jsonUtil.AnyToJson(dailyPerformanceMetrics))
+
+    // --------------------
+    // Add business to user during auth
+    // --------------------
+    // bid1, _ := bid.NewBusinessId("12251512170589559833") // IL
+    // bid2, _ := bid.NewBusinessId("4496688115335717986")  // IL Internal
+    // businessIds := []bid.BusinessId{bid1, bid2}
+    // var businesses []model.Business
+    // for _, businessId := range businessIds {
+    //     business, err := businessDao.GetBusiness(businessId)
+    //     if err != nil {
+    //         return events.LambdaFunctionURLResponse{
+    //             StatusCode: 500,
+    //         }, err
+    //     }
+    //     if business == nil {
+    //         log.Errorf("Business %s does not exist", businessId)
+    //         return events.LambdaFunctionURLResponse{
+    //             StatusCode: 400,
+    //         }, err
+    //     }
+    //     businesses = append(businesses, *business)
+    // }
+    //
+    // userId := "Ucc29292b212e271132cee980c58e94eb"
+    //
+    // businessAccountId := "106775638291982182570"
+    //
+    // // get user
+    // userPtr, err := userDao.GetUser(userId)
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    //
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{
+    //         StatusCode: 500,
+    //     }, err
+    // }
+    //
+    // user, err := updateUser(userId,
+    //     businesses,
+    //     businessAccountId,
+    //     userPtr,
+    //     userDao,
+    //     google,
+    //     line,
+    // )
+    // if err != nil {
+    //     return events.LambdaFunctionURLResponse{}, err
+    // }
+    //
+    // log.Infof("User updated: %s", jsonUtil.AnyToJson(user))
 
     // --------------------
     // Check auth
