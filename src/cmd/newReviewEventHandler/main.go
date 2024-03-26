@@ -45,7 +45,6 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
     log := logger.NewLogger()
     stage := os.Getenv(constant.StageEnvKey)
     log.Infof("Received request in %s: %s", stage, jsonUtil.AnyToJson(request))
-
     // --------------------
     // parse request body
     // --------------------
@@ -96,48 +95,29 @@ func handleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
         log.Errorf("Error getting business '%s': %v", businessId, err)
         return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting business"}`, StatusCode: 500}, nil
     }
-
-    var review model.Review
     if businessPtr == nil {
-        log.Infof("Business '%s' does not exist.", businessId)
-
-        if stringUtil.IsEmptyStringPtr(event.UserId) {
-            log.Errorf("No business ID in event and no user ID in event. Unable to create new review")
-            return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event and no user ID in event"}`, StatusCode: 400}, nil
-        }
-        userId := *event.UserId
-
-        log.Infof("User %s has not completed oauth. Assigning its userId as review partition key", userId)
-
-        reviewId, err := reviewDao.GetNextReviewIDByUserId(userId)
-        if err != nil {
-            log.Errorf("Error getting next review id for user %s: %v", userId, err)
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
-        }
-
-        review, err = model.NewReview(userId, reviewId, event)
-        if err != nil {
-            log.Error("Validation error occurred during mapping to Review object: ", err)
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Validation error during mapping to Review object"}`, StatusCode: 400}, nil
-        }
-    } else {
-        business = *businessPtr
-
-        var reviewId rid.ReviewId
+        userId := ""
         if !stringUtil.IsEmptyStringPtr(event.UserId) {
-            reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), *event.UserId)
+            userId = *event.UserId
         } else {
-            reviewId, err = reviewDao.GetNextReviewID(business.BusinessId.String(), "stub_user_id")
+            log.Errorf("User ID not found in event.")
         }
-        if err != nil {
-            log.Errorf("Error getting next review id for business %s: %v", business.BusinessId, err)
-            return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
-        }
-
-        review, err = model.NewReview(business.BusinessId.String(), reviewId, event)
+        log.Errorf("Business '%s' does not exist for user '%s'", businessId, userId)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "No business ID in event."}`, StatusCode: 400}, nil
     }
 
-    // local testing: generate a new vendor review ID to prevent duplication
+    business = *businessPtr
+    var reviewId rid.ReviewId
+    reviewId, err = reviewDao.GenerateNextReviewID(business.BusinessId)
+    if err != nil {
+        log.Errorf("Error getting next review id for business %s: %v", business.BusinessId, err)
+        return events.LambdaFunctionURLResponse{Body: `{"message": "Error getting next review id"}`, StatusCode: 500}, nil
+    }
+
+    var review model.Review
+    review, err = model.NewReview(business.BusinessId.String(), reviewId, event)
+
+    // For local testing: generate a new vendor review ID to prevent duplication
     if stage == enum.StageLocal.String() {
         review.VendorReviewId = uuid.New().String()
     }
