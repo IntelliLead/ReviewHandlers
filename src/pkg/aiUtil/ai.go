@@ -38,7 +38,7 @@ func (ai *Ai) GenerateReply(review string, business model.Business, user model.U
             openai.ChatCompletionRequest{
                 Temperature: float32(temp),
                 MaxTokens:   512,
-                Model:       openai.GPT4,
+                Model:       openai.GPT4o,
                 Messages: []openai.ChatCompletionMessage{
                     {
                         Role:    openai.ChatMessageRoleSystem,

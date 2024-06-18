@@ -15,7 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/google/uuid v1.4.0
 	github.com/line/line-bot-sdk-go/v7 v7.21.0
-	github.com/sashabaranov/go-openai v1.17.9
+	github.com/sashabaranov/go-openai v1.25.0
 	github.com/slack-go/slack v0.12.3
 	go.uber.org/zap v1.26.0
 	golang.org/x/oauth2 v0.15.0
